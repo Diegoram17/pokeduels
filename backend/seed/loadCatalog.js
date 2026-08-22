@@ -34,12 +34,21 @@ export function mergeCatalog(data) {
 }
 
 /**
+ * Reads and parses the canonical seed file (root seed-data.json by default).
+ *
+ * @param {string} [filePath] path to seed-data.json
+ * @returns {object} parsed seed data (starters, catalog, type_effectiveness)
+ */
+export function readSeedData(filePath = DEFAULT_SEED_DATA_PATH) {
+  return JSON.parse(readFileSync(filePath, 'utf8'));
+}
+
+/**
  * Reads and merges the canonical seed file (root seed-data.json by default).
  *
  * @param {string} [filePath] path to seed-data.json
  * @returns {Array} merged pokemon entries
  */
 export function loadCatalogFromFile(filePath = DEFAULT_SEED_DATA_PATH) {
-  const data = JSON.parse(readFileSync(filePath, 'utf8'));
-  return mergeCatalog(data);
+  return mergeCatalog(readSeedData(filePath));
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeCatalog, loadCatalogFromFile, DEFAULT_SEED_DATA_PATH } from '../seed/loadCatalog.js';
+import { mergeCatalog, loadCatalogFromFile, readSeedData, DEFAULT_SEED_DATA_PATH } from '../seed/loadCatalog.js';
 
 const starters = [
   { name: 'Pikachu', type: 'electric', pokeapi_id: 25, is_starter: true },
@@ -41,5 +41,14 @@ describe('loadCatalogFromFile', () => {
 
   it('exposes a default path pointing at the repo-root seed-data.json', () => {
     expect(DEFAULT_SEED_DATA_PATH.endsWith('seed-data.json')).toBe(true);
+  });
+});
+
+describe('readSeedData', () => {
+  it('parses the canonical root seed-data.json with catalog and sparse effectiveness', () => {
+    const data = readSeedData();
+    expect(data.starters).toHaveLength(4);
+    expect(data.catalog).toHaveLength(50);
+    expect(data.type_effectiveness).toHaveLength(120);
   });
 });
