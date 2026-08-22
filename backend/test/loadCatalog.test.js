@@ -52,3 +52,11 @@ describe('readSeedData', () => {
     expect(data.type_effectiveness).toHaveLength(120);
   });
 });
+
+describe('pokeapi_id uniqueness (regression: Tyranitar-Dark once collided with Weavile at 461)', () => {
+  it('has no duplicate pokeapi_id across all 54 starters + catalog entries', () => {
+    const rows = loadCatalogFromFile();
+    const ids = rows.map((p) => p.pokeapi_id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
