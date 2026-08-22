@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import type { DuelPokemonState } from '../state/schema'
 import type { MoveIndex } from '../engine/damage'
@@ -281,6 +281,7 @@ function DuelBoardScreen() {
   const [timeoutNotice, setTimeoutNotice] = useState(false)
   const [showSurrender, setShowSurrender] = useState(false)
   const { duel } = state
+  const navigate = useNavigate()
 
   if (!duel) {
     return <Navigate to="/wait-room" replace />
@@ -289,6 +290,14 @@ function DuelBoardScreen() {
   const humanActive = humanActivePokemon(state)
   const rivalActive = rivalActivePokemon(state)
   const canAct = duel.phase === 'awaiting_actions' && Boolean(humanActive) && Boolean(rivalActive)
+
+  // KO detection: the engine flips the duel to awaiting_switch when the human
+  // active faints with bench remaining — send the player to the forced swap.
+  useEffect(() => {
+    if (duel.phase === 'awaiting_switch') {
+      navigate('/swap?mode=forced', { replace: true })
+    }
+  }, [duel.phase, navigate])
 
   const handleTimeout = useCallback(() => {
     setTimeoutNotice(true)
@@ -383,7 +392,22 @@ function DuelBoardScreen() {
             {TIMEOUT_NOTICE}
           </p>
         )}
-        <MoveButtonGrid disabled={!canAct} onAttack={handleAttack} />
+        <div style={{ display: 'flex', gap: 16, flex: 1, flexDirection: 'column' }}>
+          <MoveButtonGrid disabled={!canAct} onAttack={handleAttack} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              className="pd-btn pd-btn--secondary"
+              disabled={!canAct}
+              onClick={() => navigate('/swap?mode=voluntary')}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                swap_horiz
+              </span>
+              CAMBIAR POKÉMON
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

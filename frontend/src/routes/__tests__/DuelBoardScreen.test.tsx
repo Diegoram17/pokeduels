@@ -4,7 +4,7 @@ import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useSearchParams } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
 import type { MockStateActions } from '../../state/useMockState'
@@ -32,9 +32,10 @@ function DuelPhaseProbe() {
 
 function SwapModeProbe() {
   const [state] = useMockState()
+  const [params] = useSearchParams()
   return (
     <span data-testid="swap-probe">
-      mode:{new URLSearchParams(window.location.search).get('mode') ?? 'none'}
+      mode:{params.get('mode') ?? 'none'}
       |active:{state.duelPokemonState.find((p) => p.isActive)?.pokemonId ?? 'none'}
     </span>
   )
@@ -53,16 +54,14 @@ function renderDuelBoard(seed?: (actions: MockStateActions) => void) {
     <MockStateProvider>
       <MemoryRouter initialEntries={['/duel']}>
         <SeedProbe seed={seed} />
+        <DuelPhaseProbe />
         <Routes>
           <Route
             path="/duel"
             element={
-              <>
-                <WaitForDuel>
-                  <DuelBoardScreen />
-                </WaitForDuel>
-                <DuelPhaseProbe />
-              </>
+              <WaitForDuel>
+                <DuelBoardScreen />
+              </WaitForDuel>
             }
           />
           <Route
@@ -180,6 +179,36 @@ describe('DuelBoardScreen — surrender', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByTestId('duel-probe').textContent).toContain('phase:finished')
     expect(screen.getByTestId('duel-probe').textContent).toContain('winner:bot')
+  })
+})
+
+describe('DuelBoardScreen — swap navigation', () => {
+  it('opens the swap screen in voluntary mode when the player clicks cambiar pokemon', async () => {
+    const user = userEvent.setup()
+    renderDuelBoard(seed1v1Duel)
+
+    await user.click(screen.getByRole('button', { name: /cambiar pokémon/i }))
+
+    expect(screen.getByText('SWAP-LANDED')).toBeInTheDocument()
+    expect(screen.getByTestId('swap-probe').textContent).toContain('mode:voluntary')
+    // The duel is untouched: still awaiting actions with the human active out.
+    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
+  })
+
+  it('navigates to the swap screen in forced mode when the active pokemon faints', async () => {
+    // Deterministic bot: move 0 (25% damage) on every response.
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const user = userEvent.setup()
+    renderDuelBoard(seed1v1Duel)
+
+    // Four exchanges drop the human active to 0 HP; the KO forces the swap.
+    for (let i = 0; i < 4; i++) {
+      await user.click(screen.getByRole('button', { name: /ataque básico/i }))
+    }
+
+    expect(screen.getByText('SWAP-LANDED')).toBeInTheDocument()
+    expect(screen.getByTestId('swap-probe').textContent).toContain('mode:forced')
+    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_switch')
   })
 })
 
