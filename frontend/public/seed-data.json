@@ -1,0 +1,519 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Seed data para juego de duelos tipo Pokémon",
+    "total_starters": 4,
+    "total_catalog": 50,
+    "notes": [
+      "Gyarados asignado como 'flying' (canónico: water/flying) para reforzar cobertura de Volador",
+      "Lugias asignado como 'flying' (canónico: psychic/flying) para reforzar cobertura de Volador",
+      "Onix asignado como 'rock' (canónico: rock/ground) para equilibrar Roca y Tierra",
+      "Snorlax asignado como 'normal' (canónico: normal) - se mantiene puro",
+      "Gengar asignado como 'ghost' (canónico: ghost/poison) para reforzar Fantasma"
+    ]
+  },
+  "starters": [
+    {
+      "name": "Pikachu",
+      "type": "electric",
+      "pokeapi_id": 25,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png",
+      "is_starter": true
+    },
+    {
+      "name": "Bulbasaur",
+      "type": "grass",
+      "pokeapi_id": 1,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png",
+      "is_starter": true
+    },
+    {
+      "name": "Squirtle",
+      "type": "water",
+      "pokeapi_id": 7,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png",
+      "is_starter": true
+    },
+    {
+      "name": "Charmander",
+      "type": "fire",
+      "pokeapi_id": 4,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png",
+      "is_starter": true
+    }
+  ],
+  "catalog": [
+    {
+      "name": "Snorlax",
+      "type": "normal",
+      "pokeapi_id": 143,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/143.png",
+      "is_starter": false
+    },
+    {
+      "name": "Eevee",
+      "type": "normal",
+      "pokeapi_id": 133,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/133.png",
+      "is_starter": false
+    },
+    {
+      "name": "Charizard",
+      "type": "fire",
+      "pokeapi_id": 6,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png",
+      "is_starter": false
+    },
+    {
+      "name": "Arcanine",
+      "type": "fire",
+      "pokeapi_id": 59,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/59.png",
+      "is_starter": false
+    },
+    {
+      "name": "Blastoise",
+      "type": "water",
+      "pokeapi_id": 9,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/9.png",
+      "is_starter": false
+    },
+    {
+      "name": "Lapras",
+      "type": "water",
+      "pokeapi_id": 131,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/131.png",
+      "is_starter": false
+    },
+    {
+      "name": "Raichu",
+      "type": "electric",
+      "pokeapi_id": 26,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/26.png",
+      "is_starter": false
+    },
+    {
+      "name": "Zapdos",
+      "type": "electric",
+      "pokeapi_id": 145,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/145.png",
+      "is_starter": false
+    },
+    {
+      "name": "Venusaur",
+      "type": "grass",
+      "pokeapi_id": 3,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/3.png",
+      "is_starter": false
+    },
+    {
+      "name": "Sceptile",
+      "type": "grass",
+      "pokeapi_id": 254,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/254.png",
+      "is_starter": false
+    },
+    {
+      "name": "Gengar",
+      "type": "ghost",
+      "pokeapi_id": 94,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/94.png",
+      "is_starter": false
+    },
+    {
+      "name": "Mimikyu",
+      "type": "ghost",
+      "pokeapi_id": 778,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/778.png",
+      "is_starter": false
+    },
+    {
+      "name": "Machamp",
+      "type": "fighting",
+      "pokeapi_id": 68,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/68.png",
+      "is_starter": false
+    },
+    {
+      "name": "Lucario",
+      "type": "fighting",
+      "pokeapi_id": 448,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/448.png",
+      "is_starter": false
+    },
+    {
+      "name": "Nidoking",
+      "type": "poison",
+      "pokeapi_id": 34,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/34.png",
+      "is_starter": false
+    },
+    {
+      "name": "Crobat",
+      "type": "poison",
+      "pokeapi_id": 169,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/169.png",
+      "is_starter": false
+    },
+    {
+      "name": "Garchomp",
+      "type": "ground",
+      "pokeapi_id": 445,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/445.png",
+      "is_starter": false
+    },
+    {
+      "name": "Rhydon",
+      "type": "ground",
+      "pokeapi_id": 112,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/112.png",
+      "is_starter": false
+    },
+    {
+      "name": "Pidgeot",
+      "type": "flying",
+      "pokeapi_id": 18,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/18.png",
+      "is_starter": false
+    },
+    {
+      "name": "Gyarados",
+      "type": "flying",
+      "pokeapi_id": 130,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/130.png",
+      "is_starter": false
+    },
+    {
+      "name": "Lugia",
+      "type": "flying",
+      "pokeapi_id": 249,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/249.png",
+      "is_starter": false
+    },
+    {
+      "name": "Mewtwo",
+      "type": "psychic",
+      "pokeapi_id": 150,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/150.png",
+      "is_starter": false
+    },
+    {
+      "name": "Alakazam",
+      "type": "psychic",
+      "pokeapi_id": 65,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/65.png",
+      "is_starter": false
+    },
+    {
+      "name": "Gardevoir",
+      "type": "psychic",
+      "pokeapi_id": 282,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/282.png",
+      "is_starter": false
+    },
+    {
+      "name": "Scyther",
+      "type": "bug",
+      "pokeapi_id": 123,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/123.png",
+      "is_starter": false
+    },
+    {
+      "name": "Butterfree",
+      "type": "bug",
+      "pokeapi_id": 12,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/12.png",
+      "is_starter": false
+    },
+    {
+      "name": "Heracross",
+      "type": "bug",
+      "pokeapi_id": 214,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/214.png",
+      "is_starter": false
+    },
+    {
+      "name": "Tyranitar",
+      "type": "rock",
+      "pokeapi_id": 248,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/248.png",
+      "is_starter": false
+    },
+    {
+      "name": "Onix",
+      "type": "rock",
+      "pokeapi_id": 95,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/95.png",
+      "is_starter": false
+    },
+    {
+      "name": "Aerodactyl",
+      "type": "rock",
+      "pokeapi_id": 142,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/142.png",
+      "is_starter": false
+    },
+    {
+      "name": "Dragonite",
+      "type": "dragon",
+      "pokeapi_id": 149,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/149.png",
+      "is_starter": false
+    },
+    {
+      "name": "Rayquaza",
+      "type": "dragon",
+      "pokeapi_id": 384,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/384.png",
+      "is_starter": false
+    },
+    {
+      "name": "Umbreon",
+      "type": "dark",
+      "pokeapi_id": 197,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/197.png",
+      "is_starter": false
+    },
+    {
+      "name": "Tyranitar-Dark",
+      "type": "dark",
+      "pokeapi_id": 461,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/461.png",
+      "is_starter": false
+    },
+    {
+      "name": "Darkrai",
+      "type": "dark",
+      "pokeapi_id": 491,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/491.png",
+      "is_starter": false
+    },
+    {
+      "name": "Steelix",
+      "type": "steel",
+      "pokeapi_id": 208,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/208.png",
+      "is_starter": false
+    },
+    {
+      "name": "Scizor",
+      "type": "steel",
+      "pokeapi_id": 212,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/212.png",
+      "is_starter": false
+    },
+    {
+      "name": "Metagross",
+      "type": "steel",
+      "pokeapi_id": 376,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/376.png",
+      "is_starter": false
+    },
+    {
+      "name": "Sylveon",
+      "type": "fairy",
+      "pokeapi_id": 700,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/700.png",
+      "is_starter": false
+    },
+    {
+      "name": "Togekiss",
+      "type": "fairy",
+      "pokeapi_id": 468,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/468.png",
+      "is_starter": false
+    },
+    {
+      "name": "Jigglypuff",
+      "type": "fairy",
+      "pokeapi_id": 39,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/39.png",
+      "is_starter": false
+    },
+    {
+      "name": "Articuno",
+      "type": "ice",
+      "pokeapi_id": 144,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/144.png",
+      "is_starter": false
+    },
+    {
+      "name": "Lapras-Ice",
+      "type": "ice",
+      "pokeapi_id": 471,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/471.png",
+      "is_starter": false
+    },
+    {
+      "name": "Mamoswine",
+      "type": "ice",
+      "pokeapi_id": 473,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/473.png",
+      "is_starter": false
+    },
+    {
+      "name": "Greninja",
+      "type": "water",
+      "pokeapi_id": 658,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/658.png",
+      "is_starter": false
+    },
+    {
+      "name": "Porygon-Z",
+      "type": "normal",
+      "pokeapi_id": 474,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/474.png",
+      "is_starter": false
+    },
+    {
+      "name": "Blaziken",
+      "type": "fire",
+      "pokeapi_id": 257,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/257.png",
+      "is_starter": false
+    },
+    {
+      "name": "Salamence",
+      "type": "dragon",
+      "pokeapi_id": 373,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/373.png",
+      "is_starter": false
+    },
+    {
+      "name": "Mew",
+      "type": "psychic",
+      "pokeapi_id": 151,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/151.png",
+      "is_starter": false
+    },
+    {
+      "name": "Weavile",
+      "type": "dark",
+      "pokeapi_id": 461,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/461.png",
+      "is_starter": false
+    }
+  ],
+  "type_effectiveness": [
+    {"attacking_type": "normal", "defending_type": "rock", "multiplier": 0.5},
+    {"attacking_type": "normal", "defending_type": "ghost", "multiplier": 0.5},
+    {"attacking_type": "normal", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "fire", "defending_type": "fire", "multiplier": 0.5},
+    {"attacking_type": "fire", "defending_type": "water", "multiplier": 0.5},
+    {"attacking_type": "fire", "defending_type": "grass", "multiplier": 2.0},
+    {"attacking_type": "fire", "defending_type": "ice", "multiplier": 2.0},
+    {"attacking_type": "fire", "defending_type": "bug", "multiplier": 2.0},
+    {"attacking_type": "fire", "defending_type": "rock", "multiplier": 0.5},
+    {"attacking_type": "fire", "defending_type": "dragon", "multiplier": 0.5},
+    {"attacking_type": "fire", "defending_type": "steel", "multiplier": 2.0},
+    {"attacking_type": "water", "defending_type": "fire", "multiplier": 2.0},
+    {"attacking_type": "water", "defending_type": "water", "multiplier": 0.5},
+    {"attacking_type": "water", "defending_type": "grass", "multiplier": 0.5},
+    {"attacking_type": "water", "defending_type": "ground", "multiplier": 2.0},
+    {"attacking_type": "water", "defending_type": "rock", "multiplier": 2.0},
+    {"attacking_type": "water", "defending_type": "dragon", "multiplier": 0.5},
+    {"attacking_type": "electric", "defending_type": "water", "multiplier": 2.0},
+    {"attacking_type": "electric", "defending_type": "electric", "multiplier": 0.5},
+    {"attacking_type": "electric", "defending_type": "grass", "multiplier": 0.5},
+    {"attacking_type": "electric", "defending_type": "ground", "multiplier": 0.5},
+    {"attacking_type": "electric", "defending_type": "flying", "multiplier": 2.0},
+    {"attacking_type": "electric", "defending_type": "dragon", "multiplier": 0.5},
+    {"attacking_type": "grass", "defending_type": "fire", "multiplier": 0.5},
+    {"attacking_type": "grass", "defending_type": "water", "multiplier": 2.0},
+    {"attacking_type": "grass", "defending_type": "grass", "multiplier": 0.5},
+    {"attacking_type": "grass", "defending_type": "poison", "multiplier": 0.5},
+    {"attacking_type": "grass", "defending_type": "ground", "multiplier": 2.0},
+    {"attacking_type": "grass", "defending_type": "flying", "multiplier": 0.5},
+    {"attacking_type": "grass", "defending_type": "bug", "multiplier": 0.5},
+    {"attacking_type": "grass", "defending_type": "rock", "multiplier": 2.0},
+    {"attacking_type": "grass", "defending_type": "dragon", "multiplier": 0.5},
+    {"attacking_type": "grass", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "ice", "defending_type": "fire", "multiplier": 0.5},
+    {"attacking_type": "ice", "defending_type": "water", "multiplier": 0.5},
+    {"attacking_type": "ice", "defending_type": "grass", "multiplier": 2.0},
+    {"attacking_type": "ice", "defending_type": "ice", "multiplier": 0.5},
+    {"attacking_type": "ice", "defending_type": "ground", "multiplier": 2.0},
+    {"attacking_type": "ice", "defending_type": "flying", "multiplier": 2.0},
+    {"attacking_type": "ice", "defending_type": "dragon", "multiplier": 2.0},
+    {"attacking_type": "ice", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "fighting", "defending_type": "normal", "multiplier": 2.0},
+    {"attacking_type": "fighting", "defending_type": "ice", "multiplier": 2.0},
+    {"attacking_type": "fighting", "defending_type": "poison", "multiplier": 0.5},
+    {"attacking_type": "fighting", "defending_type": "flying", "multiplier": 0.5},
+    {"attacking_type": "fighting", "defending_type": "psychic", "multiplier": 0.5},
+    {"attacking_type": "fighting", "defending_type": "bug", "multiplier": 0.5},
+    {"attacking_type": "fighting", "defending_type": "rock", "multiplier": 2.0},
+    {"attacking_type": "fighting", "defending_type": "ghost", "multiplier": 0.5},
+    {"attacking_type": "fighting", "defending_type": "dark", "multiplier": 2.0},
+    {"attacking_type": "fighting", "defending_type": "steel", "multiplier": 2.0},
+    {"attacking_type": "fighting", "defending_type": "fairy", "multiplier": 0.5},
+    {"attacking_type": "poison", "defending_type": "grass", "multiplier": 2.0},
+    {"attacking_type": "poison", "defending_type": "poison", "multiplier": 0.5},
+    {"attacking_type": "poison", "defending_type": "ground", "multiplier": 0.5},
+    {"attacking_type": "poison", "defending_type": "rock", "multiplier": 0.5},
+    {"attacking_type": "poison", "defending_type": "ghost", "multiplier": 0.5},
+    {"attacking_type": "poison", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "poison", "defending_type": "fairy", "multiplier": 2.0},
+    {"attacking_type": "ground", "defending_type": "fire", "multiplier": 2.0},
+    {"attacking_type": "ground", "defending_type": "electric", "multiplier": 2.0},
+    {"attacking_type": "ground", "defending_type": "grass", "multiplier": 0.5},
+    {"attacking_type": "ground", "defending_type": "poison", "multiplier": 2.0},
+    {"attacking_type": "ground", "defending_type": "flying", "multiplier": 0.5},
+    {"attacking_type": "ground", "defending_type": "bug", "multiplier": 0.5},
+    {"attacking_type": "ground", "defending_type": "rock", "multiplier": 2.0},
+    {"attacking_type": "ground", "defending_type": "steel", "multiplier": 2.0},
+    {"attacking_type": "flying", "defending_type": "electric", "multiplier": 0.5},
+    {"attacking_type": "flying", "defending_type": "grass", "multiplier": 2.0},
+    {"attacking_type": "flying", "defending_type": "fighting", "multiplier": 2.0},
+    {"attacking_type": "flying", "defending_type": "bug", "multiplier": 2.0},
+    {"attacking_type": "flying", "defending_type": "rock", "multiplier": 0.5},
+    {"attacking_type": "flying", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "psychic", "defending_type": "fighting", "multiplier": 2.0},
+    {"attacking_type": "psychic", "defending_type": "poison", "multiplier": 2.0},
+    {"attacking_type": "psychic", "defending_type": "psychic", "multiplier": 0.5},
+    {"attacking_type": "psychic", "defending_type": "dark", "multiplier": 0.5},
+    {"attacking_type": "psychic", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "bug", "defending_type": "fire", "multiplier": 0.5},
+    {"attacking_type": "bug", "defending_type": "grass", "multiplier": 2.0},
+    {"attacking_type": "bug", "defending_type": "fighting", "multiplier": 0.5},
+    {"attacking_type": "bug", "defending_type": "poison", "multiplier": 0.5},
+    {"attacking_type": "bug", "defending_type": "flying", "multiplier": 0.5},
+    {"attacking_type": "bug", "defending_type": "psychic", "multiplier": 2.0},
+    {"attacking_type": "bug", "defending_type": "ghost", "multiplier": 0.5},
+    {"attacking_type": "bug", "defending_type": "dark", "multiplier": 2.0},
+    {"attacking_type": "bug", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "bug", "defending_type": "fairy", "multiplier": 0.5},
+    {"attacking_type": "rock", "defending_type": "fire", "multiplier": 2.0},
+    {"attacking_type": "rock", "defending_type": "ice", "multiplier": 2.0},
+    {"attacking_type": "rock", "defending_type": "fighting", "multiplier": 0.5},
+    {"attacking_type": "rock", "defending_type": "ground", "multiplier": 0.5},
+    {"attacking_type": "rock", "defending_type": "flying", "multiplier": 2.0},
+    {"attacking_type": "rock", "defending_type": "bug", "multiplier": 2.0},
+    {"attacking_type": "rock", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "ghost", "defending_type": "normal", "multiplier": 0.5},
+    {"attacking_type": "ghost", "defending_type": "psychic", "multiplier": 2.0},
+    {"attacking_type": "ghost", "defending_type": "ghost", "multiplier": 2.0},
+    {"attacking_type": "ghost", "defending_type": "dark", "multiplier": 0.5},
+    {"attacking_type": "dragon", "defending_type": "dragon", "multiplier": 2.0},
+    {"attacking_type": "dragon", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "dragon", "defending_type": "fairy", "multiplier": 0.5},
+    {"attacking_type": "dark", "defending_type": "fighting", "multiplier": 0.5},
+    {"attacking_type": "dark", "defending_type": "psychic", "multiplier": 2.0},
+    {"attacking_type": "dark", "defending_type": "ghost", "multiplier": 2.0},
+    {"attacking_type": "dark", "defending_type": "dark", "multiplier": 0.5},
+    {"attacking_type": "dark", "defending_type": "fairy", "multiplier": 0.5},
+    {"attacking_type": "steel", "defending_type": "fire", "multiplier": 0.5},
+    {"attacking_type": "steel", "defending_type": "water", "multiplier": 0.5},
+    {"attacking_type": "steel", "defending_type": "electric", "multiplier": 0.5},
+    {"attacking_type": "steel", "defending_type": "ice", "multiplier": 2.0},
+    {"attacking_type": "steel", "defending_type": "rock", "multiplier": 2.0},
+    {"attacking_type": "steel", "defending_type": "steel", "multiplier": 0.5},
+    {"attacking_type": "steel", "defending_type": "fairy", "multiplier": 2.0},
+    {"attacking_type": "fairy", "defending_type": "fire", "multiplier": 0.5},
+    {"attacking_type": "fairy", "defending_type": "fighting", "multiplier": 2.0},
+    {"attacking_type": "fairy", "defending_type": "poison", "multiplier": 0.5},
+    {"attacking_type": "fairy", "defending_type": "dragon", "multiplier": 2.0},
+    {"attacking_type": "fairy", "defending_type": "dark", "multiplier": 2.0},
+    {"attacking_type": "fairy", "defending_type": "steel", "multiplier": 0.5}
+  ]
+}
