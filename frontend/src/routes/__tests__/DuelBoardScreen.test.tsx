@@ -144,6 +144,45 @@ describe('DuelBoardScreen — move grid', () => {
   })
 })
 
+describe('DuelBoardScreen — surrender', () => {
+  it('opens a custom confirm dialog when the surrender button is clicked', async () => {
+    const user = userEvent.setup()
+    renderDuelBoard(seed1v1Duel)
+
+    await user.click(screen.getByRole('button', { name: /rendirse/i }))
+
+    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /rendirse/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /seguir luchando/i })).toBeInTheDocument()
+  })
+
+  it('closes the dialog and keeps the duel running when the player cancels', async () => {
+    const user = userEvent.setup()
+    renderDuelBoard(seed1v1Duel)
+
+    await user.click(screen.getByRole('button', { name: /rendirse/i }))
+    await user.click(screen.getByRole('button', { name: /seguir luchando/i }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
+    expect(screen.getByTestId('duel-probe').textContent).toContain('winner:none')
+  })
+
+  it('ends the duel with the opponent as winner when the player confirms', async () => {
+    const user = userEvent.setup()
+    renderDuelBoard(seed1v1Duel)
+
+    await user.click(screen.getByRole('button', { name: /rendirse/i }))
+    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
+    await user.click(within(dialog).getByRole('button', { name: /rendirse/i }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:finished')
+    expect(screen.getByTestId('duel-probe').textContent).toContain('winner:bot')
+  })
+})
+
 describe('DuelBoardScreen — turn timer', () => {
   it('auto-applies the basic attack when the countdown expires without an action', () => {
     // Deterministic bot: force move 0 (25% damage) on the response.

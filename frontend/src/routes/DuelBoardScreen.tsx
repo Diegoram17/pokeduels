@@ -210,9 +210,76 @@ function MoveButtonGrid({
   )
 }
 
+/**
+ * Custom surrender confirmation (RF-7.7): a Tailwind/design-system modal
+ * instead of the native window.confirm. Confirming ends the duel as a loss,
+ * canceling resumes it.
+ */
+function SurrenderConfirmModal({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(4,7,18,.78)',
+        backdropFilter: 'blur(4px)',
+        padding: 24,
+      }}
+    >
+      <div
+        className="pd-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirmar rendirse"
+        style={{ maxWidth: 420, width: '100%', textAlign: 'center', padding: 32 }}
+      >
+        <h2 className="pd-title" style={{ marginBottom: 8 }}>
+          ¿RENDIRSE?
+        </h2>
+        <p className="pd-body" style={{ marginBottom: 24 }}>
+          Si te rindes, el duelo termina y pierdes el combate.
+        </p>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <button type="button" className="pd-btn pd-btn--danger" onClick={onConfirm}>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              logout
+            </span>
+            RENDIRSE
+          </button>
+          <button type="button" className="pd-btn pd-btn--secondary" onClick={onCancel}>
+            SEGUIR LUCHANDO
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SurrenderButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="pd-btn pd-btn--danger" onClick={onClick}>
+      <span className="material-symbols-outlined" aria-hidden="true">
+        logout
+      </span>
+      RENDIRSE / SALIR
+    </button>
+  )
+}
+
 function DuelBoardScreen() {
   const [state, actions] = useMockState()
   const [timeoutNotice, setTimeoutNotice] = useState(false)
+  const [showSurrender, setShowSurrender] = useState(false)
   const { duel } = state
 
   if (!duel) {
@@ -251,8 +318,21 @@ function DuelBoardScreen() {
         }}
       >
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
+          <SurrenderButton onClick={() => setShowSurrender(true)} />
+        </div>
       </header>
+
+      {showSurrender && (
+        <SurrenderConfirmModal
+          onConfirm={() => {
+            actions.surrender()
+            setShowSurrender(false)
+          }}
+          onCancel={() => setShowSurrender(false)}
+        />
+      )}
 
       <div className="duel-arena" style={{ position: 'relative', height: '55vh', flex: 'none', overflow: 'hidden' }}>
         <div className="pd-scrim-v" />
@@ -310,4 +390,4 @@ function DuelBoardScreen() {
 }
 
 export default DuelBoardScreen
-export { HudCard, HpBar, MoveButton, MoveButtonGrid, TimerRing }
+export { HudCard, HpBar, MoveButton, MoveButtonGrid, SurrenderButton, SurrenderConfirmModal, TimerRing }
