@@ -19,6 +19,7 @@ export interface MockStateActions {
   confirmSwap(pokemonId: string): void
   surrender(): void
   advanceTournament(): void
+  resetSession(): void
 }
 
 export type MockStateContextValue = [MockState, MockStateActions]
@@ -52,6 +53,7 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       confirmSwap: (pokemonId) => send({ type: 'confirmSwap', pokemonId }),
       surrender: () => send({ type: 'surrender' }),
       advanceTournament: () => send({ type: 'advanceTournament' }),
+      resetSession: () => send({ type: 'resetSession' }),
     }
   }, [])
 

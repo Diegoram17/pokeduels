@@ -86,6 +86,7 @@ export type MockStateAction =
   | { type: 'confirmSwap'; pokemonId: string }
   | { type: 'surrender' }
   | { type: 'advanceTournament' }
+  | { type: 'resetSession' }
 
 const MOVE_PP = [4, 4, 4] as const
 
@@ -267,6 +268,11 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
 
     case 'advanceTournament':
       return recordResultAndAdvance(state)
+
+    // "Play again": wipe the whole session (room, team, tournament, duel) but
+    // keep the player's nickname (design: PlayAgainButton on the ranking screen).
+    case 'resetSession':
+      return { ...createInitialState(), player: state.player }
 
     default:
       return state

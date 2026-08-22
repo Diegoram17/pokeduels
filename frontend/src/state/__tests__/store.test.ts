@@ -335,3 +335,27 @@ describe('reduceMockState — advanceTournament', () => {
     expect(after.tournament).toBeNull()
   })
 })
+
+describe('reduceMockState — resetSession', () => {
+  it('clears the room, tournament, team and duel but keeps the nickname', () => {
+    let s = reduceMockState(createInitialState(), {
+      type: 'setNickname',
+      nickname: 'Ash',
+    })
+    s = reduceMockState(s, { type: 'createRoom', mode: 'tournament', maxPlayers: 4 })
+    s = reduceMockState(s, {
+      type: 'updateTeamSelection',
+      selection: { starterId: 'pikachu', rosterIds: ['a', 'b', 'c', 'd', 'e'] },
+    })
+    s = reduceMockState(s, { type: 'enterDuel', slot: 'semiA' })
+
+    const after = reduceMockState(s, { type: 'resetSession' })
+
+    expect(after.player.nickname).toBe('Ash')
+    expect(after.room).toBeNull()
+    expect(after.tournament).toBeNull()
+    expect(after.teamSelection).toEqual({ starterId: null, rosterIds: [] })
+    expect(after.duel).toBeNull()
+    expect(after.duelPokemonState).toHaveLength(0)
+  })
+})
