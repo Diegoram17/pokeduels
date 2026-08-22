@@ -277,8 +277,8 @@
     {
       "name": "Tyranitar-Dark",
       "type": "dark",
-      "pokeapi_id": 461,
-      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/461.png",
+      "pokeapi_id": 359,
+      "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/359.png",
       "is_starter": false
     },
     {
