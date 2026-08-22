@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'

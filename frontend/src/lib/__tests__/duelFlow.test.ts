@@ -236,9 +236,15 @@ describe('computePostDuelRoute', () => {
   })
 
   it('routes a finished 1v1 duel straight to the ranking screen', () => {
-    const state = {
+    const state: MockState = {
       ...makeTournamentState('1v1', 'finished', NICKNAME, makeTournament()),
-      room: { code: 'AB12', mode: '1v1', maxPlayers: 2, status: 'finished', players: [NICKNAME] },
+      room: {
+        code: 'AB12',
+        mode: '1v1',
+        maxPlayers: 2,
+        status: 'finished',
+        players: [NICKNAME],
+      },
       tournament: null,
     }
     expect(computePostDuelRoute(state)).toEqual({ path: '/ranking' })
