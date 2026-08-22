@@ -6,4 +6,9 @@ import { cleanup } from '@testing-library/react'
 
 afterEach(() => {
   cleanup()
+  // jsdom keeps a single localStorage per test file; MockStateProvider hydrates
+  // from it on mount, so state persisted by one test would leak into the next.
+  if (typeof localStorage !== 'undefined') {
+    localStorage.clear()
+  }
 })
