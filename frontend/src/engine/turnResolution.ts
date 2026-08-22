@@ -21,7 +21,13 @@ function clampHp(hp: number): number {
 export function resolveTurn(humanMoveIndex: MoveIndex, state: MockState): TurnResult {
   const { duel, duelPokemonState, player } = state
 
-  if (!duel || duel.phase === 'finished') {
+  // resolveTurn is a precondition: an active duel must exist. Callers (the
+  // state reducer's applyPlayerAttack) guard before invoking.
+  if (!duel) {
+    throw new Error('resolveTurn requires an active duel')
+  }
+
+  if (duel.phase === 'finished') {
     return { duelPokemonState, duel }
   }
 
