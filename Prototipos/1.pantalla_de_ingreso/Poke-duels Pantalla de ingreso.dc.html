@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="../assets/pokeduels-design-system.css">
+<script src="./image-slot.js"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Styles now provided by ../assets/pokeduels-design-system.css -->
+</helmet>
+<div class="pd-page" style="display:flex;align-items:center;justify-content:center;padding:var(--pd-space-5) 40px">
+
+  <div class="pd-art-layer"><image-slot id="pd-arena" shape="rect" fit="cover" placeholder="Suelta aquí tu arte de la arena" src="./fondo_login_pokeduels2-mt453jj1-gilj.jpg"></image-slot></div>
+  <div class="pd-scrim-v"></div>
+  <div class="pd-scrim-d"></div>
+  
+
+  
+
+  
+  
+
+  
+  <div class="pd-glow-blob" style="right:-8%;top:16%;width:700px;height:700px"></div>
+  
+
+  <div class="pd-grid-perspective"></div>
+  
+
+  <main style="position: relative; z-index: 5; width: 100%; max-width: 1560px; display: grid; grid-template-columns: 1fr auto; gap: 72px; align-items: center; height: 504px; max-height: calc(100vh - 48px); box-sizing: border-box">
+
+    <div style="align-self:start;display:flex;flex-direction:column;gap:var(--pd-space-5);text-align:left;padding:var(--pd-space-5) var(--pd-space-5) var(--pd-space-5) 0;margin-left:-8px">
+
+
+      <div style="display:flex;flex-direction:column;gap:var(--pd-space-3)">
+        <div style="display:flex;align-items:center;gap:var(--pd-space-2)">
+          <span class="pd-pokeball"></span>
+          <span class="pd-eyebrow">Arena oficial</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:var(--pd-space-3);max-width:520px">
+          <span style="flex:1;height:2px;background:linear-gradient(90deg,var(--pd-red),rgba(238,21,21,0))"></span>
+          <span style="font:700 12px/1 var(--pd-font-mono);letter-spacing:.3em;color:rgba(234,240,255,.6);text-transform:uppercase">Duelos 6 vs 6</span>
+        </div><h1 class="pd-logo pd-logo--hero">Poke-duels</h1>
+      </div><div style="display:flex;flex-direction:column;gap:var(--pd-space-3)">
+        <h2 class="pd-title">¡Hola, Entrenador!</h2>
+        <p class="pd-body" style="max-width:470px;text-wrap:pretty">Ingresa tu apodo, arma tu equipo de 6 Pokémon y demuestra quién manda en la arena.</p>
+      </div>
+
+      <sc-if value="{{ showStatus }}" hint-placeholder-val="{{ true }}">
+        
+      </sc-if>
+    </div>
+
+    <div class="pd-card" style="padding:var(--pd-space-6);width:432px;height:263px">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--pd-space-3);margin-bottom:var(--pd-space-5)">
+          <h3 class="pd-label" style="letter-spacing:.28em">INICIAR SESIÓN</h3>
+          <span class="pd-pokeball" style="width:16px;height:16px"></span>
+        </div>
+
+        <form onSubmit="{{ onSubmit }}" style="display:flex;flex-direction:column;gap:var(--pd-space-5)">
+          <div style="display:flex;flex-direction:column;gap:var(--pd-space-2)">
+            <label for="nickname" class="pd-label">Nickname</label>
+            <div class="pd-input-wrap">
+              <span class="material-symbols-outlined pd-input-icon" aria-hidden="true">badge</span>
+              <input id="nickname" name="nickname" type="text" required="" autocomplete="off" placeholder="INTRODUCE TU APODO" class="pd-input pd-input--icon">
+            </div>
+          </div>
+
+          <button type="submit" class="pd-btn pd-btn--primary pd-btn--block pd-btn--lg" disabled="{{ submitting }}">
+            <span>{{ ctaLabel }}</span>
+            <span class="pd-btn__shine"></span>
+          </button>
+
+          <sc-if value="{{ showSecondary }}" hint-placeholder-val="{{ true }}">
+            
+          </sc-if>
+        </form>
+      </div><div style="width:100%;max-width:430px;justify-self:end;align-self:end;animation:pd-bob 7s ease-in-out infinite">
+      
+
+      <div class="pd-meta" style="margin-top:var(--pd-space-4);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--pd-space-2) var(--pd-space-4)">
+       </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showStatus&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Contenido&quot;},&quot;showSecondary&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Contenido&quot;}}">
+class Component extends DCLogic {
+  state = { submitting: false };
+  renderVals() {
+    return {
+      showStatus: this.props.showStatus ?? true,
+      showSecondary: this.props.showSecondary ?? true,
+      ctaLabel: this.state.submitting ? 'PREPARANDO ARENA…' : 'ENTRAR A JUGAR',
+      submitting: this.state.submitting,
+      onSubmit: (e) => {
+        e.preventDefault();
+        var nicknameInput = document.getElementById('nickname');
+        var value = nicknameInput ? nicknameInput.value.trim() : '';
+        if (value) localStorage.setItem('pd_nickname', value);
+        this.setState({ submitting: true });
+        setTimeout(function() { window.location.href = '../2.Lobby_de_salas.html'; }, 600);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

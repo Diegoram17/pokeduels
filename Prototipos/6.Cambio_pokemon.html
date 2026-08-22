@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cambio de Pokémon · Poke-duels</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/pokeduels-design-system.css">
+<style>
+  .switch-topbar{display:flex;align-items:center;justify-content:space-between;padding:0 var(--pd-space-6);height:64px;
+    background:rgba(5,8,20,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--pd-border-blue-dim);
+    position:sticky;top:0;z-index:20}
+  .switch-main{position:relative;z-index:2;padding:var(--pd-space-6);max-width:1200px;margin:0 auto}
+  .switch-head{text-align:center;margin-bottom:var(--pd-space-5)}
+  .roster-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--pd-space-4)}
+  .unit-card{display:flex;flex-direction:column;position:relative}
+  .unit-card .art{height:190px;position:relative;border-bottom:1px solid var(--pd-border-blue-dim);
+    display:flex;align-items:center;justify-content:center;padding:var(--pd-space-2);background:rgba(6,12,30,.5)}
+  .unit-card .art img{width:100%;height:100%;object-fit:contain}
+  .unit-card .body{padding:var(--pd-space-4);display:flex;flex-direction:column;gap:var(--pd-space-3);flex:1}
+  .unit-card .top-row{display:flex;justify-content:space-between;align-items:flex-start}
+  .unit-card h2{margin:0;font:800 19px/1.2 var(--pd-font-display);color:#fff;text-transform:uppercase}
+  .flag{position:absolute;top:10px;right:10px;z-index:5;padding:var(--pd-space-1) var(--pd-space-2);border-radius:var(--pd-radius-sm);
+    font:700 10px/1 var(--pd-font-mono);letter-spacing:.1em;text-transform:uppercase}
+  .flag--active{background:var(--pd-yellow);color:#1a1400}
+  .flag--danger{display:flex;align-items:center;gap:var(--pd-space-1);background:transparent;color:var(--pd-danger)}
+  .hp-row{display:flex;justify-content:space-between;font:700 13px/1 var(--pd-font-mono);color:var(--pd-text-meta);margin-bottom:var(--pd-space-1)}
+  .hp-row--danger{color:var(--pd-danger)}
+  .ko-flag{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:none;
+    background:repeating-linear-gradient(45deg, rgba(0,0,0,.45),rgba(0,0,0,.45) 10px, rgba(0,0,0,.65) 10px, rgba(0,0,0,.65) 20px)}
+  .ko-flag span{transform:rotate(-10deg);border-top:3px solid rgba(255,180,171,.6);border-bottom:3px solid rgba(255,180,171,.6);
+    padding:var(--pd-space-1) var(--pd-space-4);font:800 20px/1 var(--pd-font-display);letter-spacing:.2em;color:var(--pd-danger);text-transform:uppercase}
+  .unit-card--ko{opacity:.6;filter:grayscale(1)}
+  .unit-card--active{border-color:var(--pd-yellow);box-shadow:0 0 0 1px var(--pd-yellow),0 26px 70px rgba(0,0,0,.72)}
+</style>
+</head>
+<body>
+<div class="pd-page">
+  <div class="pd-glow-blob" style="left:50%;top:-10%;width:700px;height:700px;transform:translateX(-50%)"></div>
+
+  <header class="switch-topbar">
+    <span class="pd-logo pd-logo--sm">Poke-duels</span>
+    <span class="pd-meta" data-pd-nickname>ENTRENADOR</span>
+    <button type="button" class="pd-btn pd-btn--ghost" onclick="window.location.href='5.Tablero_de_duelo.html'"><span class="material-symbols-outlined" aria-hidden="true">logout</span>VOLVER AL COMBATE</button>
+  </header>
+
+  <main class="switch-main">
+    <div class="switch-head">
+      <h1 class="pd-title pd-title--lg" style="text-transform:uppercase;letter-spacing:.08em;color:var(--pd-blue-light)">SELECCIONAR POKÉMON</h1>
+      <p class="pd-meta" style="margin-top:var(--pd-space-1)">Elige qué Pokémon enviar al combate</p>
+    </div>
+
+    <div class="roster-grid">
+      <!-- Active Unit -->
+      <div class="pd-card pd-card--flush unit-card unit-card--active">
+        <span class="flag flag--active">EN CAMPO</span>
+        <div class="art">
+          <img alt="IGNIS-PRIME" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpZKYQ4Tee_MOEHOu4_zD5KdlO65pXQ5PxKecS4IPPPHrglM8Ao5K0SuoJbbaz4WGQFDkIeffReSldNQLvWeP5HcDc25hdd8U8IY06_FiY0uYJ78-bma8Ca1E1qsibMzYLDZbEeL_LrxgOtMxCP9mKqdXrzrQPb5CyaXbF5XKKiE5KSdvPsEJzRm7JQWyaZGDFa_qcXWQICsMJQGNQqyvYL6mzhYbYXREZ2HGpl4n8i_5gQVM3eyuJQA">
+        </div>
+        <div class="body">
+          <div class="top-row"><h2>IGNIS-PRIME</h2><span class="pd-badge pd-badge--fire">FUEGO</span></div>
+          <div>
+            <div class="hp-row"><span>HP</span><span>65 / 100</span></div>
+            <div class="pd-hp-bar"><div class="pd-hp-fill pd-hp-fill--mid" style="width:67%"></div></div>
+          </div>
+          <button type="button" class="pd-btn pd-btn--block" disabled>DESPLEGADO ACTUALMENTE</button>
+        </div>
+      </div>
+
+      <!-- Ready Unit 1 -->
+      <div class="pd-card pd-card--interactive pd-card--flush unit-card">
+        <div class="art">
+          <img alt="AQUA-STRIKER" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZhKMAvCu1oAtZYGjKt1uYvuBHPMDHFEkPeDwdOksfu1nwLTlTVd606W-KID2lJ8RXnoGPAWLhCItQa2DBHqYqTJqJ7BseDK3H9i6ic7bebsPs4vFazVG1c7lU41XE75IBJFYKuq4oqaevE9NeMVdFIc-ghxW7Ha3CsvqXH9tQGIg_6BTiaPlBPUc8nDJDohbXFHS6fH8sIo6zDjQPv-E8UNgr0cYT7VbGxua4eYucthX847omKlHm-g">
+        </div>
+        <div class="body">
+          <div class="top-row"><h2>AQUA-STRIKER</h2><span class="pd-badge pd-badge--water">AGUA</span></div>
+          <div>
+            <div class="hp-row"><span>HP</span><span>100 / 100</span></div>
+            <div class="pd-hp-bar"><div class="pd-hp-fill pd-hp-fill--high" style="width:100%"></div></div>
+          </div>
+          <button type="button" class="pd-btn pd-btn--primary pd-btn--block" onclick="window.location.href='5.Tablero_de_duelo.html'">ENTRAR AL COMBATE<span class="pd-btn__shine"></span></button>
+        </div>
+      </div>
+
+      <!-- Ready Unit 2 (Low HP) -->
+      <div class="pd-card pd-card--interactive pd-card--flush unit-card" style="border-color:rgba(238,21,21,.35)">
+        <span class="flag flag--danger"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">warning</span>EN PELIGRO</span>
+        <div class="art">
+          <img alt="TERRA-GUARD" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNbBb68DOxeMe4vzNUuLwVLYx-iTRDvu1o8mS4qL25KBGiURj5l7NEoLH5kvY9Z4X207rlWXXyAJYDRkBaviRC-WhSFfaeoZC3Sq78952GDT_NJheVfJt4OnpBrZL2i0x73XzJPKstsQ3zzvyZih-G9OpdFJB_PXmTh2-6YbcINp6tAIwqPVqi4tWsGNVL9A2f1ptCPXJq5RHlldUg2GCXEhR41z7G04GEXTQgf63ddqH7AjY6diY8pA">
+        </div>
+        <div class="body">
+          <div class="top-row"><h2>TERRA-GUARD</h2><span class="pd-badge pd-badge--grass">PLANTA</span></div>
+          <div>
+            <div class="hp-row hp-row--danger"><span>HP</span><span>10 / 100</span></div>
+            <div class="pd-hp-bar"><div class="pd-hp-fill pd-hp-fill--low" style="width:10%"></div></div>
+          </div>
+          <button type="button" class="pd-btn pd-btn--secondary pd-btn--block" onclick="window.location.href='5.Tablero_de_duelo.html'">ENTRAR AL COMBATE</button>
+        </div>
+      </div>
+
+      <!-- KO Unit 1 -->
+      <div class="pd-card pd-card--flush unit-card unit-card--ko">
+        <div class="ko-flag"><span>K.O.</span></div>
+        <div class="art">
+          <img alt="VOLT-DASH" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBbPTEZ6C6h7wla434bdm7ue9L2zSoO9VpsjjDXLVnGJlEKUgXsFOWjY-ShFxPvYTUosUnxeAscUd9iJeTFEOTcdUB60eW6VTIQc24jUkqmPfukv9CQhNvKwtDjOPZqen9QEeIt_Mci-vNcLDmWiHM1zuulBOiOZFjVN2rb2cAzYCZavPLFcX4W0rkmQoAPimdEdr1-S8IancA_kSjbYhNvOfUxnoD1LdvZNPizouB4vHnBMMz2VqMfg">
+        </div>
+        <div class="body">
+          <div class="top-row"><h2>VOLT-DASH</h2><span class="pd-badge pd-badge--electric">ELÉCTRICO</span></div>
+          <div>
+            <div class="hp-row"><span>HP</span><span>0 / 100</span></div>
+            <div class="pd-hp-bar"><div class="pd-hp-fill" style="width:0"></div></div>
+          </div>
+          <button type="button" class="pd-btn pd-btn--block" disabled>UNIDAD FUERA DE SERVICIO</button>
+        </div>
+      </div>
+
+      <!-- Ready Unit 3 -->
+      <div class="pd-card pd-card--interactive pd-card--flush unit-card">
+        <div class="art">
+          <img alt="MIND-WEAVER" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3Pl-3QiBfpUot0tyUpX591-scBy2ySXj3szjYlfT5tLbX8QLsfRV0uLxhf0-3lssWQbxQF9giskMY_lUlSVHFsa5s0HJJ2IujNalAvNmvgfi2tZl-Lw2RJBDFgduq594FdmSn-CJSgTlS4FqETvS1U8cw09ZKh0TXPUDHoDrQSct9KesnYS9iMqNaIFxktFB1JhkNV-LmeCVW32BgjYLwCpoX8-9rhazF6Q3an0FMcpBKAjSmE8_ytw">
+        </div>
+        <div class="body">
+          <div class="top-row"><h2>MIND-WEAVER</h2><span class="pd-badge pd-badge--psychic">PSÍQUICO</span></div>
+          <div>
+            <div class="hp-row"><span>HP</span><span>100 / 100</span></div>
+            <div class="pd-hp-bar"><div class="pd-hp-fill pd-hp-fill--high" style="width:100%"></div></div>
+          </div>
+          <button type="button" class="pd-btn pd-btn--secondary pd-btn--block" onclick="window.location.href='5.Tablero_de_duelo.html'">ENTRAR AL COMBATE</button>
+        </div>
+      </div>
+
+      <!-- KO Unit 2 -->
+      <div class="pd-card pd-card--flush unit-card unit-card--ko">
+        <div class="ko-flag"><span>K.O.</span></div>
+        <div class="art">
+          <img alt="BRAWL-CORE" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnJSU36bFeTnEhitSZgvn5IiuPhilHzQ83rB2dQi4CiaFrzxZ-oGyHGVhDX7jvhieDqT5MQafm7m40WSTLQ5TXt_Owf0ArkV9MnH6oDO8mSO8adQPVHnmvMXmPJYzgykY_OFwFDiZ1ehpLGXw-sj0ZxFw1rFMYPQKeIW731WGKkrOorS1PhjTE4AYhpgo983y-0feKtzauoe_rdBvhZ_4-aJVlofAz2aKu-SzI6cNWq381uMwODeIhHg">
+        </div>
+        <div class="body">
+          <div class="top-row"><h2>BRAWL-CORE</h2><span class="pd-badge pd-badge--fighting">LUCHA</span></div>
+          <div>
+            <div class="hp-row"><span>HP</span><span>0 / 100</span></div>
+            <div class="pd-hp-bar"><div class="pd-hp-fill" style="width:0"></div></div>
+          </div>
+          <button type="button" class="pd-btn pd-btn--block" disabled>UNIDAD FUERA DE SERVICIO</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+(function(){
+  var name = localStorage.getItem('pd_nickname') || 'ENTRENADOR';
+  var els = document.querySelectorAll('[data-pd-nickname]');
+  for (var i = 0; i < els.length; i++) els[i].textContent = name;
+})();
+</script>
+</body>
+</html>

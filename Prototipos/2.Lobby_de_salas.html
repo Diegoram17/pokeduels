@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lobby de Salas · Poke-duels</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/pokeduels-design-system.css">
+<style>
+  .lobby-topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;
+    padding:var(--pd-space-3) var(--pd-space-6);background:rgba(5,8,20,.72);backdrop-filter:blur(10px);border-bottom:1px solid var(--pd-border-blue-dim)}
+  .lobby-shell{position:relative;z-index:2;display:flex;flex-direction:column;min-height:100vh}
+  .lobby-body{flex:1;display:flex;flex-direction:column;gap:var(--pd-space-6);padding:var(--pd-space-6);max-width:1440px;margin:0 auto;width:100%}
+  @media(min-width:960px){.lobby-body{flex-direction:row}}
+  .lobby-main{flex:1;display:flex;flex-direction:column;gap:var(--pd-space-5)}
+  .lobby-header-row{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--pd-space-4);flex-wrap:wrap}
+  .view-toggle{display:flex;gap:var(--pd-space-2)}
+  .view-toggle button{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:var(--pd-radius-sm);border:1px solid var(--pd-border-blue);background:rgba(6,12,30,.5);
+    color:var(--pd-text-meta);cursor:pointer;transition:border-color var(--pd-fast),color var(--pd-fast)}
+  .view-toggle button:hover{color:#fff;border-color:var(--pd-border-blue-soft)}
+  .view-toggle button.active{color:var(--pd-yellow);border-color:var(--pd-yellow)}
+  .room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--pd-space-4)}
+  .room-card{display:flex;flex-direction:column;gap:var(--pd-space-3);padding:var(--pd-space-4)}
+  .room-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--pd-space-2)}
+  .room-code{font:700 20px/1 var(--pd-font-mono);color:var(--pd-yellow)}
+  .room-code--dim{color:var(--pd-text-meta)}
+  .room-mode-label{display:block;margin-top:var(--pd-space-1)}
+  .stack{display:flex;-webkit-box-orient:horizontal}
+  .avatar-stack{display:flex}
+  .avatar-stack .pd-avatar{width:32px;height:32px;margin-left:-8px}
+  .avatar-stack .pd-avatar:first-child{margin-left:0}
+  .avatar-stack .pd-avatar img{width:100%;height:100%;object-fit:cover}
+  .avatar-slot-empty{width:32px;height:32px;margin-left:-8px;border-radius:50%;border:2px dashed var(--pd-border-blue-soft);
+    background:rgba(6,12,30,.5);display:flex;align-items:center;justify-content:center;color:var(--pd-text-meta)}
+  .avatar-slot-empty .material-symbols-outlined{font-size:16px}
+  .room-card-foot{display:flex;justify-content:space-between;align-items:center}
+  .room-card--empty{align-items:center;justify-content:center;min-height:160px;opacity:.6}
+  .room-card--full{opacity:.6}
+
+  .lobby-side{width:100%;display:flex;flex-direction:column;gap:var(--pd-space-5);padding:var(--pd-space-5)}
+  @media(min-width:960px){.lobby-side{width:340px;flex:none}}
+  .side-heading{display:flex;align-items:center;gap:var(--pd-space-2);margin:0 0 var(--pd-space-3)}
+  .quick-join-wrap{position:relative;display:flex;align-items:center}
+  .quick-join-wrap .pd-input{text-transform:uppercase;padding-right:48px}
+  .quick-join-submit{position:absolute;right:8px;width:32px;height:32px;border-radius:var(--pd-radius-sm);
+    border:none;background:transparent;color:var(--pd-yellow);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .create-room-btn{position:relative;display:flex;align-items:center;justify-content:space-between;gap:var(--pd-space-3);
+    width:100%;text-align:left;padding:var(--pd-space-4);border-radius:var(--pd-radius-md);cursor:pointer;
+    background:rgba(6,12,30,.5);transition:border-color var(--pd-fast),transform var(--pd-fast)}
+  .create-room-btn:hover{transform:translateY(-2px)}
+  .create-room-btn__title{font:800 16px/1.3 var(--pd-font-display);color:#fff}
+  .create-room-btn__desc{display:block;margin-top:var(--pd-space-1);font:400 11px/1.4 var(--pd-font-mono);letter-spacing:.1em;color:var(--pd-text-meta);text-transform:uppercase}
+  .create-room-btn__icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+</style>
+</head>
+<body>
+<div class="pd-page lobby-shell">
+  <div class="pd-glow-blob" style="right:-8%;top:10%;width:600px;height:600px"></div>
+  <div class="pd-grid-perspective"></div>
+
+  <header class="lobby-topbar">
+    <div style="display:flex;align-items:center;gap:var(--pd-space-2)">
+      <span class="pd-pokeball"></span>
+      <span class="pd-logo pd-logo--sm">Poke-duels</span>
+    </div>
+    <span class="pd-meta" data-pd-nickname>ENTRENADOR</span>
+  </header>
+
+  <div class="lobby-body">
+    <main class="lobby-main">
+      <div class="lobby-header-row">
+        <div>
+          <h1 class="pd-title pd-title--lg" style="text-transform:uppercase">SALAS DE BATALLA</h1>
+          <p class="pd-body" style="margin-top:var(--pd-space-2);max-width:520px">¡Únete a un duelo listo o crea tu propia sala para desafiar a otros entrenadores!</p>
+        </div>
+        <div class="view-toggle">
+          <button type="button" aria-label="Filtrar"><span class="material-symbols-outlined" aria-hidden="true">filter_list</span></button>
+          <button type="button" class="active" aria-label="Vista de cuadrícula"><span class="material-symbols-outlined pd-icon--fill" aria-hidden="true">grid_view</span></button>
+          <button type="button" aria-label="Vista de lista"><span class="material-symbols-outlined" aria-hidden="true">view_list</span></button>
+        </div>
+      </div>
+
+      <div class="room-grid">
+        <!-- Room Card 1 (Waiting) -->
+        <button type="button" class="pd-card pd-card--interactive room-card" onclick="window.location.href='3.Seleccion_equipo.html'">
+          <div class="room-card-top">
+            <div>
+              <span class="room-code">#X892</span>
+              <span class="pd-meta room-mode-label">DUELO 1V1</span>
+            </div>
+            <span class="pd-badge pd-badge--waiting">ESPERANDO ENTRENADORES</span>
+          </div>
+          <div class="pd-divider"></div>
+          <div class="room-card-foot">
+            <div class="avatar-stack">
+              <span class="pd-avatar"><img alt="Jugador 1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-vTvoNk3_m661BLOz6aD9Fk1XYhaAqwyesXtCOJUAdTyCTIcQuaLIdfTPO_YN6_C83PKBE9kRW76QMSB-hrE62t1ArMUOkXed2kxBW7Kj5UxA2u8pXOk1_YTrkR9dS1WrlrQqv1mvySfdq4rs85FFiT-Kxqy7N2Dkuq7dB0cPG9pZUQZzgEUOHrDYhbMqmQruZiHHv0p461biM6YpkHsd84ZeKh3-g2JcK5t0dd_i2eJTS0gcynULkQ"></span>
+              <span class="avatar-slot-empty"><span class="material-symbols-outlined" aria-hidden="true">add</span></span>
+            </div>
+            <div style="text-align:right">
+              <span class="pd-stat" style="display:block">1/2</span>
+              <span class="pd-meta">Jugadores</span>
+            </div>
+          </div>
+        </button>
+
+        <!-- Room Card 2 (Full / In progress) -->
+        <div class="pd-card room-card room-card--full">
+          <div class="room-card-top">
+            <div>
+              <span class="room-code room-code--dim">#Y441</span>
+              <span class="pd-meta room-mode-label">EN COMBATE</span>
+            </div>
+            <span class="pd-badge pd-badge--live">EN COMBATE</span>
+          </div>
+          <div class="pd-divider"></div>
+          <div class="room-card-foot">
+            <div class="avatar-stack">
+              <span class="pd-avatar"><img alt="Jugador 1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQ4Cy1UbAZ04NFBmVKNXbn67TIQ3BsRBT3u3PcuPXiWndKuTtwnBgYctFAGuj8JQhjlu_qvVUMLR659CwNJl2VRf42Z9AEnlZjsQZ-DG0sSMv91s9U01XLK7BXgrWglYSp4K47Z5ZfRJK62wQHQHgenvCMV8Pgn5qVFoKStfqHm75NUJicEllfx7tEVPlYPn78m1ElVRlzNAzfd7QXb30buCL_isk5bs3bdIY8SABsczGfpHcqLuZE8w"></span>
+              <span class="pd-avatar"><img alt="Jugador 2" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQpDOmwFkvU9aK0qfzeMX-9UvForbgJMaqBKB-NRi-nUbZnFdWwtDKhJimt4wymoKyREtzi29wvyqvYFXY_nmCCSOKlirJK05Ax4m5QZpTKbYEd0AGmlCkeuTiJSFlD7CClV25lqgRJlZMmetpUAm7Z0VGx7m2so2tt547gznX0eR5Ye-vXt_wYmtbsx5NFrUfGS0WeyTH3DApcCDVrVx_Xz9dWi0Dp2TcHZjRcGUPP4Vk7IcyDfeJaw"></span>
+            </div>
+            <div style="text-align:right">
+              <span class="pd-stat" style="display:block;color:var(--pd-text-meta)">2/2</span>
+              <span class="pd-meta">Jugadores</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Room Card 3 (Waiting 4P) -->
+        <button type="button" class="pd-card pd-card--interactive room-card" style="border-color:var(--pd-border-blue-soft)" onclick="window.location.href='3.Seleccion_equipo.html'">
+          <div class="room-card-top">
+            <div>
+              <span class="room-code">#Z009</span>
+              <span class="pd-meta room-mode-label">TORNEO DE 4</span>
+            </div>
+            <span class="pd-badge pd-badge--waiting">ESPERANDO ENTRENADORES</span>
+          </div>
+          <div class="pd-divider"></div>
+          <div class="room-card-foot">
+            <div class="avatar-stack">
+              <span class="pd-avatar"><img alt="Jugador 1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCV-tkzO240NwGjZ_va63MxuMAWbcUkjaaVjY14q_Oj7ob7FJp3FBV-iaMqK0C7rrENBVxIvjPeEzq_HMarXK2gdG3oNesmWsCRouKeWVTN95UsUioy3y2ytvIUW2Db3P-QMJ2F0XSFDt8NKtJCqoEA9UAXdNsMs0NZMDCrdIR2j2MvFaozKy3RW3PI0TRbz8VeX0q31cQAlU2LuMdLCgOxsNOaCWRj8z4aaZinkQyZPFyzT2A6F9XwUw"></span>
+              <span class="pd-avatar"><img alt="Jugador 2" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1B5Mm2Qv1WmtlC9dYfzCvF9zv0gVa_EV7WaeGAFQfb7bYDI64-6aAn2v67m9NH4cMv9UfT9JtvWj1ZzafGF4YnUSvIYRi6BXud_dZBZNBS9vFAPrcNOasaRObztzoo5-2VfXeys2p-09coKt-TiMRMWrGaXI-KCOuQi5wjSQgMKT0UQPp1mKEgxzBUXfFaDIWxYm55_yzCewTYZlZIJfM-AHAXGryypAGjdLf5mpYbUEuKz3M7mzJiQ"></span>
+              <span class="avatar-slot-empty"><span class="material-symbols-outlined" aria-hidden="true">add</span></span>
+              <span class="avatar-slot-empty"><span class="material-symbols-outlined" aria-hidden="true">add</span></span>
+            </div>
+            <div style="text-align:right">
+              <span class="pd-stat" style="display:block">2/4</span>
+              <span class="pd-meta">Jugadores</span>
+            </div>
+          </div>
+        </button>
+
+        <!-- Empty slot -->
+        <div class="pd-card room-card room-card--empty">
+          <span class="pd-meta">Buscando...</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right: Action Panel -->
+    <aside class="pd-card lobby-side">
+      <div>
+        <h3 class="pd-title side-heading"><span class="material-symbols-outlined" aria-hidden="true" style="color:var(--pd-yellow)">bolt</span>Unirse con Código</h3>
+        <div class="quick-join-wrap">
+          <input class="pd-input" type="text" placeholder="Código de Sala...">
+          <button type="button" class="quick-join-submit" aria-label="Unirse" onclick="window.location.href='3.Seleccion_equipo.html'"><span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
+        </div>
+      </div>
+
+      <div class="pd-divider"></div>
+
+      <div>
+        <h3 class="pd-title" style="margin-bottom:var(--pd-space-3)">Crear Sala</h3>
+        <div style="display:flex;flex-direction:column;gap:var(--pd-space-3)">
+          <button type="button" class="create-room-btn" style="border:1px solid var(--pd-border-blue-soft)" onclick="window.location.href='3.Seleccion_equipo.html'">
+            <span>
+              <span class="create-room-btn__title">Duelo Individual (1v1)</span>
+              <span class="create-room-btn__desc">Duelo directo a 1 ronda</span>
+            </span>
+            <span class="create-room-btn__icon" style="background:rgba(90,170,255,.14);border:1px solid var(--pd-border-blue-soft);color:var(--pd-blue-light)">
+              <span class="material-symbols-outlined" aria-hidden="true">person</span>
+            </span>
+          </button>
+          <button type="button" class="create-room-btn" style="border:1px solid rgba(238,21,21,.35)" onclick="window.location.href='3.Seleccion_equipo.html'">
+            <span>
+              <span class="create-room-btn__title">Torneo de Entrenadores (4 Jugadores)</span>
+              <span class="create-room-btn__desc">Torneo eliminatorio con semifinal y final</span>
+            </span>
+            <span class="create-room-btn__icon" style="background:rgba(238,21,21,.14);border:1px solid rgba(238,21,21,.35);color:var(--pd-danger)">
+              <span class="material-symbols-outlined" aria-hidden="true">group</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+(function(){
+  var name = localStorage.getItem('pd_nickname') || 'ENTRENADOR';
+  var els = document.querySelectorAll('[data-pd-nickname]');
+  for (var i = 0; i < els.length; i++) els[i].textContent = name;
+})();
+</script>
+</body>
+</html>

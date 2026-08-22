@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero de Duelo · Poke-duels</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/pokeduels-design-system.css">
+<style>
+  html,body{height:100%;overflow:hidden}
+  .duel-shell{display:flex;flex-direction:column;height:100vh}
+  .duel-topbar{flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 var(--pd-space-6);height:64px;
+    background:rgba(5,8,20,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--pd-border-blue-dim);z-index:30}
+  .duel-topbar-right{display:flex;align-items:center;gap:var(--pd-space-4)}
+  .duel-arena{position:relative;height:55vh;overflow:hidden;flex:none}
+  .duel-timer{position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:20;
+    width:80px;height:80px;border-radius:50%;background:rgba(9,16,40,.7);border:2px solid var(--pd-yellow);
+    display:flex;align-items:center;justify-content:center;box-shadow:0 0 15px rgba(255,203,5,.5)}
+  .duel-hud{position:absolute;inset:0;padding:var(--pd-space-5);display:flex;justify-content:space-between;align-items:flex-start;
+    pointer-events:none;z-index:10}
+  .hud-card{width:280px;pointer-events:auto;padding:var(--pd-space-3)}
+  .hud-card .hud-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--pd-space-1)}
+  .hud-card .hud-name{font:800 18px/1.2 var(--pd-font-display);color:#fff;text-transform:uppercase}
+  .hud-card .hud-lvl{font:700 14px/1 var(--pd-font-mono);color:var(--pd-yellow)}
+  .hud-card--rival{border-right:4px solid var(--pd-red)}
+  .hud-card--rival .hud-lvl{color:var(--pd-danger)}
+  .hud-badges{display:flex;gap:var(--pd-space-1);margin-bottom:var(--pd-space-2)}
+  .hud-hp-foot{display:flex;justify-content:flex-end;margin-top:var(--pd-space-1)}
+  .hud-hp-foot--left{justify-content:flex-start}
+  .sprite-wrap{position:absolute;bottom:40px;left:25%;transform:translateX(-50%);width:220px;height:220px}
+  .sprite-wrap--rival{bottom:96px;left:auto;right:25%;transform:translateX(50%);width:250px;height:250px}
+  .sprite-wrap img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 10px 20px rgba(90,170,255,.35))}
+
+  .duel-command{flex:1;background:rgba(5,8,20,.9);border-top:1px solid var(--pd-border-blue-dim);
+    padding:var(--pd-space-5) var(--pd-space-6);display:flex;flex-direction:column;gap:var(--pd-space-4);position:relative;z-index:20;overflow-y:auto}
+  @media(min-width:960px){.duel-command{flex-direction:row}}
+  .move-grid{flex:1;display:grid;grid-template-columns:repeat(2,1fr);gap:var(--pd-space-2)}
+  .move-btn{text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:var(--pd-space-2);
+    padding:var(--pd-space-4);border-left:4px solid var(--pd-blue-light);cursor:pointer}
+  .move-btn:hover{border-color:var(--pd-yellow)}
+  .move-btn--weak{border-left-color:var(--pd-border-blue)}
+  .move-row{display:flex;justify-content:space-between;align-items:center;width:100%}
+  .move-name{font:800 16px/1.2 var(--pd-font-display);color:#fff;text-transform:uppercase}
+  .move-dmg{font:700 13px/1 var(--pd-font-mono);color:var(--pd-blue-light)}
+  .move-btn--weak .move-dmg{color:var(--pd-text-meta)}
+  .move-pp{font:700 13px/1 var(--pd-font-mono);color:var(--pd-text-meta)}
+  .side-panel{width:100%;display:flex;flex-direction:column;justify-content:flex-end}
+  @media(min-width:960px){.side-panel{width:240px;flex:none}}
+</style>
+</head>
+<body>
+<div class="pd-page duel-shell">
+  <header class="duel-topbar">
+    <span class="pd-logo pd-logo--sm">Poke-duels</span>
+    <div class="duel-topbar-right">
+      <span class="pd-meta" data-pd-nickname>ENTRENADOR</span>
+      <button type="button" class="pd-btn pd-btn--danger" onclick="window.location.href='7.Ranking_final.html'"><span class="material-symbols-outlined" aria-hidden="true">logout</span>RENDIRSE / SALIR</button>
+      <span class="pd-avatar" style="width:40px;height:40px">
+        <img alt="Avatar del jugador" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcSGITMGuPrT1JqIbxsarq-FMGFt9raXaPvX-JBjJ6ZJ7HQNQSDj944VhTno9qR4ghTZpD8ZbrqkDY_63GFlmOuJ9QA9gOR1g8bIQB7oVS1Rh57Urs_iKSGyjCb9rN4U-WTqMUAS7hQQptVYQlhko2O0ZeK7MfrZUqzdWcpdl_VUlo8J638lffnMCO11dm1OgaZjzScFdzHaVuxZj7cWsCWIsou7AK7LW3rGCoSxO8ARJL4d2I-3vgaA" style="width:100%;height:100%;object-fit:cover">
+      </span>
+    </div>
+  </header>
+
+  <div class="duel-arena">
+    <div class="pd-art-layer" style="background-image:url('https://lh3.googleusercontent.com/aida-public/AB6AXuBS8usGmQBoJ4_4uW9wzDqsrjWADapZYreQh9mzCHSAFBEY9dj6JymmsCkoJDyEbDAVfqdC4RPk5_ttIZXbOsvVrug-pkK1K0-aPTekLB5e9zMeBiYRuKQdRH1UHBrnCv57NX53sU5EIB6RQ4ex6ZzDn2ciLLnBhn34Ck_Q42bQ_81sNJJp1upP6KpV5Z6ljqN6lkYA2Qf2nWbG6t2Ks1Z4d2Ij4F_bLPqpICfW7w-rv_thq6HsiYnhUA');opacity:.4"></div>
+    <div class="pd-scrim-v"></div>
+    <div class="pd-scrim-d"></div>
+
+    <div class="duel-timer"><span class="pd-stat pd-stat--xl" style="color:var(--pd-yellow)">08</span></div>
+
+    <div class="duel-hud">
+      <!-- Player HUD -->
+      <div class="pd-card hud-card">
+        <div class="hud-top"><span class="hud-name">VOLT HOUND</span><span class="hud-lvl">Lv.50</span></div>
+        <div class="hud-badges"><span class="pd-badge pd-badge--electric">ELÉCTRICO</span></div>
+        <div class="pd-hp-bar"><div class="pd-hp-fill pd-hp-fill--high" style="width:75%"></div></div>
+        <div class="hud-hp-foot"><span class="pd-stat" style="font-size:13px">75/100</span></div>
+      </div>
+      <!-- Rival HUD -->
+      <div class="pd-card hud-card hud-card--rival">
+        <div class="hud-top"><span class="hud-lvl">Lv.50</span><span class="hud-name" style="text-align:right">BLAZE REX</span></div>
+        <div class="hud-badges" style="justify-content:flex-end"><span class="pd-badge pd-badge--fire">FUEGO</span></div>
+        <div class="pd-hp-bar"><div class="pd-hp-fill pd-hp-fill--mid" style="width:40%;margin-left:auto"></div></div>
+        <div class="hud-hp-foot hud-hp-foot--left"><span class="pd-stat" style="font-size:13px">40/100</span></div>
+      </div>
+    </div>
+
+    <div class="sprite-wrap">
+      <img alt="Sprite de VOLT HOUND" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDpMcVInQryGLksU3CH14aFZQWrc68YurOS1Q-FczGnvulb4oz_BQSVDrwk_m0PA-3cox1UyVTZzo3oyn_R3lTwGUrZcKqbNts3dVI8DRY7hWMnw910TjdpFhiz0wIKJ70sSizqtBaDcaQ2dL3P4yNWXEs68xDpjGW0T8S0MvxIX_k9oZZQ9nGIpNnXqCs71r2m3m9t6zR9GawHU9ES5-MFyfUNZgIDf-WlmhmMg1Ngti_kI8CHPISYcw">
+    </div>
+    <div class="sprite-wrap sprite-wrap--rival">
+      <img alt="Sprite de BLAZE REX" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpV-4PrCXPuoNMRn3r14H5FAJaIw3CEVjZ2Y16MO0ZZYOXFcgVxxQOhL6RSJc-PRzrNtsqOZf8tqEiSIIcdNGkKnlFIQCZgoXPrPU2IchYR4B5BDcwVOVNSVPKlfhO8nrh0j0BY4LYYnJOX_s8lYcjQeUdU5ZwwFrvb5uU3u4JubdEHnoKFh_D416FpHNHKaXI4Um4vZsrsvivyfBiNyO_Ku8r_LDLXsTikjg9BJu508bCYwjnmBHD-w">
+    </div>
+  </div>
+
+  <div class="duel-command">
+    <div class="move-grid">
+      <button type="button" class="pd-card move-btn">
+        <div class="move-row"><span class="move-name">THUNDER FANG</span><span class="move-dmg">25% DMG</span></div>
+        <div class="move-row"><span class="pd-badge" style="background:rgba(120,180,255,.14);color:var(--pd-text-meta)">ELEC</span><span class="move-pp">PP 4/4</span></div>
+      </button>
+      <button type="button" class="pd-card move-btn">
+        <div class="move-row"><span class="move-name">SPARK RUSH</span><span class="move-dmg">20% DMG</span></div>
+        <div class="move-row"><span class="pd-badge" style="background:rgba(120,180,255,.14);color:var(--pd-text-meta)">ELEC</span><span class="move-pp">PP 4/4</span></div>
+      </button>
+      <button type="button" class="pd-card move-btn move-btn--weak">
+        <div class="move-row"><span class="move-name">QUICK ATTACK</span><span class="move-dmg">15% DMG</span></div>
+        <div class="move-row"><span class="pd-badge" style="background:rgba(120,180,255,.14);color:var(--pd-text-meta)">ELEC</span><span class="move-pp">PP 4/4</span></div>
+      </button>
+      <button type="button" class="pd-card move-btn move-btn--weak">
+        <div class="move-row"><span class="move-name">CHARGE</span><span class="move-dmg">10% DMG</span></div>
+        <div class="move-row"><span class="pd-badge" style="background:rgba(120,180,255,.14);color:var(--pd-text-meta)">ELEC</span><span class="move-pp" style="color:var(--pd-blue-light)">PP ∞</span></div>
+      </button>
+    </div>
+    <div class="side-panel">
+      <button type="button" class="pd-btn pd-btn--secondary pd-btn--block pd-btn--lg" onclick="window.location.href='6.Cambio_pokemon.html'">
+        <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>CAMBIAR POKÉMON
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var name = localStorage.getItem('pd_nickname') || 'ENTRENADOR';
+  var els = document.querySelectorAll('[data-pd-nickname]');
+  for (var i = 0; i < els.length; i++) els[i].textContent = name;
+})();
+</script>
+</body>
+</html>

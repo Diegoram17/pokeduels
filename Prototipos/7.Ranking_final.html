@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ranking Final · Poke-duels</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/pokeduels-design-system.css">
+<style>
+  .rank-topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
+    padding:0 var(--pd-space-6);height:64px;background:rgba(5,8,20,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--pd-border-blue-dim)}
+  .rank-topbar-right{display:flex;align-items:center;gap:var(--pd-space-3)}
+  .rank-main{position:relative;min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:48px var(--pd-space-6);overflow:hidden}
+  .rank-intro{text-align:center;z-index:20;margin-bottom:var(--pd-space-6);max-width:560px}
+  .rank-eyebrow{display:inline-block;padding:var(--pd-space-1) var(--pd-space-3);border-radius:var(--pd-radius-sm);
+    background:rgba(255,203,5,.1);border:1px solid rgba(255,203,5,.35);margin-bottom:var(--pd-space-3)}
+  .particle{position:absolute;border-radius:50%;background:var(--pd-blue-light);
+    box-shadow:0 0 10px var(--pd-blue-light),0 0 20px var(--pd-blue-light);animation:float-up linear infinite;opacity:0}
+  @keyframes float-up{0%{transform:translateY(100px) scale(0);opacity:0}20%{opacity:1;transform:translateY(80px) scale(1)}
+    80%{opacity:.8;transform:translateY(-50px) scale(.8)}100%{transform:translateY(-100px) scale(0);opacity:0}}
+  @media (prefers-reduced-motion: reduce){.particle{animation:none;display:none}}
+
+  .podium{position:relative;z-index:20;display:flex;align-items:flex-end;justify-content:center;gap:var(--pd-space-4);
+    width:100%;max-width:1000px;flex-wrap:wrap}
+  .podium-col{display:flex;flex-direction:column;align-items:center;width:280px;max-width:100%}
+  .podium-col--first{width:320px;transform:translateY(-24px)}
+  .podium-card{width:100%;border-radius:var(--pd-radius-md) var(--pd-radius-md) 0 0;border-bottom:none;padding:var(--pd-space-4);display:flex;flex-direction:column;
+    align-items:center;text-align:center;position:relative}
+  .rank-chip{position:absolute;top:-14px;padding:var(--pd-space-1) var(--pd-space-3);border-radius:var(--pd-radius-sm);font:700 16px/1 var(--pd-font-mono)}
+  .podium-avatar{border-radius:50%;overflow:hidden;margin-bottom:var(--pd-space-3);margin-top:var(--pd-space-4)}
+  .podium-avatar img{width:100%;height:100%;object-fit:cover}
+  .podium-name{margin:0 0 var(--pd-space-1);font:800 18px/1.2 var(--pd-font-display);color:#fff;text-transform:uppercase}
+  .podium-rank-label{font-family:var(--pd-font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--pd-space-3)}
+  .stat-row{width:100%;display:flex;justify-content:space-between;padding:var(--pd-space-2) var(--pd-space-3);border-radius:var(--pd-radius-sm);
+    background:rgba(9,16,40,.5);border:1px solid var(--pd-border-blue-dim);margin-top:auto}
+  .stat-item{display:flex;flex-direction:column;align-items:center;gap:2px}
+  .podium-base{width:100%;border-left:1px solid var(--pd-border-blue-dim);border-right:1px solid var(--pd-border-blue-dim);
+    border-top:1px solid var(--pd-border-blue-dim)}
+  .podium-base--2,.podium-base--3{height:110px;background:linear-gradient(180deg, rgba(20,30,60,.6), rgba(9,16,40,.4))}
+  .podium-base--1{height:160px;background:linear-gradient(180deg, rgba(255,203,5,.14), rgba(9,16,40,.4));border-color:rgba(255,203,5,.4)}
+  .champion-badge{display:inline-block;padding:var(--pd-space-1) var(--pd-space-2);border-radius:var(--pd-radius-sm);margin-bottom:var(--pd-space-2);
+    background:rgba(255,203,5,.14);color:var(--pd-yellow);border:1px solid rgba(255,203,5,.4);
+    font:700 11px/1 var(--pd-font-mono);letter-spacing:.12em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="pd-page">
+  <div class="pd-glow-blob" style="left:50%;top:10%;width:800px;height:600px;transform:translateX(-50%)"></div>
+
+  <header class="rank-topbar">
+    <span class="pd-logo pd-logo--sm">Poke-duels</span>
+    <div class="rank-topbar-right">
+      <button type="button" class="pd-btn pd-btn--ghost" onclick="window.location.href='2.Lobby_de_salas.html'">Unirse a Partida</button>
+      <button type="button" class="pd-btn pd-btn--secondary" onclick="window.location.href='2.Lobby_de_salas.html'">Crear Sala</button>
+      <span class="pd-meta" data-pd-nickname>ENTRENADOR</span>
+      <span class="pd-avatar" style="width:40px;height:40px">
+        <img alt="Avatar del jugador" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA54kqeU-V_Ugk0uEjZyhZvzL4jOpHxq05emgVV-pS_zSyNxph12u5jFSWvuWEvvWcGToZZ4jAyrys9RHC2I5EjjXHrI4Odgu41AgIKR-sGdEN2TMfhFZltwKOi0IH1aLa2H8QzFwHPqzzcVAe-rIv4GOGfPHgS6cMQ8VodQwoNJ6Yv9h41H_anyGeGC3YLxcLDr7XUu_PHF9sN3fpwRCRiuWgDq5bz8p8D5nDl-Mo-toTbzdFxst1QTg" style="width:100%;height:100%;object-fit:cover">
+      </span>
+    </div>
+  </header>
+
+  <main class="rank-main">
+    <div class="pd-grid-perspective"></div>
+    <div id="particle-container" style="position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden"></div>
+
+    <div class="rank-intro">
+      <span class="rank-eyebrow pd-label">TORNEO DE ENTRENADORES</span>
+      <h2 class="pd-title pd-title--lg" style="margin-top:var(--pd-space-1)">HALL DE LA FAMA</h2>
+      <p class="pd-body" style="margin-top:var(--pd-space-2)">Presentamos a los mejores entrenadores de la temporada.</p>
+    </div>
+
+    <div class="podium">
+      <!-- 2nd place -->
+      <div class="podium-col">
+        <div class="pd-card podium-card">
+          <span class="rank-chip" style="background:rgba(120,180,255,.14);color:var(--pd-text-meta);border:1px solid var(--pd-border-blue)">#2</span>
+          <span class="pd-avatar podium-avatar" style="width:96px;height:96px">
+            <img alt="Avatar del 2º lugar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMVih3SFICKXzvkNm0547peGAuczANe7l3qLO3HiQrOszNUROCFGKdICJSrZrF57s3BKq3YSBQaIpO6vjM3EmWC1l2z3fHFJSK_rE4_iF2B5ENzP1LdEGFgCGfycVWocXwbH6Gr4XkWwkdI_IRa9IW1fABKebHBTuwPWrtbqj4SAmBhyl0Ol5CjIirDiEBHLq22uSfvCjBQzFkiKEv4vqqM_DToEutAU3PKJCsK4FIiTtgkC2BEP-xcA">
+          </span>
+          <h3 class="podium-name">CyberNinja</h3>
+        </div>
+        <div class="podium-base podium-base--2"></div>
+      </div>
+
+      <!-- 1st place -->
+      <div class="podium-col podium-col--first">
+        <div class="pd-card podium-card" style="border-color:var(--pd-yellow);box-shadow:0 0 20px rgba(255,203,5,.35),0 26px 70px rgba(0,0,0,.72)">
+          <span class="material-symbols-outlined pd-icon--fill" aria-hidden="true" style="position:absolute;top:-34px;font-size:44px;color:var(--pd-yellow)">workspace_premium</span>
+          <span class="rank-chip" style="background:var(--pd-yellow);color:#1a1400;font-size:18px">#1</span>
+          <span class="pd-avatar podium-avatar" style="width:120px;height:120px;border-color:var(--pd-yellow)">
+            <img alt="Avatar del 1er lugar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYBbYwbMeMYbkxJO42ThxkQEYeFG6ISZfG6MjyIG3XV6VMPiVC-ZODY1eRuYKUT8JgvKr1DXrM3wRNC7amZGYZzBxa99PRgdsK5PKoZHICB4wdwJDZMg3QLUHAo3FJ9SA5IZDiUlK3erMzETb2xzBQcy6Zu3DlgDUifdwRwmTS1a5iQl6jgSCYSVR1nAUKaKx31Wd_NlE-2jmreIJEHn0qum9i5P8kCYXb9i11-j1YqhKFRUXQMA7Vmw">
+          </span>
+          <span class="champion-badge">CAMPEÓN</span>
+          <h3 class="podium-name" style="font-size:22px;color:var(--pd-yellow)">V0idWalker</h3>
+        </div>
+        <div class="podium-base podium-base--1"></div>
+      </div>
+
+      <!-- 3rd place -->
+      <div class="podium-col">
+        <div class="pd-card podium-card">
+          <span class="rank-chip" style="background:rgba(120,180,255,.14);color:var(--pd-text-meta);border:1px solid var(--pd-border-blue)">#3</span>
+          <span class="pd-avatar podium-avatar" style="width:96px;height:96px">
+            <img alt="Avatar del 3er lugar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJtvZHfB_AYqD-jX-HhqYE_SUIco0pZV2Q1iAh9dENBtIbQRQhGXcbjgZARrkExPARXgTLHIBkBHZp-PA4rOlaMWaJrKvpp04f5ShETmDglBb5Deaak_ZpUC-HD6BM8HGho4jvMlASEtx3L01wMLrG-mA-7VjKRmo_rLz2hynH583o1qFhEW5-jNLuPpVNXIeDMLk1XbjtVUAHomB9doi00JuPc-XNA3r7xUoPUliSuxHIGYL3mpcxQw">
+          </span>
+          <h3 class="podium-name">RogueSquad</h3>
+        </div>
+        <div class="podium-base podium-base--3"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:48px;z-index:20;position:relative">
+      <button type="button" class="pd-btn pd-btn--primary pd-btn--lg" onclick="window.location.href='2.Lobby_de_salas.html'">VOLVER AL LOBBY<span class="pd-btn__shine"></span></button>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Simple ambient particle generator (vanilla JS, preserved from the original prototype).
+  (function () {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var container = document.getElementById('particle-container');
+    var particleCount = 30;
+
+    function createParticle() {
+      var particle = document.createElement('div');
+      particle.classList.add('particle');
+
+      var size = Math.random() * 6 + 2;
+      var left = Math.random() * 100;
+      var bottom = Math.random() * 20;
+      var duration = Math.random() * 3 + 2;
+      var delay = Math.random() * 2;
+
+      if (Math.random() > 0.7) {
+        particle.style.background = '#ffcb05';
+        particle.style.boxShadow = '0 0 10px #ffcb05, 0 0 20px #ffcb05';
+      }
+
+      particle.style.width = size + 'px';
+      particle.style.height = size + 'px';
+      particle.style.left = left + '%';
+      particle.style.bottom = bottom + '%';
+      particle.style.animationDuration = duration + 's';
+      particle.style.animationDelay = delay + 's';
+
+      container.appendChild(particle);
+
+      particle.addEventListener('animationend', function () {
+        particle.remove();
+        createParticle();
+      });
+    }
+
+    for (var i = 0; i < particleCount; i++) createParticle();
+  })();
+</script>
+<script>
+(function(){
+  var name = localStorage.getItem('pd_nickname') || 'ENTRENADOR';
+  var els = document.querySelectorAll('[data-pd-nickname]');
+  for (var i = 0; i < els.length; i++) els[i].textContent = name;
+})();
+</script>
+</body>
+</html>

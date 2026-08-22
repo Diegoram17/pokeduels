@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selección de Equipo · Poke-duels</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/pokeduels-design-system.css">
+<style>
+  html,body{height:100%;overflow:hidden}
+  .draft-shell{display:flex;flex-direction:column;height:100vh}
+  .draft-topbar{position:relative;flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:0 var(--pd-space-6);height:64px;background:rgba(5,8,20,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--pd-border-blue-dim);z-index:20}
+  .draft-topbar .center-logo{position:absolute;left:50%;transform:translateX(-50%)}
+  .draft-profile{display:flex;align-items:center;gap:var(--pd-space-2);color:var(--pd-text-meta)}
+  .draft-profile .avatar-sm{width:32px;height:32px;border-radius:50%;background:rgba(6,12,30,.6);border:1px solid var(--pd-border-blue);
+    display:flex;align-items:center;justify-content:center}
+  .draft-main{flex:1;overflow:hidden;display:flex;gap:var(--pd-space-5);padding:var(--pd-space-5) var(--pd-space-6);position:relative;z-index:2}
+  .draft-left{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--pd-space-5);padding-right:var(--pd-space-2)}
+  .draft-progress-head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--pd-space-4);margin-bottom:var(--pd-space-3);flex-wrap:wrap}
+  .section-heading{display:flex;align-items:center;gap:var(--pd-space-2);margin:0 0 var(--pd-space-3);text-transform:uppercase}
+  .starter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--pd-space-4)}
+  .catalog-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--pd-space-4)}
+  @media(max-width:960px){.starter-grid{grid-template-columns:repeat(2,1fr)}.catalog-grid{grid-template-columns:repeat(3,1fr)}}
+  .mon-card{display:flex;flex-direction:column;cursor:pointer}
+  .mon-card:focus-visible{border-color:var(--pd-border-blue-soft);outline:2px solid var(--pd-yellow);outline-offset:2px}
+  .mon-card .art{height:128px;position:relative;background:rgba(6,12,30,.6);overflow:hidden}
+  .mon-card .art img{width:100%;height:100%;object-fit:cover;opacity:.85;transition:opacity var(--pd-fast)}
+  .mon-card:hover .art img{opacity:1}
+  .mon-card .type-tag{position:absolute;top:8px;right:8px}
+  .mon-card .check{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:50%;background:var(--pd-yellow);
+    display:flex;align-items:center;justify-content:center;color:#1a1400}
+  .mon-card .check .material-symbols-outlined{font-size:15px}
+  .mon-card .meta{padding:var(--pd-space-2) var(--pd-space-3);border-top:1px solid var(--pd-border-blue-dim)}
+  .mon-card .meta h4{margin:0;font:700 14px/1.2 var(--pd-font-mono);color:#fff}
+  .mon-card .meta span{display:block;margin-top:var(--pd-space-1);font:400 10px/1.4 var(--pd-font-mono);letter-spacing:.1em;color:var(--pd-text-meta);text-transform:uppercase}
+  .mon-card--selected{border-color:var(--pd-yellow)}
+  .mon-card--selected .meta{border-top-color:rgba(255,203,5,.3)}
+  .mon-card--taken{cursor:not-allowed;opacity:.85}
+  .mon-card--taken .art img{filter:grayscale(1);opacity:.35}
+  .taken-flag{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:repeating-linear-gradient(45deg, rgba(0,0,0,.65),rgba(0,0,0,.65) 10px, rgba(20,20,20,.65) 10px, rgba(20,20,20,.65) 20px)}
+  .taken-flag span{transform:rotate(-10deg);border:2px solid rgba(238,21,21,.5);background:rgba(0,0,0,.8);
+    padding:var(--pd-space-1) var(--pd-space-3);font:800 12px/1 var(--pd-font-display);letter-spacing:.14em;color:var(--pd-danger);text-transform:uppercase}
+  .catalog-card{cursor:pointer}
+  .catalog-card:focus-visible{border-color:var(--pd-border-blue-soft);outline:2px solid var(--pd-yellow);outline-offset:2px}
+  .catalog-card .art{height:96px;position:relative;background:rgba(6,12,30,.6)}
+  .catalog-card .art img{width:100%;height:100%;object-fit:cover;opacity:.75;transition:opacity var(--pd-fast)}
+  .catalog-card:hover .art img{opacity:1}
+  .catalog-card .type-tag{position:absolute;top:6px;right:6px;font-size:10px;padding:var(--pd-space-1)}
+  .catalog-card .check{position:absolute;top:6px;left:6px;width:16px;height:16px;border-radius:50%;background:var(--pd-yellow);
+    display:flex;align-items:center;justify-content:center;color:#1a1400}
+  .catalog-card .check .material-symbols-outlined{font-size:11px}
+  .catalog-card .meta{padding:var(--pd-space-2);border-top:1px solid var(--pd-border-blue-dim)}
+  .catalog-card .meta h4{margin:0;font:700 13px/1.2 var(--pd-font-mono);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .draft-side{width:320px;flex:none;display:flex;flex-direction:column;height:100%}
+  @media(max-width:960px){.draft-side{width:240px}}
+  .draft-side-head{border-bottom:1px solid var(--pd-border-blue-dim);padding-bottom:var(--pd-space-2);margin-bottom:var(--pd-space-2);flex:none}
+  .squad-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--pd-space-2);padding-right:var(--pd-space-1)}
+  .squad-slot{display:flex;align-items:center;gap:var(--pd-space-3);padding:var(--pd-space-2);border-radius:var(--pd-radius-sm);
+    background:rgba(9,16,40,.6);border:1px solid rgba(255,203,5,.3)}
+  .squad-slot img{width:44px;height:44px;border-radius:var(--pd-radius-sm);object-fit:cover;flex:none;background:rgba(6,12,30,.6)}
+  .squad-slot h4{margin:0;font:700 13px/1.2 var(--pd-font-mono);color:#fff}
+  .squad-slot--empty{opacity:.5;border:1px dashed var(--pd-border-blue-soft);background:transparent}
+  .squad-slot--empty .num{width:44px;height:44px;flex:none;border-radius:var(--pd-radius-sm);background:rgba(6,12,30,.5);
+    display:flex;align-items:center;justify-content:center;font:700 16px/1 var(--pd-font-mono);color:var(--pd-text-meta)}
+  .draft-side-foot{flex:none;margin-top:var(--pd-space-3)}
+</style>
+</head>
+<body>
+<div class="pd-page draft-shell">
+  <div class="pd-glow-blob" style="left:-10%;bottom:-10%;width:520px;height:520px"></div>
+
+  <header class="draft-topbar">
+    <div class="draft-profile">
+      <span class="avatar-sm"><span class="material-symbols-outlined" aria-label="Perfil de Jugador" style="font-size:16px">person</span></span>
+      <span class="pd-meta" data-pd-nickname>ENTRENADOR</span>
+    </div>
+    <span class="pd-logo pd-logo--sm center-logo">Poke-duels</span>
+    <button type="button" class="pd-btn pd-btn--ghost" onclick="window.location.href='2.Lobby_de_salas.html'">SALIR</button>
+  </header>
+
+  <div class="draft-main">
+    <div class="draft-left pd-scroll">
+      <!-- Drafting Header & Progress -->
+      <section class="pd-card">
+        <div class="draft-progress-head">
+          <div>
+            <h2 class="pd-title pd-title--lg" style="text-transform:uppercase">ELIGE TU EQUIPO</h2>
+            <p class="pd-body" style="margin-top:var(--pd-space-1)">Selecciona 1 Pokémon inicial exclusivo y 5 compañeros para tu equipo de combate.</p>
+          </div>
+          <div style="text-align:right">
+            <span class="pd-stat pd-stat--xl" style="color:var(--pd-yellow);display:block">3/6</span>
+            <span class="pd-meta">SELECCIONADOS</span>
+          </div>
+        </div>
+        <div class="pd-progress"><div class="pd-progress__fill" style="width:50%"></div></div>
+      </section>
+
+      <!-- Exclusive Starter Section -->
+      <section>
+        <h3 class="pd-title section-heading"><span class="material-symbols-outlined" aria-hidden="true" style="color:var(--pd-yellow)">star</span>ELEGIR INICIAL</h3>
+        <div class="starter-grid">
+          <!-- Pikachu -->
+          <button type="button" class="pd-card pd-card--flush mon-card">
+            <div class="art">
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfKfDCsaKf4YQMokcBiIBXJm5gjjLFUjfG-bwaZkrTD8ezu3BSXVcL2jZac31vcLJrmpWYn7lSIVd1hxF_TpUg0G8ashzoFcvHj3Ur-aob7R1xIcg38-kvqWzLytJ7AhauiUBKLXb9ZPnt2LUrOi4wDrTlkJXOyzJdOMJGBp59A6nhGGwrlFIUbwSzbATnAdv6uUDbN4iweH8fpOK7grqllu-0hoEzkWVtUexwNEQlqJnaSgdYI3KZ9w" alt="Pikachu">
+              <span class="pd-badge pd-badge--electric type-tag">ELÉCTRICO</span>
+            </div>
+            <div class="meta"><h4>Pikachu</h4><span>TIPO: ELÉCTRICO</span></div>
+          </button>
+          <!-- Bulbasaur -->
+          <button type="button" class="pd-card pd-card--flush mon-card">
+            <div class="art">
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2pfDiyN5NTmNtDkktHm8uPS4ScCJic9WtCoBfNGtnYmScD12Em7vZyf3UWcmwAzKlibsZroS7qr4oCDOjZTghqRXCSb3852-iA0XgDQbXlLO5VDMxKqITwhHrrfT9GhfkAegZwOHbg2wMZNVz_F4-m-lSMA2FP9Xo8pAT_H8h-3knMjfHWSMMQ4RTsdoWJVdt08Btn2iHD9jFNFl6MDXiItFe7YL-EsJwxH0DeguXC2ObEfWgzH_A6g" alt="Bulbasaur">
+              <span class="pd-badge pd-badge--grass type-tag">PLANTA</span>
+            </div>
+            <div class="meta"><h4>Bulbasaur</h4><span>TIPO: PLANTA</span></div>
+          </button>
+          <!-- Charmander (selected) -->
+          <button type="button" class="pd-card mon-card mon-card--selected">
+            <div class="art">
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkgNNi5Jp_lAoydp3ZjZ1S6A7hddeC2JjCzDa6Zgmj-39f1IZ1HQZnF1WGLiV9dcLhdYKz16vW77oJ6ZXCj2SDLLkMReTvCeuenhll1ZAiHeIf8y-WraXTDxag4OLV69D9msCG9U1aAjnOfsSfxE5acgQ_8In5tj8D2aFE7hiKDYZxSCLzXHv6-oJbDshYcOH0mI2OlhTzvGvVpiwGSyaH01HKzfz05VwA8sEKqqxn_YqdnlQ-Y5PmDA" alt="Charmander">
+              <span class="pd-badge pd-badge--fire type-tag">FUEGO</span>
+              <span class="check"><span class="material-symbols-outlined pd-icon--fill" aria-hidden="true">check</span></span>
+            </div>
+            <div class="meta"><h4>Charmander</h4><span style="color:var(--pd-yellow)">TIPO: FUEGO</span></div>
+          </button>
+          <!-- Squirtle (taken) -->
+          <button type="button" class="pd-card mon-card mon-card--taken" disabled aria-disabled="true">
+            <div class="art">
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7FULbAQhtONrdMm28dtkI8wwUtNZA6e46w_v3SKak5OZgxj3FM8RQmVEGBh163H9cz2m0nCT_hbxenUnIeuOqETYcHZJBtUtuvHaKfKoA_mvrD_eFfE8lpj2M36h4OPWZHwtbjp-sDSwEsKAaegQBNT7D0tpsM0YffXdNKdzgsEj9Hyawik0eW6qwEFJe4oQDc6qDdEJb8HFmIi3r1QSXILiJ2jfzsDonuoWLwblELZwt4q75cVdtrA" alt="Squirtle">
+              <span class="pd-badge pd-badge--water type-tag" style="opacity:.6">AGUA</span>
+              <div class="taken-flag"><span>SELECCIONADO POR RIVAL</span></div>
+            </div>
+            <div class="meta" style="opacity:.5"><h4>Squirtle</h4><span>TIPO: AGUA</span></div>
+          </button>
+        </div>
+      </section>
+
+      <!-- Catalog Section -->
+      <section>
+        <h3 class="pd-title section-heading"><span class="material-symbols-outlined" aria-hidden="true" style="color:var(--pd-blue-light)">view_cozy</span>CATÁLOGO</h3>
+        <div class="catalog-grid">
+          <button type="button" class="pd-card pd-card--flush catalog-card">
+            <div class="art"><span class="pd-badge pd-badge--poison type-tag">VENENO</span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAIAGDmAvtmnshKQg27y2WcnlUltRRzyW_L6nU7M3UE1btwA41dE1qPS4VcKs1zg2Uw6IeP9gH6JzJhh6A1oDeQF8UuF_m6XabfMHu2EU8I0kcQd-SaV-a9zl5ZTbGiOWqh79CJhyk6Q9htXwq_sGtKfS9QdsVefDkMr1pfYGzElQHLXr943_Fzvn_ncyTTVTtEcOPZI4ZOPZyiiGYZ2CXWhXE-bEPSDpIfpTsE_wBxF-Ke-FIgxUzWVA" alt="Zubat">
+            </div>
+            <div class="meta"><h4>Zubat</h4></div>
+          </button>
+          <button type="button" class="pd-card pd-card--flush catalog-card">
+            <div class="art"><span class="pd-badge pd-badge--normal type-tag">NORMAL</span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdz5ghr2PShMNFMoU3qNyGWIJ4wi2-Mkj5tNwnzr3_KO9FIGb_ukuWui9kO-7KuJZXUOYlggooMcyw6bqk4QUPouGLQEgXH-4PITXpPdx4BscgiLljltaGU3naBSnLL_SlOx1IhKwNeH-lDIG6B7wyqF2c3owe6oV1__JtLR8LcUArRAwSE6VMy6QjMSGlh1KiTxNiu8QnUHBQnJxFTy4Nn5N6j7wK_EWHPsse0fVdkMT3--Vf5lmmgw" alt="Pidgey">
+            </div>
+            <div class="meta"><h4>Pidgey</h4></div>
+          </button>
+          <button type="button" class="pd-card pd-card--flush catalog-card">
+            <div class="art"><span class="pd-badge pd-badge--ground type-tag">TIERRA</span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAgVdynjtqUT7_uw_CbhqyX0d_XACoFSQoku1mmEUHi5LQwzsHS_y9q1weFSORY_XvulNyGOuTE7DZAIKK7Y8P1u59oPCnRvm8N8DUZczbqlC6IJ0m5_ZzIWhUbX0GKmiLublfUEbaF0mnMApct6n8VkzvOVt9KOdg1JeBTNRKuVBdiifjVLPBXElQxKSrI9qMIMaXxB6MIhLH5KiP_inJPwkFuwoWFiwX-F5LoqlR9xQ4SsTRinKrRPQ" alt="Sandshrew">
+            </div>
+            <div class="meta"><h4>Sandshrew</h4></div>
+          </button>
+          <!-- Kadabra (selected) -->
+          <button type="button" class="pd-card pd-card--flush catalog-card" style="border-color:var(--pd-yellow)">
+            <div class="art"><span class="pd-badge pd-badge--psychic type-tag">PSÍQUICO</span>
+              <span class="check"><span class="material-symbols-outlined pd-icon--fill" aria-hidden="true">check</span></span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxbi6a2M_DexgHCPLkzVzbWL8jIaDUBgYG3yEYlUnLCZvL-sqmXWKcIGT3csrjKXxJQfPa_lNa2jA4h9qdoCsDWvc4-0Ewo7EdxJdHRzLvcPW7TBr7DtpZHsZiaHo-6Anh5dE3w9731AuipaCz0gOy28q2LdZKGPALSFAASjACDpvGYUYpuPfmyZ41XbCQyOdts1Jp09-5C_ZLunWABZ2JzRwz-wwcVygDxVjJ84kpWDkozUD6axdR7w" alt="Kadabra">
+            </div>
+            <div class="meta"><h4>Kadabra</h4></div>
+          </button>
+          <button type="button" class="pd-card pd-card--flush catalog-card">
+            <div class="art"><span class="pd-badge pd-badge--fairy type-tag">HADA</span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDE90LKAMITsOAuCo7XFrp831cRxm87X4uZpUz4jVBtCf3ZdvmQMTWyfhSi3JHHRy0Y0Oh9vyrdpmeRtfN_FxUiBEYd6lYF4iGkmdfQx8J-xN2Up8y5blwjxIHctFrwERtg_buBdn0eqaAbY7VvJNhb4TWVStoom0wy7V6WrDoSdMN4JHzDNVbkkJ_iJqiNOlK_YKaUdDFl6kxTZl0dpy4kHi24H0RO6BtYWnvJwbGPOSk_DMGQAlqPJA" alt="Jigglypuff">
+            </div>
+            <div class="meta"><h4>Jigglypuff</h4></div>
+          </button>
+          <button type="button" class="pd-card pd-card--flush catalog-card">
+            <div class="art"><span class="pd-badge pd-badge--fighting type-tag">LUCHA</span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6i2CU8_0cJeRG-q-Y7f12ldvJQ6zA_1i84NyPa6DP234KBjK61hXxYK6SHSwNuvVKlBQv3osFex89-TOyWeQwlmWB4Ozze44NB18yQLMYnR8PHCrPSOanuH2HvM8xpEV1bpERV_-PGJ1D6tgK6q_b9RzN1ULKSRDKuM42_zfjQwpPzjTlWzc-VliLlaW2D1gUFAFn8V-8FVvIs9HdUDg61Xfc8esneUFjytUl4URiN5NBtUddeAZsdA" alt="Machamp">
+            </div>
+            <div class="meta"><h4>Machamp</h4></div>
+          </button>
+          <button type="button" class="pd-card pd-card--flush catalog-card">
+            <div class="art"><span class="pd-badge pd-badge--rock type-tag">ROCA</span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeBtcMYk3teji751fsBgxBvEjESGMN9vYAErvbAww_NTi-ofkQGG9iPaxCyNkxhq4nV2DmGr57OMXub_Yft5pvk6D8R9rMjbEVmctVucTrlMXRrMXFdCoC3XGIR_lb8rourMRKFd4ICMk2IMA4fROIy5hNatgrmF6KTMx7ZMuAij7SI-NGbgv_JGzD8lMqIyA8jhIZrXn9TUeuzTAOmc21ya-L4yXmZPqY1b4QNyGpmQupPko-dV5PJA" alt="Onix">
+            </div>
+            <div class="meta"><h4>Onix</h4></div>
+          </button>
+          <button type="button" class="pd-card pd-card--flush catalog-card">
+            <div class="art"><span class="pd-badge pd-badge--ghost type-tag">FANTASMA</span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDVbHbah5jGvbusm_DFLltFgB7I2yzcRmoBl2WcGyGvvwzLyZXZy7QXPD9v6-J7VLcqKpcFcN84YR7bnU1viDDluEP28RTNSFedw6sgLnEc0cXXN7CU3qECPDU_02p7ndFLrGng8jh6oASDN_7cz7xxIS7F5ERz3iNJfxPvwgLFNWojaFE-TN4pZA2EGyrw3k1co9T3aiJFAa3w1woT-bQAhKEIwsDFfa_6oMnnAsAJryiaopbqQIzcw" alt="Gengar">
+            </div>
+            <div class="meta"><h4>Gengar</h4></div>
+          </button>
+          <!-- Jynx (selected) -->
+          <button type="button" class="pd-card pd-card--flush catalog-card" style="border-color:var(--pd-yellow)">
+            <div class="art"><span class="pd-badge pd-badge--ice type-tag">HIELO</span>
+              <span class="check"><span class="material-symbols-outlined pd-icon--fill" aria-hidden="true">check</span></span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2fB7Xz2wlpvW5pcxkal1s-wkX8eT5I1-Vqtk1U-Yqu0ETQchFa3NQAuBTN1cuxFMSsMX5iBNpQ9Wah_Z7FJt5FvDY-5CQ1AEjJ3JWXgMHMjHZMo0Kw_Li7q7tL8Gg3s2_r7eOmvA_vu11B7Ivua41k5bZ-85WxktkCyrh9fDelEHaC3J5sG23I12wQbeNphKEwKRu1xbFOZWicsN1kGBxJR0DhWtOccVwobETdng5fMVpobxqdYLIvQ" alt="Jynx">
+            </div>
+            <div class="meta"><h4>Jynx</h4></div>
+          </button>
+          <button type="button" class="pd-card pd-card--flush catalog-card">
+            <div class="art"><span class="pd-badge pd-badge--steel type-tag">ACERO</span>
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDi1Iaf_4GO8-AuGEsxIGjTWLEdda05C4XB0OPL0WW_y8k6lZcBRMjDtmaFtQWZvnz7A8-Z2dwp7UbSxNVGhymqynizsZ_7X4xku9xFAZIUckdn5FPgwtiNJtG281dEeRA_MxeEM_qyfgcnVK-4UivS9HQ3_kU48Ob57pxQOSit5PpGYfmeL9CJE6y4um-XNhec9GcTRpbQ12KOORpI1l6xiAjM-FAP9Z2rrxrXtnIO3fs8vzrSbCgL8w" alt="Magneton">
+            </div>
+            <div class="meta"><h4>Magneton</h4></div>
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Right Side Panel: Squad Summary -->
+    <aside class="pd-card draft-side">
+      <div class="draft-side-head">
+        <h3 class="pd-title" style="letter-spacing:-.01em">TU EQUIPO</h3>
+        <p class="pd-label" style="margin-top:var(--pd-space-1)">INTEGRANTES (6)</p>
+      </div>
+      <div class="squad-list pd-scroll">
+        <div class="squad-slot">
+          <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfQGjcawaJBwkdM2sF7ATGHY8c_gXLtOqJxApwOQJYFwYp-se98wSKT_OL4B61PPRfcCnaWbPEmbk6kvhiH2M_qmcBkqyb25_FjLij5R0xeDABfIlHPbd1pLcr-MC2lYpd0tn3S7c8sXZ8URSfh4DBoRx4oc5lIwQqV82T_OBffAbAYQglk1rbLTLRQzRVMCRBnFuA1Wc60GGduf6SvzK9aWpcjqw44U75jrJy60yP3ehc-Le2l2uMgg" alt="Charmander">
+          <div><h4>Charmander</h4><span class="pd-label" style="color:var(--pd-type-fire);font-size:9px">FUEGO</span></div>
+        </div>
+        <div class="squad-slot">
+          <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYw70TBYLaCNJBABZmpNXz3FzoywYqIYfB7nDcVMssuz-DCmGOeDtMuDnqiYOdcwGBlxVSnKbyX7RJHUUHGTO6JYWjg_GJtn8EIzvQGSfV7ZkihAGq_b_uxCV8XRwbGv8Md2WQHZAEBUFHDdIeLW-7jqsXk4cC0Px9Vm7bQWJac1R8HjKKIuR54GXOQHbgBSlg2FcXtci0TLiiCA6ZTsim0H7XbGJE8eqJs0ug8x_UUbGiN3nZWPBeig" alt="Kadabra">
+          <div><h4>Kadabra</h4><span class="pd-label" style="color:var(--pd-type-psychic);font-size:9px">PSÍQUICO</span></div>
+        </div>
+        <div class="squad-slot">
+          <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMn5DW3G0si_5GnyQfqPR44UjmM2wmGpVtwKaNmLLvZbWc0BYP_YsuaMi4-Sr2Wbsr5PkRH1iLLhjbTaebthQZg77A59rPfCSIu7aA3XhgLDc738aingAmSRCJ7yJxINjB358hdSUpjowEd98Kx-ZliSDoaabMeQnHohuulTiAZuersewoyEz9Hmvv-J9uCXO6ur6WaP99UyTSxowYSwmRhgtZ740HwS2Vze3nTsukkOR6IiciGHxpZQ" alt="Jynx">
+          <div><h4>Jynx</h4><span class="pd-label" style="color:var(--pd-type-ice);font-size:9px">HIELO</span></div>
+        </div>
+        <div class="squad-slot squad-slot--empty"><span class="num">4</span><span class="pd-label">SLOT DISPONIBLE</span></div>
+        <div class="squad-slot squad-slot--empty"><span class="num">5</span><span class="pd-label">SLOT DISPONIBLE</span></div>
+        <div class="squad-slot squad-slot--empty"><span class="num">6</span><span class="pd-label">SLOT DISPONIBLE</span></div>
+      </div>
+      <div class="draft-side-foot">
+        <button type="button" id="btn-ready" class="pd-btn pd-btn--primary pd-btn--block" disabled>
+          <span class="material-symbols-outlined" aria-hidden="true">lock</span>¡LISTO PARA COMBATIR!
+          <span class="pd-btn__shine"></span>
+        </button>
+        <p id="ready-helper" class="pd-meta" style="text-align:center;margin-top:var(--pd-space-2);font-size:10px">Elige 3 Pokémon más para completar tu equipo</p>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+(function(){
+  // Team selection logic for Pokémon draft
+  var selectedCount = 3; // Charmander, Kadabra, Jynx are pre-selected in HTML
+  var counter = document.querySelector('.pd-stat--xl');
+  var btnReady = document.getElementById('btn-ready');
+  var helper = document.getElementById('ready-helper');
+  var cards = document.querySelectorAll('.mon-card:not(.mon-card--taken), .catalog-card');
+
+  // Ensure pre-selected cards have check marks
+  for (var i = 0; i < cards.length; i++) {
+    if (cards[i].classList.contains('mon-card--selected') || cards[i].style.borderColor) {
+      var art = cards[i].querySelector('.art');
+      if (art && !art.querySelector('.check')) {
+        var check = document.createElement('span');
+        check.className = 'check';
+        check.innerHTML = '<span class="material-symbols-outlined pd-icon--fill" aria-hidden="true">check</span>';
+        art.appendChild(check);
+      }
+    }
+  }
+
+  function updateUI() {
+    counter.textContent = selectedCount + '/6';
+    if (selectedCount === 6) {
+      btnReady.removeAttribute('disabled');
+      btnReady.querySelector('.material-symbols-outlined').textContent = 'check_circle';
+      btnReady.childNodes[1].textContent = '\u00a1EQUIPO LISTO!';
+      helper.textContent = 'Tu equipo está completo';
+    } else {
+      btnReady.setAttribute('disabled', '');
+      var icon = btnReady.querySelector('.material-symbols-outlined');
+      if (icon) icon.textContent = 'lock';
+      btnReady.childNodes[1].textContent = '\u00a1LISTO PARA COMBATIR!';
+      var remaining = 6 - selectedCount;
+      helper.textContent = 'Elige ' + remaining + ' Pokémon más para completar tu equipo';
+    }
+  }
+
+  for (var i = 0; i < cards.length; i++) {
+    cards[i].addEventListener('click', function() {
+      var isTaken = this.classList.contains('mon-card--taken');
+      if (isTaken) return;
+
+      var wasSelected = this.classList.contains('mon-card--selected');
+      this.classList.toggle('mon-card--selected');
+
+      var art = this.querySelector('.art');
+      var check = art.querySelector('.check');
+
+      if (!wasSelected) {
+        if (!check) {
+          check = document.createElement('span');
+          check.className = 'check';
+          check.innerHTML = '<span class="material-symbols-outlined pd-icon--fill" aria-hidden="true">check</span>';
+          art.appendChild(check);
+        }
+        selectedCount++;
+      } else {
+        if (check) check.remove();
+        selectedCount--;
+      }
+      updateUI();
+    });
+  }
+
+  btnReady.addEventListener('click', function() {
+    if (!this.hasAttribute('disabled')) {
+      window.location.href = '4.Sala_de_espera.html';
+    }
+  });
+
+  // Nickname injection
+  var name = localStorage.getItem('pd_nickname') || 'ENTRENADOR';
+  var els = document.querySelectorAll('[data-pd-nickname]');
+  for (var i = 0; i < els.length; i++) els[i].textContent = name;
+})();
+</script>
+</body>
+</html>

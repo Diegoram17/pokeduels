@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sala de Espera · Poke-duels</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/pokeduels-design-system.css">
+<style>
+  html,body{height:100%;overflow:hidden}
+  .wait-shell{display:flex;flex-direction:column;height:100vh}
+  .wait-topbar{flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 var(--pd-space-6);height:64px;
+    background:rgba(5,8,20,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--pd-border-blue-dim);z-index:20}
+  .wifi-status{display:flex;align-items:center;gap:var(--pd-space-2)}
+  .wait-main{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:var(--pd-space-4);padding:var(--pd-space-4) var(--pd-space-6);position:relative;z-index:2}
+  @media(min-width:960px){.wait-main{flex-direction:row}}
+  .wait-side{width:100%;display:flex;flex-direction:column;gap:var(--pd-space-4);overflow-y:auto}
+  @media(min-width:960px){.wait-side{width:34%;flex:none}}
+  .wait-side-head{display:flex;justify-content:space-between;align-items:center}
+  .player-list{display:flex;flex-direction:column;gap:var(--pd-space-2);flex:1}
+  .player-row{display:flex;align-items:center;gap:var(--pd-space-3);padding:var(--pd-space-2);border-radius:var(--pd-radius-md);
+    background:rgba(9,16,40,.55);border:1px solid var(--pd-border-blue-dim)}
+  .player-row--ready{border-left:4px solid var(--pd-yellow);background:rgba(255,203,5,.06)}
+  .player-row--pending{opacity:.7}
+  .player-row img,.player-row .avatar-fallback{width:44px;height:44px;border-radius:var(--pd-radius-sm);object-fit:cover;flex:none;
+    background:rgba(6,12,30,.6);border:1px solid var(--pd-border-blue-dim);display:flex;align-items:center;justify-content:center;color:var(--pd-text-meta)}
+  .player-row .info{flex:1}
+  .player-row .name{font:700 15px/1 var(--pd-font-mono);color:#fff}
+  .player-row .rank{display:flex;align-items:center;gap:var(--pd-space-1);margin-top:var(--pd-space-1);font:400 10px/1.4 var(--pd-font-mono);
+    letter-spacing:.12em;text-transform:uppercase;color:var(--pd-yellow-mid)}
+  .player-row .rank .material-symbols-outlined{font-size:14px}
+  .player-row--pending .rank{color:var(--pd-text-meta)}
+
+  .bracket-section{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .bracket-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--pd-space-4)}
+  .bracket-wrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;padding-bottom:70px}
+  .bracket-row{display:flex;width:100%;max-width:680px;justify-content:space-between;align-items:stretch;height:220px}
+  .semis{display:flex;flex-direction:column;justify-content:space-between;height:100%;width:180px}
+  .bracket-slot{display:flex;align-items:center;gap:var(--pd-space-2);padding:var(--pd-space-2)}
+  .bracket-slot .pid{width:30px;height:30px;border-radius:var(--pd-radius-sm);display:flex;align-items:center;justify-content:center;
+    font:700 11px/1 var(--pd-font-mono);flex:none}
+  .connections{flex:1;position:relative;margin:0 var(--pd-space-4)}
+  .final-slot{display:flex;flex-direction:column;justify-content:center;height:100%;width:220px}
+  .final-slot .pd-card{text-align:center}
+</style>
+</head>
+<body>
+<div class="pd-page wait-shell">
+  <div class="pd-glow-blob" style="right:-6%;top:20%;width:520px;height:520px"></div>
+
+  <header class="wait-topbar">
+    <span class="pd-logo pd-logo--sm">Poke-duels</span>
+    <span class="pd-meta" data-pd-nickname>ENTRENADOR</span>
+    <span class="pd-meta wifi-status"><span class="material-symbols-outlined pd-icon--fill" aria-hidden="true" style="font-size:16px;color:var(--pd-yellow-mid)">wifi</span>Conectado</span>
+  </header>
+
+  <main class="wait-main">
+    <!-- Left: Waiting Room -->
+    <aside class="pd-card wait-side">
+      <div class="wait-side-head">
+        <h2 class="pd-title" style="color:var(--pd-blue-light)">SALA DE ESPERA</h2>
+        <span class="pd-stat" style="background:rgba(6,12,30,.6);padding:var(--pd-space-1) var(--pd-space-2);border-radius:var(--pd-radius-sm)">4 / 4</span>
+      </div>
+
+      <div class="player-list">
+        <div class="player-row player-row--ready">
+          <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3xZncA06tS2hfjAckYfJcUkDZzhyZcCtErxdS3IZwRPNZlbDPDSyx25AWDBxkJa4rg7ROK-kyen9RJcqUcSggvdsjzbVhb5jP2qaJehddnFFBAI-j8bLGo_gobriQYB0IBlksIAWvqq_eVpsz4WdgD1XxSYt1P1xkLD5cSFd_FQaNiwpm8xvyvspVHFnyDje6JrQIyDRVC_5CjLO0G85QNqsL6YOZmggSF-FDrrvP8QF0f4HBIBBf6w" alt="Avatar de VORTEX_99">
+          <div class="info">
+            <div class="name">VORTEX_99</div>
+          </div>
+          <span class="material-symbols-outlined pd-icon--fill" aria-hidden="true" style="color:var(--pd-yellow)">check_circle</span>
+        </div>
+        <div class="player-row player-row--pending">
+          <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCJwW7ca2Bwi33oNkYV-z7pBpA-z1jWE5NuZqNrmc4TjiDh5eZcSt2RX5IqiS9hnCJLQHMOqw4QQ5mKad1e_VsPs_Y4y2PsGL_wgStwVcCnVHW_qAP6NmEams9jczx9CAEA_nJMHDX-BiQGmolztd2vkvc4y0sa7NKlWxssBVXyCuQEwFWvoPYYy3GPzyAybthBj75apIB0DF_yfwNiL6kcUtcbtvmXNrQzqXC4w2fOYLH5BKlSb8rng" alt="Avatar de STEALTH_OP">
+          <div class="info">
+            <div class="name" style="color:var(--pd-text-meta)">STEALTH_OP</div>
+          </div>
+          <span class="material-symbols-outlined" aria-hidden="true" style="color:var(--pd-text-meta)">hourglass_empty</span>
+        </div>
+        <div class="player-row player-row--ready">
+          <span class="avatar-fallback"><span class="material-symbols-outlined" aria-hidden="true">person</span></span>
+          <div class="info">
+            <div class="name">CYBER_RONIN</div>
+          </div>
+          <span class="material-symbols-outlined pd-icon--fill" aria-hidden="true" style="color:var(--pd-yellow)">check_circle</span>
+        </div>
+      </div>
+
+      <button type="button" class="pd-btn pd-btn--ghost pd-btn--block" onclick="window.location.href='2.Lobby_de_salas.html'">SALIR DE LA SALA</button>
+    </aside>
+
+    <!-- Right: Tournament Bracket -->
+    <section class="pd-card bracket-section">
+      <div class="bracket-head">
+        <h2 class="pd-title" style="color:var(--pd-blue-light)">CUADRO / LLAVES</h2>
+        <span class="pd-badge pd-badge--outline" style="color:var(--pd-text-meta);border-color:var(--pd-border-blue)">RONDA DE 4</span>
+      </div>
+
+      <div class="bracket-wrap">
+        <div class="bracket-row">
+          <div class="semis">
+            <div class="pd-card pd-card--tight bracket-slot" style="border-left:4px solid var(--pd-yellow)">
+              <span class="pid" style="background:rgba(255,203,5,.16);color:var(--pd-yellow)">P1</span>
+              <span class="pd-stat">VORTEX_99</span>
+            </div>
+            <div class="pd-card pd-card--tight bracket-slot" style="opacity:.6">
+              <span class="pid" style="background:rgba(120,180,255,.1);color:var(--pd-text-meta)">P2</span>
+              <span class="pd-stat" style="color:var(--pd-text-meta)">TBD</span>
+            </div>
+          </div>
+          <div class="connections">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+              <path d="M 0 15 L 50 15 L 50 50 L 100 50" fill="none" stroke="#ffcb05" stroke-width="2"></path>
+              <path d="M 0 85 L 50 85 L 50 50" fill="none" stroke="rgba(120,180,255,.35)" stroke-width="2"></path>
+            </svg>
+          </div>
+          <div class="final-slot">
+            <div class="pd-card" style="border-color:var(--pd-yellow)">
+              <span class="pd-label" style="display:block;margin-bottom:var(--pd-space-2)">Gran Final</span>
+              <div style="display:flex;align-items:center;justify-content:center;gap:var(--pd-space-3)">
+                <span class="pd-stat">VORTEX_99</span>
+                <span class="pd-meta">VS</span>
+                <span class="pd-stat" style="color:var(--pd-text-meta)">???</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end">
+        <button type="button" class="pd-btn pd-btn--primary" onclick="window.location.href='5.Tablero_de_duelo.html'">
+          <span class="material-symbols-outlined" aria-hidden="true">sports_esports</span>ENTRAR AL COMBATE
+          <span class="pd-btn__shine"></span>
+        </button>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+(function(){
+  var name = localStorage.getItem('pd_nickname') || 'ENTRENADOR';
+  var els = document.querySelectorAll('[data-pd-nickname]');
+  for (var i = 0; i < els.length; i++) els[i].textContent = name;
+})();
+</script>
+</body>
+</html>
