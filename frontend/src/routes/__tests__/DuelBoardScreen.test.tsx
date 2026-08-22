@@ -381,6 +381,54 @@ describe('DuelBoardScreen — duel finish routing', () => {
   })
 })
 
+describe('DuelBoardScreen — Rules of Hooks safety', () => {
+  it('does not crash when duel flips from null to set while the screen stays mounted', async () => {
+    // Seeds only room + teamSelection (no duel yet) so the FIRST render hits
+    // the `!duel` branch. The screen is mounted directly (no Route/Navigate
+    // gate) so the instance survives the null -> set transition in place —
+    // this is exactly the scenario a Rules-of-Hooks violation crashes on.
+    localStorage.setItem(
+      STORAGE_KEY,
+      serializeMockState({
+        player: { nickname: 'Ash' },
+        room: { code: 'AB12', mode: '1v1', maxPlayers: 2, status: 'waiting', players: ['Ash'] },
+        teamSelection: {
+          starterId: 'Pikachu',
+          rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+        },
+        tournament: null,
+        duelPokemonState: [],
+        duel: null,
+      }),
+    )
+
+    function EnterDuelTrigger() {
+      const [, actions] = useMockState()
+      return (
+        <button type="button" onClick={() => actions.enterDuel('1v1')}>
+          start-duel
+        </button>
+      )
+    }
+
+    render(
+      <MockStateProvider>
+        <MemoryRouter initialEntries={['/duel']}>
+          <EnterDuelTrigger />
+          <DuelBoardScreen />
+        </MemoryRouter>
+      </MockStateProvider>,
+    )
+
+    const user = userEvent.setup()
+    // First render: duel is null. Click sets duel on the SAME instance —
+    // a hook-order mismatch throws here on the buggy implementation.
+    await user.click(screen.getByRole('button', { name: 'start-duel' }))
+
+    expect(screen.getByTestId('hud-human')).toBeInTheDocument()
+  })
+})
+
 describe('DuelBoardScreen — turn timer', () => {
   it('auto-applies the basic attack when the countdown expires without an action', () => {
     // Deterministic bot: force move 0 (25% damage) on the response.

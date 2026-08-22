@@ -284,25 +284,22 @@ function DuelBoardScreen() {
   const navigate = useNavigate()
   const handledDuelId = useRef<string | null>(null)
 
-  if (!duel) {
-    return <Navigate to="/wait-room" replace />
-  }
-
-  const humanActive = humanActivePokemon(state)
-  const rivalActive = rivalActivePokemon(state)
-  const canAct = duel.phase === 'awaiting_actions' && Boolean(humanActive) && Boolean(rivalActive)
-
   // KO detection: the engine flips the duel to awaiting_switch when the human
   // active faints with bench remaining — send the player to the forced swap.
+  // Hooks must run unconditionally on every render (Rules of Hooks), so the
+  // `duel` null-check lives inside the effect body instead of gating the
+  // hook call itself.
   useEffect(() => {
+    if (!duel) return
     if (duel.phase === 'awaiting_switch') {
       navigate('/swap?mode=forced', { replace: true })
     }
-  }, [duel.phase, navigate])
+  }, [duel, navigate])
 
   // Duel finish: record the result in the tournament (when applicable), then
   // route back to the wait room if slots remain, or to the ranking screen.
   useEffect(() => {
+    if (!duel) return
     if (duel.phase !== 'finished') return
     if (handledDuelId.current === duel.duelId) return
     handledDuelId.current = duel.duelId
@@ -315,6 +312,16 @@ function DuelBoardScreen() {
     setTimeoutNotice(true)
     actions.applyPlayerAttack(BASIC_ATTACK_INDEX)
   }, [actions])
+
+  // The `!duel` redirect happens AFTER every hook above has been declared —
+  // moving it earlier would make hook calls conditional (see Rules of Hooks).
+  if (!duel) {
+    return <Navigate to="/wait-room" replace />
+  }
+
+  const humanActive = humanActivePokemon(state)
+  const rivalActive = rivalActivePokemon(state)
+  const canAct = duel.phase === 'awaiting_actions' && Boolean(humanActive) && Boolean(rivalActive)
 
   const handleAttack = (index: MoveIndex) => {
     setTimeoutNotice(false)
