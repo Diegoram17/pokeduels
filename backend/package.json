@@ -1,0 +1,21 @@
+{
+  "name": "backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
+    "migrate:create": "node-pg-migrate create",
+    "preseed": "node ../scripts/sync-seed-data.mjs",
+    "seed": "node seed/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "pg": "^8",
+    "node-pg-migrate": "^7"
+  },
+  "devDependencies": {
+    "vitest": "^4"
+  }
+}
