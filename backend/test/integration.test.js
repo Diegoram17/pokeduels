@@ -67,6 +67,149 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
     });
   });
 
+  // Constraint-rejection scenarios (spec obs #127, scenarios #1-#15). These
+  // can only be proven against a real Postgres instance -- CHECK/FK/UNIQUE
+  // enforcement does not exist at the application layer. They run after the
+  // schema+seed test above (types/pokemons/type_effectiveness already
+  // populated) and before the migrate-down test (schema still present).
+
+  const pokemonIdByName = async (name) => {
+    const result = await pool.query('SELECT id FROM pokemons WHERE name = $1', [name]);
+    return result.rows[0].id;
+  };
+
+  it('players: two players named "Ash" in different rooms both insert successfully with distinct session_token', async () => {
+    const a = await pool.query(`INSERT INTO players (nickname) VALUES ('Ash') RETURNING session_token`);
+    const b = await pool.query(`INSERT INTO players (nickname) VALUES ('Ash') RETURNING session_token`);
+    expect(a.rows[0].session_token).not.toBe(b.rows[0].session_token);
+  });
+
+  it('types: a pokemons row referencing an unknown type is rejected on the foreign key', async () => {
+    await expect(
+      pool.query(
+        `INSERT INTO pokemons (name, type, pokeapi_id) VALUES ($1, 'cosmic', $2)`,
+        ['ConstraintTestCosmic', 999901],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+  });
+
+  it('pokemons: a second row named "Pikachu" is rejected on the unique constraint', async () => {
+    await expect(
+      pool.query(
+        `INSERT INTO pokemons (name, type, pokeapi_id) VALUES ('Pikachu', 'electric', $1)`,
+        [999902],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+
+  it('type effectiveness: multiplier = 1.5 is rejected on the CHECK constraint', async () => {
+    await expect(
+      pool.query(
+        `INSERT INTO type_effectiveness (attacking_type, defending_type, multiplier)
+         VALUES ('fire', 'water', 1.5)
+         ON CONFLICT (attacking_type, defending_type) DO NOTHING`,
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('rooms: updating status to "cancelled" is rejected on the CHECK constraint', async () => {
+    const room = await pool.query(`INSERT INTO rooms (code, max_players) VALUES ('RMSTAT01', 2) RETURNING id`);
+    await expect(
+      pool.query(`UPDATE rooms SET status = 'cancelled' WHERE id = $1`, [room.rows[0].id]),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('rooms: max_players = 3 is rejected on the CHECK constraint', async () => {
+    await expect(
+      pool.query(`INSERT INTO rooms (code, max_players) VALUES ('RMCAP01', 3)`),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('room players: two different players joining as "Ash" in the same room are rejected on the (room_id, nickname) unique constraint', async () => {
+    const room = await pool.query(`INSERT INTO rooms (code, max_players) VALUES ('RMPLYR01', 2) RETURNING id`);
+    const playerA = await pool.query(`INSERT INTO players (nickname) VALUES ('Ash') RETURNING id`);
+    const playerB = await pool.query(`INSERT INTO players (nickname) VALUES ('Ash') RETURNING id`);
+
+    await pool.query(
+      `INSERT INTO room_players (room_id, player_id, nickname) VALUES ($1, $2, 'Ash')`,
+      [room.rows[0].id, playerA.rows[0].id],
+    );
+    await expect(
+      pool.query(
+        `INSERT INTO room_players (room_id, player_id, nickname) VALUES ($1, $2, 'Ash')`,
+        [room.rows[0].id, playerB.rows[0].id],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+
+  it('team selections: slot = 7 is rejected on the CHECK constraint', async () => {
+    const room = await pool.query(`INSERT INTO rooms (code, max_players) VALUES ('RMSLOT01', 2) RETURNING id`);
+    const player = await pool.query(`INSERT INTO players (nickname) VALUES ('Slot Tester') RETURNING id`);
+    const pikachuId = await pokemonIdByName('Pikachu');
+
+    await expect(
+      pool.query(
+        `INSERT INTO team_selections (room_id, player_id, pokemon_id, slot) VALUES ($1, $2, $3, 7)`,
+        [room.rows[0].id, player.rows[0].id, pikachuId],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('starter exclusivity: a second player selecting Pikachu as starter in the same room is rejected on uq_starter_por_sala', async () => {
+    const room = await pool.query(`INSERT INTO rooms (code, max_players) VALUES ('RMSTAR01', 2) RETURNING id`);
+    const playerA = await pool.query(`INSERT INTO players (nickname) VALUES ('Starter A') RETURNING id`);
+    const playerB = await pool.query(`INSERT INTO players (nickname) VALUES ('Starter B') RETURNING id`);
+    const pikachuId = await pokemonIdByName('Pikachu');
+
+    await pool.query(
+      `INSERT INTO team_selections (room_id, player_id, pokemon_id, is_starter, slot) VALUES ($1, $2, $3, TRUE, 1)`,
+      [room.rows[0].id, playerA.rows[0].id, pikachuId],
+    );
+    await expect(
+      pool.query(
+        `INSERT INTO team_selections (room_id, player_id, pokemon_id, is_starter, slot) VALUES ($1, $2, $3, TRUE, 1)`,
+        [room.rows[0].id, playerB.rows[0].id, pikachuId],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+
+  it('duels: round = "octavos" is rejected on the CHECK constraint', async () => {
+    await expect(
+      pool.query(`INSERT INTO duels (round) VALUES ('octavos')`),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('duels: setting end_reason = "timeout" is rejected on the CHECK constraint', async () => {
+    const duel = await pool.query(`INSERT INTO duels (round) VALUES ('unica') RETURNING id`);
+    await expect(
+      pool.query(`UPDATE duels SET end_reason = 'timeout' WHERE id = $1`, [duel.rows[0].id]),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('duel pokemon state: current_hp = 120 is rejected on the CHECK constraint', async () => {
+    await expect(
+      pool.query(`INSERT INTO duel_pokemon_state (current_hp) VALUES (120)`),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('duel pokemon state: pp_move_1 = 5 is rejected on the CHECK constraint', async () => {
+    await expect(
+      pool.query(`INSERT INTO duel_pokemon_state (pp_move_1) VALUES (5)`),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('moves: action_type = "flee" is rejected on the CHECK constraint', async () => {
+    await expect(
+      pool.query(`INSERT INTO moves (turn_number, action_type) VALUES (1, 'flee')`),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('moves: action_type = "attack" with move_index = 5 is rejected on the CHECK constraint', async () => {
+    await expect(
+      pool.query(`INSERT INTO moves (turn_number, action_type, move_index) VALUES (1, 'attack', 5)`),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
   it('reverts every table on migrate down', () => {
     run(`${MIGRATE} down`);
 
