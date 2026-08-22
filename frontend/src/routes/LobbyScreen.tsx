@@ -170,7 +170,7 @@ function JoinByCodeForm() {
 }
 
 function ChangeNicknameControl() {
-  const [state, actions] = useMockState()
+  const [, actions] = useMockState()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)

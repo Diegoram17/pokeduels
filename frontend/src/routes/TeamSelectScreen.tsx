@@ -255,7 +255,7 @@ function RosterPicker() {
 }
 
 function TeamPanel() {
-  const [state, actions] = useMockState()
+  const [state] = useMockState()
   const navigate = useNavigate()
   const { starterId, rosterIds } = state.teamSelection
   const complete = isTeamComplete(starterId, rosterIds)
