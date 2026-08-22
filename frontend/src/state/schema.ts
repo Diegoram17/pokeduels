@@ -1,0 +1,71 @@
+// Mock-state schema — mirrors ADR-0002 entity shapes for the client-local mock.
+
+export interface PlayerState {
+  nickname: string
+}
+
+export type RoomMode = '1v1' | 'tournament'
+export type RoomStatus = 'waiting' | 'in_progress' | 'finished'
+
+export interface RoomState {
+  code: string
+  mode: RoomMode
+  maxPlayers: 2 | 4
+  status: RoomStatus
+  players: string[]
+}
+
+export interface TeamSelectionState {
+  starterId: string | null
+  rosterIds: string[] // exactly 5 when complete
+}
+
+export type TournamentSlot = 'semiA' | 'semiB' | 'thirdPlace' | 'final'
+
+export interface BracketPairing {
+  playerA: string
+  playerB: string
+}
+
+export interface TournamentState {
+  bracket: Partial<Record<TournamentSlot, BracketPairing | null>>
+  // FIFO; seeded ["semiA","semiB"], appends ["thirdPlace","final"] once both semis resolve
+  queue: TournamentSlot[]
+  activeSlot: TournamentSlot
+  results: Partial<Record<TournamentSlot, { winner: string; loser: string }>>
+}
+
+export interface DuelPokemonState {
+  duelId: string
+  ownerId: string
+  pokemonId: string
+  name: string
+  type: string
+  currentHp: number
+  ppMove1: number
+  ppMove2: number
+  ppMove3: number
+  isActive: boolean
+  fainted: boolean
+}
+
+export type DuelPhase = 'awaiting_actions' | 'awaiting_switch' | 'finished'
+export type DuelSlot = TournamentSlot | '1v1'
+
+export interface DuelState {
+  duelId: string
+  slot: DuelSlot
+  phase: DuelPhase
+  turnNumber: number
+  winnerId: string | null
+  endReason: 'ko' | 'surrender' | null
+}
+
+export interface MockState {
+  player: PlayerState
+  room: RoomState | null
+  teamSelection: TeamSelectionState
+  tournament: TournamentState | null // null for 1v1
+  duelPokemonState: DuelPokemonState[]
+  duel: DuelState | null
+}
