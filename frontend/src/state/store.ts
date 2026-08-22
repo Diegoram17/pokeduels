@@ -11,6 +11,7 @@ import type {
 } from './schema'
 import { resolveTurn, type TurnResult } from '../engine/turnResolution'
 import { advanceQueue } from '../engine/tournamentQueue'
+import { slotLoserId } from '../lib/duelFlow'
 import type { MoveIndex } from '../engine/damage'
 
 export const STORAGE_KEY = 'pokeduels:mockState'
@@ -169,12 +170,12 @@ function mergeTurnResult(state: MockState, result: TurnResult): MockState {
 }
 
 function recordResultAndAdvance(state: MockState): MockState {
-  const { tournament, duel, duelPokemonState } = state
+  const { tournament, duel } = state
   if (!tournament || !duel || duel.phase !== 'finished' || !duel.winnerId) {
     return state
   }
   const slot = duel.slot as TournamentSlot
-  const loser = duelPokemonState.find((p) => p.ownerId !== duel.winnerId)?.ownerId
+  const loser = slotLoserId(state)
   if (!loser) return state
 
   const results = { ...tournament.results, [slot]: { winner: duel.winnerId, loser } }

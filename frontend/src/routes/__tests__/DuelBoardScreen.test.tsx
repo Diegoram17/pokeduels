@@ -8,6 +8,14 @@ import { MemoryRouter, Routes, Route, useSearchParams } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
 import type { MockStateActions } from '../../state/useMockState'
+import { STORAGE_KEY, serializeMockState } from '../../state/store'
+import type {
+  DuelPokemonState,
+  DuelState,
+  MockState,
+  TournamentSlot,
+  TournamentState,
+} from '../../state/schema'
 import DuelBoardScreen from '../DuelBoardScreen'
 
 function SeedProbe({ seed }: { seed?: (actions: MockStateActions) => void }) {
@@ -49,12 +57,121 @@ function WaitForDuel({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+function TournamentProbe() {
+  const [state] = useMockState()
+  const results = state.tournament?.results ?? {}
+  return (
+    <span data-testid="tournament-probe">
+      activeSlot:{state.tournament?.activeSlot ?? 'none'}|slotsDone:{Object.keys(results).length}
+    </span>
+  )
+}
+
 function renderDuelBoard(seed?: (actions: MockStateActions) => void) {
   return render(
     <MockStateProvider>
       <MemoryRouter initialEntries={['/duel']}>
         <SeedProbe seed={seed} />
         <DuelPhaseProbe />
+        <TournamentProbe />
+        <Routes>
+          <Route
+            path="/duel"
+            element={
+              <WaitForDuel>
+                <DuelBoardScreen />
+              </WaitForDuel>
+            }
+          />
+          <Route
+            path="/swap"
+            element={
+              <>
+                <SwapModeProbe />
+                <div>SWAP-LANDED</div>
+              </>
+            }
+          />
+          <Route path="/wait-room" element={<div>WAIT-LANDED</div>} />
+          <Route path="/ranking" element={<div>RANKING-LANDED</div>} />
+        </Routes>
+      </MemoryRouter>
+    </MockStateProvider>,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Pre-seeded state helpers (the provider hydrates from localStorage on mount)
+// ---------------------------------------------------------------------------
+
+function makePokemon(ownerId: string, pokemonId: string, isActive: boolean): DuelPokemonState {
+  return {
+    duelId: 'duel-slot',
+    ownerId,
+    pokemonId,
+    name: pokemonId,
+    type: 'normal',
+    currentHp: isActive ? 100 : 0,
+    ppMove1: 4,
+    ppMove2: 4,
+    ppMove3: 4,
+    isActive,
+    fainted: !isActive,
+  }
+}
+
+const QUEUE_FULL: TournamentSlot[] = ['semiA', 'semiB', 'thirdPlace', 'final']
+
+function makeTournamentState(overrides: Partial<TournamentState> = {}): TournamentState {
+  return {
+    bracket: {},
+    queue: ['semiA', 'semiB'],
+    activeSlot: 'semiA',
+    results: {},
+    ...overrides,
+  }
+}
+
+function buildInProgressDuel(
+  duelSlot: DuelState['slot'],
+  tournament: TournamentState,
+): MockState {
+  return {
+    player: { nickname: 'Ash' },
+    room: {
+      code: 'AB12',
+      mode: 'tournament',
+      maxPlayers: 4,
+      status: 'in_progress',
+      players: ['Ash'],
+    },
+    teamSelection: {
+      starterId: 'Pikachu',
+      rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+    },
+    tournament,
+    duelPokemonState: [
+      makePokemon('Ash', 'Pikachu', true),
+      makePokemon('bot', 'rattata', true),
+    ],
+    duel: {
+      duelId: `duel-${duelSlot}`,
+      slot: duelSlot,
+      phase: 'awaiting_actions',
+      turnNumber: 1,
+      winnerId: null,
+      endReason: null,
+    },
+  }
+}
+
+function renderDuelBoardFromState(state: MockState) {
+  localStorage.setItem(STORAGE_KEY, serializeMockState(state))
+  return render(
+    <MockStateProvider>
+      <MemoryRouter initialEntries={['/duel']}>
+        <DuelPhaseProbe />
+        <TournamentProbe />
         <Routes>
           <Route
             path="/duel"
@@ -209,6 +326,58 @@ describe('DuelBoardScreen — swap navigation', () => {
     expect(screen.getByText('SWAP-LANDED')).toBeInTheDocument()
     expect(screen.getByTestId('swap-probe').textContent).toContain('mode:forced')
     expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_switch')
+  })
+})
+
+describe('DuelBoardScreen — duel finish routing', () => {
+  it('routes a finished 1v1 duel to the ranking screen', async () => {
+    const user = userEvent.setup()
+    renderDuelBoard(seed1v1Duel)
+
+    await user.click(screen.getByRole('button', { name: /rendirse/i }))
+    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
+    await user.click(within(dialog).getByRole('button', { name: /rendirse/i }))
+
+    expect(screen.getByText('RANKING-LANDED')).toBeInTheDocument()
+  })
+
+  it('records the semifinal result and returns to the wait room while slots remain', async () => {
+    const user = userEvent.setup()
+    const state = buildInProgressDuel('semiA', makeTournamentState())
+    renderDuelBoardFromState(state)
+
+    await user.click(screen.getByRole('button', { name: /rendirse/i }))
+    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
+    await user.click(within(dialog).getByRole('button', { name: /rendirse/i }))
+
+    expect(screen.getByText('WAIT-LANDED')).toBeInTheDocument()
+    // The recorded semiA result advances the wait room to the next slot.
+    expect(screen.getByTestId('tournament-probe').textContent).toContain('activeSlot:semiB')
+    expect(screen.getByTestId('tournament-probe').textContent).toContain('slotsDone:1')
+  })
+
+  it('routes to the ranking screen when the final concludes the tournament', async () => {
+    const user = userEvent.setup()
+    const state = buildInProgressDuel(
+      'final',
+      makeTournamentState({
+        queue: QUEUE_FULL,
+        activeSlot: 'final',
+        results: {
+          semiA: { winner: 'Ash', loser: 'bot' },
+          semiB: { winner: 'Ash', loser: 'bot' },
+          thirdPlace: { winner: 'bot', loser: 'Ash' },
+        },
+      }),
+    )
+    renderDuelBoardFromState(state)
+
+    await user.click(screen.getByRole('button', { name: /rendirse/i }))
+    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
+    await user.click(within(dialog).getByRole('button', { name: /rendirse/i }))
+
+    expect(screen.getByText('RANKING-LANDED')).toBeInTheDocument()
+    expect(screen.getByTestId('tournament-probe').textContent).toContain('slotsDone:4')
   })
 })
 

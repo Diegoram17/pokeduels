@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import type { DuelPokemonState } from '../state/schema'
 import type { MoveIndex } from '../engine/damage'
-import { humanActivePokemon, rivalActivePokemon } from '../lib/duelFlow'
+import { humanActivePokemon, rivalActivePokemon, computePostDuelRoute } from '../lib/duelFlow'
 import {
   BASIC_ATTACK_INDEX,
   MAX_HP,
@@ -282,6 +282,7 @@ function DuelBoardScreen() {
   const [showSurrender, setShowSurrender] = useState(false)
   const { duel } = state
   const navigate = useNavigate()
+  const handledDuelId = useRef<string | null>(null)
 
   if (!duel) {
     return <Navigate to="/wait-room" replace />
@@ -298,6 +299,17 @@ function DuelBoardScreen() {
       navigate('/swap?mode=forced', { replace: true })
     }
   }, [duel.phase, navigate])
+
+  // Duel finish: record the result in the tournament (when applicable), then
+  // route back to the wait room if slots remain, or to the ranking screen.
+  useEffect(() => {
+    if (duel.phase !== 'finished') return
+    if (handledDuelId.current === duel.duelId) return
+    handledDuelId.current = duel.duelId
+    if (state.tournament) actions.advanceTournament()
+    const route = computePostDuelRoute(state)
+    if (route) navigate(route.path, { replace: true })
+  }, [duel, state.tournament, state, actions, navigate])
 
   const handleTimeout = useCallback(() => {
     setTimeoutNotice(true)
