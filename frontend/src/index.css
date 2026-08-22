@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Load the legacy Tailwind config that aliases the --pd-* design tokens. */
+@config "../tailwind.config.ts";
