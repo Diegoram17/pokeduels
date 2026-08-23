@@ -303,6 +303,7 @@ function resolverRonda(duel, accionP1, accionP2) {
 | `team:select_roster` | `{ roomId, pokemonIds[5] }` | |
 | `room:ready` | `{ roomId }` | |
 | `room:leave` | `{ roomId }` | Libera el starter reservado |
+| `duel:join` | `{ duelId }` | Suscribe al canal `duel:{duelId}`; el servidor responde `duel:state` |
 | `duel:select_lead` | `{ duelId, pokemonId }` | Pokémon inicial del duelo |
 | `duel:switch_decision` | `{ duelId, switchTo: pokemonId \| null }` | `null` = mantiene el actual |
 | `duel:select_action` | `{ duelId, moveIndex }` | Sujeto a timeout de 10s |
@@ -316,11 +317,15 @@ function resolverRonda(duel, accionP1, accionP2) {
 | `team:starter_rejected` | `{ pokemonId, reason: 'taken' }` | Perdió la carrera |
 | `team:roster_rejected` | `{ reason: 'invalid_count' \| 'duplicate' \| 'not_in_catalog' }` | Respuesta a un `team:select_roster` inválido |
 | `tournament:bracket` | `{ duels[] }` | Emparejamientos generados |
-| `duel:start` | `{ duelId, opponent, yourTeam }` | |
-| `duel:awaiting_switch` | `{ duelId, availablePokemon[] }` | |
+| `duel:start` | `{ duelId }` | Broadcast a `room:{roomId}` cuando ambos jugadores están listos; dispara el `duel:join` del cliente |
+| `duel:state` | `{ duelId, turnNumber, winnerId, endReason, pokemonStates[] }` | Snapshot camelCase (schema `DuelState`/`DuelPokemonState`), respuesta dirigida a `duel:join` |
+| `duel:lead_rejected` | `{ pokemonId, reason: 'wrong_owner' \| 'fainted' \| 'invalid' \| 'not_participant' }` | Respuesta a un `duel:select_lead` inválido |
+| `duel:switch_rejected` | `{ switchTo, reason: 'wrong_owner' \| 'fainted' \| 'already_active' \| 'invalid' \| 'not_participant' }` | Respuesta a un `duel:switch_decision` inválido |
+| `duel:action_rejected` | `{ moveIndex, reason: 'insufficient_pp' \| 'invalid_move' \| 'no_active_pokemon' \| 'not_participant' }` | Dirigido solo al emisor; NO resetea el timer de 10s (re-pick permitido) |
+| `duel:awaiting_switch` | `{ duelId }` | Tras un KO; `availablePokemon[]` lo completa el wiring de cliente (#9/#10) |
 | `duel:field_update` | `{ yourActive, opponentActive }` | Tras revelar cambios |
 | `duel:awaiting_actions` | `{ duelId, deadline, availableMoves[] }` | Arranca el contador de 10s |
-| `duel:turn_resolved` | `{ eventos[], estadoActualizado }` | Secuencia animable |
+| `duel:turn_resolved` | `{ duelId, turnNumber, winnerId, endReason, pokemonStates[] }` | Estado camelCase post-ronda, broadcast a `duel:{duelId}` |
 | `duel:finished` | `{ winnerId, endReason }` | |
 | `duel:opponent_disconnected` | `{ duelId }` | Victoria automática |
 | `tournament:awaiting_round` | `{ nextRound, pendingDuels[] }` | El jugador vuelve a P4 a esperar |
