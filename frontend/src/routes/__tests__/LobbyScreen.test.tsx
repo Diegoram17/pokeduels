@@ -1,140 +1,180 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
-import { useRef } from 'react'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
-import { useMockState } from '../../state/useMockState'
-import type { MockStateActions } from '../../state/useMockState'
 import LobbyScreen from '../LobbyScreen'
+import { setSessionToken } from '../../lib/api'
 
-function SeedProbe({ seed }: { seed?: (actions: MockStateActions) => void }) {
-  const [, actions] = useMockState()
-  const seeded = useRef(false)
-  if (!seeded.current && seed) {
-    seeded.current = true
-    seed(actions)
-  }
-  return null
+function jsonResponse(status: number, body: unknown): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: String(status),
+    json: async () => body,
+  } as Response
 }
 
-function StateProbe() {
-  const [state] = useMockState()
-  return (
-    <div data-testid="state-probe">
-      <span data-testid="probe-nickname">{state.player.nickname}</span>
-      <span data-testid="probe-room-mode">{state.room?.mode ?? 'none'}</span>
-      <span data-testid="probe-room-max">{state.room?.maxPlayers ?? 'none'}</span>
-      <span data-testid="probe-room-code">{state.room?.code ?? 'none'}</span>
-    </div>
-  )
-}
+const waitingRooms = [
+  { id: 'r1', code: 'AB12', max_players: 2, status: 'waiting', player_count: 1 },
+  { id: 'r2', code: 'Z009', max_players: 4, status: 'waiting', player_count: 2 },
+]
 
-function renderLobby(seed?: (actions: MockStateActions) => void) {
+function renderLobby() {
   return render(
     <MockStateProvider>
       <MemoryRouter initialEntries={['/lobby']}>
-        <SeedProbe seed={seed} />
         <Routes>
           <Route
             path="/lobby"
             element={
               <>
-                <StateProbe />
                 <LobbyScreen />
               </>
             }
           />
-          <Route
-            path="/team-select"
-            element={
-              <>
-                <StateProbe />
-                <div>TEAM-SELECT-LANDED</div>
-              </>
-            }
-          />
+          <Route path="/team-select" element={<div>TEAM-SELECT-LANDED</div>} />
         </Routes>
       </MemoryRouter>
     </MockStateProvider>,
   )
 }
 
-function seedNickname(actions: MockStateActions) {
-  actions.setNickname('Ash')
-}
+beforeEach(() => {
+  setSessionToken('token-1')
+  vi.stubGlobal('fetch', vi.fn())
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  setSessionToken(null)
+})
 
 describe('LobbyScreen', () => {
-  it('renders the current room from mock state with its code, mode and player count', () => {
-    renderLobby((actions) => {
-      actions.setNickname('Ash')
-      actions.createRoom('1v1', 2)
-    })
-    expect(screen.getByTestId('room-code').textContent).toMatch(/^#[A-Z0-9]{4}$/)
+  it('lists the waiting rooms from GET /api/rooms with their derived mode label', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, waitingRooms))
+
+    renderLobby()
+
+    expect(await screen.findByText('#AB12')).toBeInTheDocument()
+    expect(screen.getByText('#Z009')).toBeInTheDocument()
     expect(screen.getByText('DUELO 1V1')).toBeInTheDocument()
+    expect(screen.getByText('TORNEO DE 4')).toBeInTheDocument()
     expect(screen.getByText('1/2')).toBeInTheDocument()
+    expect(screen.getByText('2/4')).toBeInTheDocument()
   })
 
-  it('creates a 1v1 room and navigates to team select', async () => {
+  it('creates a 1v1 room via POST /api/rooms and navigates to team select', async () => {
     const user = userEvent.setup()
-    renderLobby(seedNickname)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, []))
+      .mockResolvedValueOnce(
+        jsonResponse(201, { id: 'r9', code: 'NEW1', max_players: 2, status: 'waiting' }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLobby()
+    await screen.findByText('SALAS DE BATALLA')
+
     await user.click(screen.getByRole('button', { name: /duelo individual/i }))
-    expect(screen.getByText('TEAM-SELECT-LANDED')).toBeInTheDocument()
-    expect(screen.getByTestId('probe-room-mode').textContent).toBe('1v1')
-    expect(screen.getByTestId('probe-room-max').textContent).toBe('2')
+
+    expect(await screen.findByText('TEAM-SELECT-LANDED')).toBeInTheDocument()
+    const createCall = fetchMock.mock.calls.find(
+      (call) => String(call[0]).includes('/api/rooms') && call[1]?.method === 'POST',
+    )
+    expect(createCall).toBeDefined()
+    expect(JSON.parse(createCall![1].body)).toEqual({ max_players: 2 })
   })
 
-  it('creates a tournament room storing mode tournament and maxPlayers 4', async () => {
+  it('creates a tournament room via POST /api/rooms with max_players 4', async () => {
     const user = userEvent.setup()
-    renderLobby(seedNickname)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, []))
+      .mockResolvedValueOnce(
+        jsonResponse(201, { id: 'r9', code: 'NEW4', max_players: 4, status: 'waiting' }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLobby()
+    await screen.findByText('SALAS DE BATALLA')
+
     await user.click(screen.getByRole('button', { name: /torneo de entrenadores/i }))
-    expect(screen.getByText('TEAM-SELECT-LANDED')).toBeInTheDocument()
-    expect(screen.getByTestId('probe-room-mode').textContent).toBe('tournament')
-    expect(screen.getByTestId('probe-room-max').textContent).toBe('4')
+
+    expect(await screen.findByText('TEAM-SELECT-LANDED')).toBeInTheDocument()
+    const createCall = fetchMock.mock.calls.find(
+      (call) => String(call[0]).includes('/api/rooms') && call[1]?.method === 'POST',
+    )
+    expect(JSON.parse(createCall![1].body)).toEqual({ max_players: 4 })
   })
 
-  it('joins a room when the typed code matches the room in state', async () => {
+  it('joins a room by code via POST /api/rooms/:code/join with the nickname', async () => {
     const user = userEvent.setup()
-    renderLobby((actions) => {
-      actions.setNickname('Ash')
-      actions.createRoom('1v1', 2)
-    })
-    const code = screen.getByTestId('room-code').textContent!.replace('#', '')
-    await user.type(screen.getByPlaceholderText(/código de sala/i), code)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, []))
+      .mockResolvedValueOnce(
+        jsonResponse(201, { id: 'r1', code: 'AB12', max_players: 2, status: 'waiting' }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLobby()
+    await screen.findByText('SALAS DE BATALLA')
+
+    await user.type(screen.getByPlaceholderText(/código de sala/i), 'ab12')
     await user.click(screen.getByRole('button', { name: /unirse/i }))
-    expect(screen.getByText('TEAM-SELECT-LANDED')).toBeInTheDocument()
+
+    expect(await screen.findByText('TEAM-SELECT-LANDED')).toBeInTheDocument()
+    const joinCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes('/api/rooms/AB12/join'),
+    )
+    expect(joinCall).toBeDefined()
+    expect(JSON.parse(joinCall![1].body)).toEqual({ nickname: '' })
   })
 
-  it('rejects an unknown code with an error and no navigation', async () => {
+  it('renders an error banner with retry when the room list fails to load', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(500, { message: 'boom' }))
+
+    renderLobby()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/servidor/i)
+    expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
+  })
+
+  it('shows an error banner and does not navigate when join returns 409 (room full)', async () => {
     const user = userEvent.setup()
-    renderLobby((actions) => {
-      actions.setNickname('Ash')
-      actions.createRoom('1v1', 2)
-    })
-    await user.type(screen.getByPlaceholderText(/código de sala/i), 'ZZ99')
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, []))
+      .mockResolvedValueOnce(jsonResponse(409, { message: 'room is full' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLobby()
+    await screen.findByText('SALAS DE BATALLA')
+
+    await user.type(screen.getByPlaceholderText(/código de sala/i), 'AB12')
     await user.click(screen.getByRole('button', { name: /unirse/i }))
-    expect(screen.getByText(/no se encontró una sala/i)).toBeInTheDocument()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/llena/i)
     expect(screen.queryByText('TEAM-SELECT-LANDED')).not.toBeInTheDocument()
   })
 
-  it('updates the nickname via the change-nickname control', async () => {
+  it('retries the room list when the banner retry button is clicked', async () => {
     const user = userEvent.setup()
-    renderLobby(seedNickname)
-    expect(screen.getByTestId('probe-nickname').textContent).toBe('Ash')
-    await user.click(screen.getByRole('button', { name: /cambiar apodo/i }))
-    await user.type(screen.getByPlaceholderText(/nuevo apodo/i), 'Red')
-    await user.click(screen.getByRole('button', { name: /guardar/i }))
-    expect(screen.getByTestId('probe-nickname').textContent).toBe('Red')
-  })
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(500, { message: 'boom' }))
+      .mockResolvedValueOnce(jsonResponse(200, waitingRooms))
+    vi.stubGlobal('fetch', fetchMock)
 
-  it('does not update the nickname when the new value is invalid', async () => {
-    const user = userEvent.setup()
-    renderLobby(seedNickname)
-    await user.click(screen.getByRole('button', { name: /cambiar apodo/i }))
-    await user.type(screen.getByPlaceholderText(/nuevo apodo/i), 'Ab')
-    await user.click(screen.getByRole('button', { name: /guardar/i }))
-    expect(screen.getByText(/al menos 3 caracteres/i)).toBeInTheDocument()
-    expect(screen.getByTestId('probe-nickname').textContent).toBe('Ash')
+    renderLobby()
+    await screen.findByRole('alert')
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }))
+
+    expect(await screen.findByText('#AB12')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

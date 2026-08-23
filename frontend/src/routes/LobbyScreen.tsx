@@ -1,24 +1,33 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
-import type { RoomMode, RoomState } from '../state/schema'
 import {
-  matchesRoomCode,
+  listRooms,
+  createRoom,
+  joinRoomByCode,
+  describeApiError,
+  type RoomSummary,
+} from '../lib/api'
+import {
+  normalizeRoomCode,
+  roomMode,
   roomModeLabel,
   roomStatusLabel,
 } from '../lib/rooms'
 import { validateNickname } from '../lib/validation'
+import ErrorBanner from '../components/ErrorBanner'
 
 /**
- * Screen 2: Lobby. Room list from mock state, create room (mode + maxPlayers),
- * join by code, and a "Cambiar apodo" control that propagates the nickname
- * to every later screen through mock state.
+ * Screen 2: Lobby. Waiting rooms listed from GET /api/rooms, create room
+ * (mode + maxPlayers) and join-by-code via REST, and a "Cambiar apodo"
+ * control. After a successful create/join the room shell is stored and the
+ * app proceeds to team select; errors render an inline banner with manual
+ * retry (no automatic redirects).
  */
 
-function RoomCard({ room }: { room: RoomState }) {
-  const filled = room.players.length
-  const emptySlots = Math.max(0, room.maxPlayers - filled)
+function WaitingRoomCard({ room }: { room: RoomSummary }) {
+  const mode = roomMode(room.max_players)
   return (
     <div className="pd-card room-card">
       <div className="room-card-top">
@@ -26,7 +35,7 @@ function RoomCard({ room }: { room: RoomState }) {
           <span className="room-code" data-testid="room-code">
             #{room.code}
           </span>
-          <span className="pd-meta room-mode-label">{roomModeLabel(room.mode)}</span>
+          <span className="pd-meta room-mode-label">{roomModeLabel(mode)}</span>
         </div>
         <span className={`pd-badge pd-badge--${room.status}`}>
           {roomStatusLabel(room.status)}
@@ -35,14 +44,14 @@ function RoomCard({ room }: { room: RoomState }) {
       <div className="pd-divider" />
       <div className="room-card-foot">
         <div className="avatar-stack">
-          {room.players.map((name) => (
-            <span className="pd-avatar" key={name} title={name}>
+          {Array.from({ length: room.player_count }).map((_, i) => (
+            <span className="pd-avatar" key={i}>
               <span className="material-symbols-outlined" aria-hidden="true">
                 person
               </span>
             </span>
           ))}
-          {Array.from({ length: emptySlots }).map((_, i) => (
+          {Array.from({ length: Math.max(0, room.max_players - room.player_count) }).map((_, i) => (
             <span className="avatar-slot-empty" key={i}>
               <span className="material-symbols-outlined" aria-hidden="true">
                 add
@@ -52,7 +61,7 @@ function RoomCard({ room }: { room: RoomState }) {
         </div>
         <div style={{ textAlign: 'right' }}>
           <span className="pd-stat" style={{ display: 'block' }}>
-            {filled}/{room.maxPlayers}
+            {room.player_count}/{room.max_players}
           </span>
           <span className="pd-meta">Jugadores</span>
         </div>
@@ -61,24 +70,33 @@ function RoomCard({ room }: { room: RoomState }) {
   )
 }
 
-function RoomList({ room }: { room: RoomState | null }) {
-  if (!room) {
+function RoomList({ rooms }: { rooms: RoomSummary[] }) {
+  if (rooms.length === 0) {
     return (
       <div className="pd-card room-card room-card--empty">
-        <span className="pd-meta">Buscando...</span>
+        <span className="pd-meta">No hay salas esperando entrenadores</span>
       </div>
     )
   }
-  return <RoomCard room={room} />
+  return (
+    <div className="room-grid">
+      {rooms.map((room) => (
+        <WaitingRoomCard key={room.id} room={room} />
+      ))}
+    </div>
+  )
 }
 
-function CreateRoomForm() {
-  const [, actions] = useMockState()
-  const navigate = useNavigate()
+function CreateRoomForm({ onCreated }: { onCreated: (maxPlayers: 2 | 4) => Promise<void> }) {
+  const [pending, setPending] = useState(false)
 
-  function create(mode: RoomMode, maxPlayers: 2 | 4) {
-    actions.createRoom(mode, maxPlayers)
-    navigate('/team-select')
+  async function create(maxPlayers: 2 | 4) {
+    setPending(true)
+    try {
+      await onCreated(maxPlayers)
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -87,7 +105,8 @@ function CreateRoomForm() {
         type="button"
         className="create-room-btn"
         style={{ border: '1px solid var(--pd-border-blue-soft)' }}
-        onClick={() => create('1v1', 2)}
+        onClick={() => create(2)}
+        disabled={pending}
       >
         <span>
           <span className="create-room-btn__title">Duelo Individual (1v1)</span>
@@ -106,7 +125,8 @@ function CreateRoomForm() {
         type="button"
         className="create-room-btn"
         style={{ border: '1px solid rgba(238,21,21,.35)' }}
-        onClick={() => create('tournament', 4)}
+        onClick={() => create(4)}
+        disabled={pending}
       >
         <span>
           <span className="create-room-btn__title">Torneo de Entrenadores (4 Jugadores)</span>
@@ -125,20 +145,19 @@ function CreateRoomForm() {
   )
 }
 
-function JoinByCodeForm() {
-  const [state, actions] = useMockState()
-  const navigate = useNavigate()
+function JoinByCodeForm({ onJoin }: { onJoin: (code: string) => Promise<void> }) {
   const [code, setCode] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!matchesRoomCode(code, state.room)) {
-      setError('No se encontró una sala con ese código')
-      return
+    setPending(true)
+    try {
+      await onJoin(normalizeRoomCode(code))
+      setCode('')
+    } finally {
+      setPending(false)
     }
-    actions.joinRoom(code)
-    navigate('/team-select')
   }
 
   return (
@@ -149,22 +168,14 @@ function JoinByCodeForm() {
           className="pd-input"
           placeholder="Código de Sala..."
           value={code}
-          onChange={(event) => {
-            setCode(event.target.value)
-            setError(null)
-          }}
+          onChange={(event) => setCode(event.target.value)}
         />
-        <button type="submit" className="quick-join-submit" aria-label="Unirse">
+        <button type="submit" className="quick-join-submit" aria-label="Unirse" disabled={pending}>
           <span className="material-symbols-outlined" aria-hidden="true">
             arrow_forward
           </span>
         </button>
       </div>
-      {error && (
-        <p role="alert" className="pd-meta" style={{ color: 'var(--pd-danger)', marginTop: 'var(--pd-space-2)' }}>
-          {error}
-        </p>
-      )}
     </form>
   )
 }
@@ -227,7 +238,52 @@ function ChangeNicknameControl() {
 }
 
 function LobbyScreen() {
-  const [state] = useMockState()
+  const [state, actions] = useMockState()
+  const navigate = useNavigate()
+  const [rooms, setRooms] = useState<RoomSummary[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const loadRooms = useCallback(() => {
+    setError(null)
+    listRooms()
+      .then(setRooms)
+      .catch((err: unknown) => setError(describeApiError(err)))
+  }, [])
+
+  useEffect(() => {
+    loadRooms()
+  }, [loadRooms])
+
+  async function handleCreated(maxPlayers: 2 | 4) {
+    setError(null)
+    try {
+      const room = await createRoom(maxPlayers)
+      actions.receiveRoomShell({
+        code: room.code,
+        maxPlayers,
+        status: room.status,
+      })
+      navigate('/team-select')
+    } catch (err) {
+      setError(describeApiError(err))
+    }
+  }
+
+  async function handleJoin(code: string) {
+    setError(null)
+    try {
+      const room = await joinRoomByCode(code, state.player.nickname)
+      actions.receiveRoomShell({
+        code: room.code,
+        maxPlayers: room.max_players,
+        status: room.status,
+      })
+      navigate('/team-select')
+    } catch (err) {
+      setError(describeApiError(err))
+    }
+  }
+
   return (
     <div className="pd-page lobby-shell">
       <div className="pd-glow-blob" style={{ right: '-8%', top: '10%', width: 600, height: 600 }} />
@@ -259,9 +315,8 @@ function LobbyScreen() {
             </div>
           </div>
 
-          <div className="room-grid">
-            <RoomList room={state.room} />
-          </div>
+          {error && <ErrorBanner message={error} onRetry={loadRooms} />}
+          <RoomList rooms={rooms} />
         </main>
 
         <aside className="pd-card lobby-side">
@@ -272,7 +327,7 @@ function LobbyScreen() {
               </span>
               Unirse con Código
             </h3>
-            <JoinByCodeForm />
+            <JoinByCodeForm onJoin={handleJoin} />
           </div>
 
           <div className="pd-divider" />
@@ -281,7 +336,7 @@ function LobbyScreen() {
             <h3 className="pd-title" style={{ marginBottom: 'var(--pd-space-3)' }}>
               Crear Sala
             </h3>
-            <CreateRoomForm />
+            <CreateRoomForm onCreated={handleCreated} />
           </div>
         </aside>
       </div>
@@ -290,4 +345,4 @@ function LobbyScreen() {
 }
 
 export default LobbyScreen
-export { RoomList, RoomCard, CreateRoomForm, JoinByCodeForm, ChangeNicknameControl }
+export { WaitingRoomCard, RoomList, CreateRoomForm, JoinByCodeForm, ChangeNicknameControl }
