@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   createInitialState,
   serializeMockState,
@@ -10,6 +10,27 @@ import {
   type StorageLike,
 } from '../store'
 import type { MockState } from '../schema'
+import { setCachedSeedData } from '../../data/seedData'
+import type { SeedData } from '../../data/seedData'
+
+const duelCatalog: SeedData = {
+  _meta: { version: '1', description: 'test', total_starters: 1, total_catalog: 6, notes: [] },
+  starters: [
+    { name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'front-pikachu', back_sprite_url: 'back-pikachu', is_starter: true },
+  ],
+  catalog: [
+    { name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'front-eevee', back_sprite_url: 'back-eevee', is_starter: false },
+    { name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'front-pidgeot', back_sprite_url: 'back-pidgeot', is_starter: false },
+    { name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'front-sceptile', back_sprite_url: 'back-sceptile', is_starter: false },
+    { name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'front-machamp', back_sprite_url: 'back-machamp', is_starter: false },
+    { name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'front-onix', back_sprite_url: 'back-onix', is_starter: false },
+    { name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'front-gengar', back_sprite_url: 'back-gengar', is_starter: false },
+  ],
+}
+
+beforeEach(() => {
+  setCachedSeedData(null)
+})
 
 function makeMemoryStorage(): StorageLike {
   const map = new Map<string, string>()
@@ -232,6 +253,48 @@ describe('reduceMockState — enterDuel', () => {
     const after = reduceMockState(s, { type: 'enterDuel', slot: '1v1' })
     expect(after.duel).toBeNull()
     expect(after.duelPokemonState).toHaveLength(0)
+  })
+})
+
+describe('reduceMockState — enterDuel resolves real catalog data', () => {
+  it('populates name, type and both sprite urls from the catalog when loaded', () => {
+    setCachedSeedData(duelCatalog)
+    const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
+    const humanActive = s.duelPokemonState.find(
+      (p) => p.ownerId === 'Ash' && p.isActive,
+    )
+    expect(humanActive?.name).toBe('Pikachu')
+    expect(humanActive?.type).toBe('electric')
+    expect(humanActive?.spriteUrl).toBe('front-pikachu')
+    expect(humanActive?.backSpriteUrl).toBe('back-pikachu')
+    // Unknown roster ids keep the stub shape instead of crashing the duel.
+    const fakeRoster = s.duelPokemonState.find((p) => p.pokemonId === 'a')
+    expect(fakeRoster?.name).toBe('a')
+    expect(fakeRoster?.spriteUrl).toBe('')
+  })
+
+  it('resolves the bot roster through the catalog (case-insensitive lookup)', () => {
+    setCachedSeedData(duelCatalog)
+    const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
+    const botActive = s.duelPokemonState.find(
+      (p) => p.ownerId === 'bot' && p.isActive,
+    )
+    expect(botActive?.name).toBe('Eevee')
+    expect(botActive?.type).toBe('normal')
+    expect(botActive?.spriteUrl).toBe('front-eevee')
+    expect(botActive?.backSpriteUrl).toBe('back-eevee')
+    expect(s.duelPokemonState.filter((p) => p.ownerId === 'bot')).toHaveLength(6)
+  })
+
+  it('falls back to the stub shape when the catalog is not loaded yet', () => {
+    const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
+    const humanActive = s.duelPokemonState.find(
+      (p) => p.ownerId === 'Ash' && p.isActive,
+    )
+    expect(humanActive?.name).toBe('pikachu')
+    expect(humanActive?.type).toBe('normal')
+    expect(humanActive?.spriteUrl).toBe('')
+    expect(humanActive?.backSpriteUrl).toBe('')
   })
 })
 

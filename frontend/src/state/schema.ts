@@ -41,6 +41,8 @@ export interface DuelPokemonState {
   pokemonId: string
   name: string
   type: string
+  spriteUrl: string
+  backSpriteUrl: string
   currentHp: number
   ppMove1: number
   ppMove2: number

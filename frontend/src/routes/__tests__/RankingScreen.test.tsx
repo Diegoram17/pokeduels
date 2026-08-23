@@ -40,6 +40,8 @@ function makePokemon(ownerId: string, isActive: boolean): DuelPokemonState {
     pokemonId: `${ownerId}-1`,
     name: `${ownerId}-1`,
     type: 'normal',
+    spriteUrl: '',
+    backSpriteUrl: '',
     currentHp: isActive ? 100 : 0,
     ppMove1: 4,
     ppMove2: 4,

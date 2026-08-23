@@ -108,6 +108,8 @@ function makePokemon(
     pokemonId,
     name: pokemonId,
     type: 'normal',
+    spriteUrl: '',
+    backSpriteUrl: '',
     currentHp: 100,
     ppMove1: 4,
     ppMove2: 4,

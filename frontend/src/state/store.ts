@@ -12,6 +12,9 @@ import type {
 import { resolveTurn, type TurnResult } from '../engine/turnResolution'
 import { advanceQueue } from '../engine/tournamentQueue'
 import { slotLoserId } from '../lib/duelFlow'
+import { pokemonById } from '../lib/catalog'
+import { getCachedSeedData } from '../data/seedData'
+import type { PokemonSeed } from '../data/seedData'
 import type { MoveIndex } from '../engine/damage'
 
 export const STORAGE_KEY = 'pokeduels:mockState'
@@ -94,6 +97,7 @@ function makeDuelPokemon(
   duelId: string,
   ownerId: string,
   pokemonId: string,
+  seed: PokemonSeed | null,
   isActive: boolean,
   hp = 100,
 ): DuelPokemonState {
@@ -101,8 +105,10 @@ function makeDuelPokemon(
     duelId,
     ownerId,
     pokemonId,
-    name: pokemonId,
-    type: 'normal',
+    name: seed?.name ?? pokemonId,
+    type: seed?.type ?? 'normal',
+    spriteUrl: seed?.sprite_url ?? '',
+    backSpriteUrl: seed?.back_sprite_url ?? '',
     currentHp: hp,
     ppMove1: MOVE_PP[0],
     ppMove2: MOVE_PP[1],
@@ -112,7 +118,9 @@ function makeDuelPokemon(
   }
 }
 
-const BOT_ROSTER = ['rattata', 'pidgey', 'oddish', 'machop', 'geodude', 'gastly']
+// The rival's fixed team. Kept to catalog names so the duel resolves real
+// sprites for both sides (original first-stage picks were never in the seed).
+const BOT_ROSTER = ['Eevee', 'Pidgeot', 'Sceptile', 'Machamp', 'Onix', 'Gengar']
 
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -150,13 +158,13 @@ function enterDuel(state: MockState, slot: DuelSlot): MockState {
 
   const duelId = `${slot}-${Date.now()}`
   const humanIds = [teamSelection.starterId!, ...teamSelection.rosterIds]
+  const catalog = getCachedSeedData()
+  const toDuelPokemon = (id: string, ownerId: string, isActive: boolean) =>
+    makeDuelPokemon(duelId, ownerId, id, pokemonById(catalog, id) ?? null, isActive)
+
   const duelPokemonState: DuelPokemonState[] = [
-    ...humanIds.map((id, i) =>
-      makeDuelPokemon(duelId, player.nickname, id, i === 0),
-    ),
-    ...BOT_ROSTER.map((id, i) =>
-      makeDuelPokemon(duelId, 'bot', id, i === 0),
-    ),
+    ...humanIds.map((id, i) => toDuelPokemon(id, player.nickname, i === 0)),
+    ...BOT_ROSTER.map((id, i) => toDuelPokemon(id, 'bot', i === 0)),
   ]
 
   return {

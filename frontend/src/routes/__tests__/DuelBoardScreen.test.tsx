@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { act, render, screen, within } from '@testing-library/react'
@@ -9,6 +9,8 @@ import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
 import type { MockStateActions } from '../../state/useMockState'
 import { STORAGE_KEY, serializeMockState } from '../../state/store'
+import { setCachedSeedData } from '../../data/seedData'
+import type { SeedData } from '../../data/seedData'
 import type {
   DuelPokemonState,
   DuelState,
@@ -17,6 +19,24 @@ import type {
   TournamentState,
 } from '../../state/schema'
 import DuelBoardScreen from '../DuelBoardScreen'
+
+// Catalog resolved by enterDuel at duel start: Pikachu is the human starter
+// and Eevee leads the fixed bot roster, so those two drive the active HUDs.
+const duelSeedFixture: SeedData = {
+  _meta: { version: '1', description: 'test', total_starters: 1, total_catalog: 7, notes: [] },
+  starters: [
+    { name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'front-pikachu', back_sprite_url: 'back-pikachu', is_starter: true },
+  ],
+  catalog: [
+    { name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'front-snorlax', back_sprite_url: 'back-snorlax', is_starter: false },
+    { name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'front-eevee', back_sprite_url: 'back-eevee', is_starter: false },
+    { name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'front-pidgeot', back_sprite_url: 'back-pidgeot', is_starter: false },
+    { name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'front-sceptile', back_sprite_url: 'back-sceptile', is_starter: false },
+    { name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'front-machamp', back_sprite_url: 'back-machamp', is_starter: false },
+    { name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'front-onix', back_sprite_url: 'back-onix', is_starter: false },
+    { name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'front-gengar', back_sprite_url: 'back-gengar', is_starter: false },
+  ],
+}
 
 function SeedProbe({ seed }: { seed?: (actions: MockStateActions) => void }) {
   const [, actions] = useMockState()
@@ -111,6 +131,8 @@ function makePokemon(ownerId: string, pokemonId: string, isActive: boolean): Due
     pokemonId,
     name: pokemonId,
     type: 'normal',
+    spriteUrl: '',
+    backSpriteUrl: '',
     currentHp: isActive ? 100 : 0,
     ppMove1: 4,
     ppMove2: 4,
@@ -213,15 +235,34 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+beforeEach(() => {
+  // The store resolves the duel roster through the cached catalog.
+  setCachedSeedData(duelSeedFixture)
+})
+
 describe('DuelBoardScreen — HUD', () => {
   it('renders the player and rival HUDs with active pokemon names and full HP', () => {
     renderDuelBoard(seed1v1Duel)
     const humanHud = screen.getByTestId('hud-human')
     const rivalHud = screen.getByTestId('hud-rival')
     expect(within(humanHud).getByText('PIKACHU')).toBeInTheDocument()
-    expect(within(rivalHud).getByText('RATTATA')).toBeInTheDocument()
+    expect(within(rivalHud).getByText('EEVEE')).toBeInTheDocument()
     expect(within(humanHud).getByText('100/100')).toBeInTheDocument()
     expect(within(rivalHud).getByText('100/100')).toBeInTheDocument()
+  })
+
+  it('renders the GB-style sprites: rival seen from the front, own pokemon from the back', () => {
+    renderDuelBoard(seed1v1Duel)
+    const humanHud = screen.getByTestId('hud-human')
+    const rivalHud = screen.getByTestId('hud-rival')
+
+    const rivalSprite = within(rivalHud).getByRole('img')
+    expect(rivalSprite).toHaveAttribute('src', 'front-eevee')
+    expect(rivalSprite).toHaveAttribute('alt', 'Eevee')
+
+    const humanSprite = within(humanHud).getByRole('img')
+    expect(humanSprite).toHaveAttribute('src', 'back-pikachu')
+    expect(humanSprite).toHaveAttribute('alt', 'Pikachu')
   })
 
   it('shows the HP bars with the live HP value', () => {

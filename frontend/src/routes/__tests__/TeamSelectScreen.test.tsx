@@ -11,18 +11,18 @@ import TeamSelectScreen from '../TeamSelectScreen'
 const seedFixture: SeedData = {
   _meta: { version: '1', description: 'test', total_starters: 4, total_catalog: 6, notes: [] },
   starters: [
-    { name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'x', is_starter: true },
-    { name: 'Charmander', type: 'fire', pokeapi_id: 4, sprite_url: 'x', is_starter: true },
-    { name: 'Bulbasaur', type: 'grass', pokeapi_id: 1, sprite_url: 'x', is_starter: true },
-    { name: 'Squirtle', type: 'water', pokeapi_id: 7, sprite_url: 'x', is_starter: true },
+    { name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'x', back_sprite_url: 'x', is_starter: true },
+    { name: 'Charmander', type: 'fire', pokeapi_id: 4, sprite_url: 'x', back_sprite_url: 'x', is_starter: true },
+    { name: 'Bulbasaur', type: 'grass', pokeapi_id: 1, sprite_url: 'x', back_sprite_url: 'x', is_starter: true },
+    { name: 'Squirtle', type: 'water', pokeapi_id: 7, sprite_url: 'x', back_sprite_url: 'x', is_starter: true },
   ],
   catalog: [
-    { name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'x', is_starter: false },
-    { name: 'Pidgey', type: 'normal', pokeapi_id: 16, sprite_url: 'x', is_starter: false },
-    { name: 'Charmeleon', type: 'fire', pokeapi_id: 5, sprite_url: 'x', is_starter: false },
-    { name: 'Vulpix', type: 'fire', pokeapi_id: 37, sprite_url: 'x', is_starter: false },
-    { name: 'Machop', type: 'fighting', pokeapi_id: 66, sprite_url: 'x', is_starter: false },
-    { name: 'Abra', type: 'psychic', pokeapi_id: 63, sprite_url: 'x', is_starter: false },
+    { name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+    { name: 'Pidgey', type: 'normal', pokeapi_id: 16, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+    { name: 'Charmeleon', type: 'fire', pokeapi_id: 5, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+    { name: 'Vulpix', type: 'fire', pokeapi_id: 37, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+    { name: 'Machop', type: 'fighting', pokeapi_id: 66, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+    { name: 'Abra', type: 'psychic', pokeapi_id: 63, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
   ],
 }
 

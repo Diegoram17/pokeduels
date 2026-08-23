@@ -6,6 +6,7 @@ export interface PokemonSeed {
   type: string
   pokeapi_id: number
   sprite_url: string
+  back_sprite_url: string
   is_starter: boolean
 }
 
@@ -22,6 +23,24 @@ export interface SeedData {
 }
 
 let cache: SeedData | null = null
+
+/**
+ * Synchronous access to the loaded catalog — used by the state store to
+ * resolve real name/type/sprite data when a duel starts. Null until the first
+ * fetchSeedData() resolves (the team-select screen always fetches before a
+ * duel can begin, so the cache is warm in the real flow).
+ */
+export function getCachedSeedData(): SeedData | null {
+  return cache
+}
+
+/**
+ * Replaces the cached catalog. Used by tests to seed a known catalog without
+ * hitting the network; passing null simulates "not loaded yet".
+ */
+export function setCachedSeedData(data: SeedData | null): void {
+  cache = data
+}
 
 /**
  * Fetches the seed data JSON from the public assets. Subsequent calls return

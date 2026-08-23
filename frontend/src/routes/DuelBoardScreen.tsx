@@ -52,6 +52,22 @@ function HudCard({ pokemon, side }: { pokemon: DuelPokemonState; side: 'human' |
       }}
     >
       <div
+        className="hud-sprite"
+        style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}
+      >
+        <img
+          src={isRival ? pokemon.spriteUrl : pokemon.backSpriteUrl}
+          alt={pokemon.name}
+          style={{
+            width: isRival ? 120 : 110,
+            height: isRival ? 120 : 110,
+            objectFit: 'contain',
+            imageRendering: 'pixelated',
+            filter: 'drop-shadow(0 10px 20px rgba(90,170,255,.35))',
+          }}
+        />
+      </div>
+      <div
         className="hud-top"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}
       >
