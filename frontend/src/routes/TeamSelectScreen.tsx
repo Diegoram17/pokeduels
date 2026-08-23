@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import { fetchCatalog, filterCatalog, pokemonById, typeOptions, ALL_TYPES, type Pokemon } from '../lib/catalog'
 import { describeApiError } from '../lib/api'
-import { isTeamComplete, toggleRoster, toggleStarter } from '../lib/teamSelection'
+import { onSocketEvent } from '../lib/socket'
+import { isTeamComplete, toggleRoster, toggleStarter, ROSTER_SIZE } from '../lib/teamSelection'
 import ErrorBanner from '../components/ErrorBanner'
 
 /**
@@ -58,6 +59,10 @@ function StarterPicker({
     }
     setBlockedHint(false)
     actions.updateTeamSelection({ starterId: next })
+    // The backend owns starter exclusivity — mirror every accepted pick over WS.
+    if (next !== null) {
+      actions.selectStarter(next)
+    }
   }
 
   return (
@@ -242,7 +247,15 @@ function RosterPicker({
       <PokemonCatalogGrid
         pokemon={visible}
         selectedIds={rosterIds}
-        onToggle={(id) => actions.updateTeamSelection({ rosterIds: toggleRoster(rosterIds, id) })}
+        onToggle={(id) => {
+          const next = toggleRoster(rosterIds, id)
+          actions.updateTeamSelection({ rosterIds: next })
+          // Send the full roster over WS once complete (backend validates
+          // count=5 and duplicates; rejections surface as an error banner).
+          if (next.length === ROSTER_SIZE) {
+            actions.selectRoster(next)
+          }
+        }}
       />
     </section>
   )
@@ -355,6 +368,21 @@ function TeamSelectScreen() {
   useEffect(() => {
     loadCatalog()
   }, [loadCatalog])
+
+  // WS rejection events for team selection route through the same inline
+  // error banner + manual retry pattern (decision #3, obs #188/#192).
+  useEffect(() => {
+    const offStarter = onSocketEvent('team:starter_rejected', () => {
+      setError('Tu Pokémon inicial fue rechazado. Elegí otro.')
+    })
+    const offRoster = onSocketEvent('team:roster_rejected', () => {
+      setError('Tu equipo fue rechazado. Revisá que no haya duplicados.')
+    })
+    return () => {
+      offStarter()
+      offRoster()
+    }
+  }, [])
 
   return (
     <div className="pd-page draft-shell">
