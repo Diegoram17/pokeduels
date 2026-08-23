@@ -4,6 +4,15 @@ import { createApp } from '../app.js';
 import { pool } from '../db/pool.js';
 import { createPlayer } from '../db/players.js';
 import { createRoomWithCreator, listWaitingRooms, joinRoom } from '../db/rooms.js';
+import {
+  getRoomPlayerSeat,
+  joinOrResumeRoom,
+  setPlayerReady,
+  leaveRoom,
+  markPlayerConnected,
+  markPlayerDisconnected,
+  getRoomState,
+} from '../db/rooms.js';
 import { generateRoomCode } from '../lib/roomCode.js';
 import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
 
@@ -153,6 +162,181 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
       await expect(joinRoom('ZZZZZZ', player.id, 'NotFoundDb')).rejects.toMatchObject({
         statusCode: 404,
       });
+    });
+  });
+
+  describe('db layer: WS-facing room functions (PR 1)', () => {
+    it('getRoomPlayerSeat returns the seat row for a seated player and undefined otherwise', async () => {
+      const creator = await createPlayer('WsSeatCreator');
+      const stranger = await createPlayer('WsSeatStranger');
+      const room = await createRoomWithCreator(4, creator.id);
+
+      const seat = await getRoomPlayerSeat(room.id, creator.id);
+      expect(seat.player_id).toBe(creator.id);
+      expect(seat.room_id).toBe(room.id);
+      expect(seat.ready).toBe(false);
+      expect(seat.connected).toBe(true);
+
+      const missing = await getRoomPlayerSeat(room.id, stranger.id);
+      expect(missing).toBeUndefined();
+    });
+
+    it('joinOrResumeRoom inserts a new seat with resumed=false and returns the room', async () => {
+      const creator = await createPlayer('WsJoinCreator');
+      const joiner = await createPlayer('WsJoinJoiner');
+      const room = await createRoomWithCreator(2, creator.id);
+
+      const joined = await joinOrResumeRoom(room.code, joiner.id, 'WsJoinJoiner');
+      expect(joined.resumed).toBe(false);
+      expect(joined.id).toBe(room.id);
+      expect(joined.code).toBe(room.code);
+      expect(joined.max_players).toBe(2);
+      expect(joined.status).toBe('waiting');
+      expect(joined.player_count).toBe(2);
+    });
+
+    it('joinOrResumeRoom resumes an existing seat with resumed=true without duplicating it', async () => {
+      const creator = await createPlayer('WsResumeCreator');
+      const room = await createRoomWithCreator(4, creator.id);
+
+      const resumed = await joinOrResumeRoom(room.code, creator.id, 'WsResumeCreator');
+      expect(resumed.resumed).toBe(true);
+      expect(resumed.player_count).toBe(1);
+
+      const { rows } = await pool.query(
+        'SELECT COUNT(*)::int AS n FROM room_players WHERE room_id = $1 AND player_id = $2',
+        [room.id, creator.id],
+      );
+      expect(rows[0].n).toBe(1);
+    });
+
+    it('joinOrResumeRoom rejects an unknown code with 404', async () => {
+      const player = await createPlayer('WsJoin404');
+      await expect(joinOrResumeRoom('ZZZZZZ', player.id, 'WsJoin404')).rejects.toMatchObject({
+        statusCode: 404,
+      });
+    });
+
+    it('joinOrResumeRoom rejects a non-waiting room with 409 on the new-seat path', async () => {
+      const creator = await createPlayer('WsNotWait');
+      const joiner = await createPlayer('WsNotWaitJ');
+      const room = await createRoomWithCreator(4, creator.id);
+      await pool.query("UPDATE rooms SET status = 'in_progress' WHERE id = $1", [room.id]);
+
+      await expect(joinOrResumeRoom(room.code, joiner.id, 'WsNotWaitJ')).rejects.toMatchObject({
+        statusCode: 409,
+      });
+    });
+
+    it('joinOrResumeRoom rejects a full room with 409 on the new-seat path', async () => {
+      const creator = await createPlayer('WsFullCreator');
+      const j2 = await createPlayer('WsFullJ2');
+      const j3 = await createPlayer('WsFullJ3');
+      const room = await createRoomWithCreator(2, creator.id);
+      await joinRoom(room.code, j2.id, 'WsFullJ2');
+
+      await expect(joinOrResumeRoom(room.code, j3.id, 'WsFullJ3')).rejects.toMatchObject({
+        statusCode: 409,
+      });
+    });
+
+    it('setPlayerReady persists the ready flag and returns the updated row', async () => {
+      const creator = await createPlayer('WsReadyCreator');
+      const room = await createRoomWithCreator(4, creator.id);
+
+      const updated = await setPlayerReady(room.id, creator.id, true);
+      expect(updated.ready).toBe(true);
+
+      const again = await setPlayerReady(room.id, creator.id, false);
+      expect(again.ready).toBe(false);
+    });
+
+    it('setPlayerReady throws 404 when the player is not seated', async () => {
+      const owner = await createPlayer('WsReadyOwner');
+      const stranger = await createPlayer('WsReadyStranger');
+      const room = await createRoomWithCreator(4, owner.id);
+
+      await expect(setPlayerReady(room.id, stranger.id, true)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+    });
+
+    it('leaveRoom removes the seat and starter selection but keeps the room waiting with others seated', async () => {
+      const creator = await createPlayer('WsLeaveCreator');
+      const j2 = await createPlayer('WsLeaveJ2');
+      const room = await createRoomWithCreator(4, creator.id);
+      await joinRoom(room.code, j2.id, 'WsLeaveJ2');
+      const { rows: pokemons } = await pool.query('SELECT id FROM pokemons LIMIT 1');
+      await pool.query(
+        'INSERT INTO team_selections (room_id, player_id, pokemon_id, is_starter, slot) VALUES ($1, $2, $3, TRUE, 1)',
+        [room.id, j2.id, pokemons[0].id],
+      );
+
+      await leaveRoom(room.id, j2.id);
+
+      const { rows: seats } = await pool.query(
+        'SELECT COUNT(*)::int AS n FROM room_players WHERE room_id = $1',
+        [room.id],
+      );
+      expect(seats[0].n).toBe(1);
+      const { rows: selections } = await pool.query(
+        'SELECT COUNT(*)::int AS n FROM team_selections WHERE room_id = $1 AND player_id = $2',
+        [room.id, j2.id],
+      );
+      expect(selections[0].n).toBe(0);
+      const { rows: roomRows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
+      expect(roomRows[0].status).toBe('waiting');
+    });
+
+    it('leaveRoom closes the room (aborted) when the last seated player leaves', async () => {
+      const creator = await createPlayer('WsCloseCreator');
+      const room = await createRoomWithCreator(2, creator.id);
+
+      await leaveRoom(room.id, creator.id);
+
+      const { rows: seats } = await pool.query(
+        'SELECT COUNT(*)::int AS n FROM room_players WHERE room_id = $1',
+        [room.id],
+      );
+      expect(seats[0].n).toBe(0);
+      const { rows: roomRows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
+      expect(roomRows[0].status).toBe('aborted');
+    });
+
+    it('markPlayerConnected / markPlayerDisconnected flip the connected flag', async () => {
+      const creator = await createPlayer('WsConnCreator');
+      const room = await createRoomWithCreator(4, creator.id);
+
+      await markPlayerDisconnected(room.id, creator.id);
+      expect((await getRoomPlayerSeat(room.id, creator.id)).connected).toBe(false);
+
+      await markPlayerConnected(room.id, creator.id);
+      expect((await getRoomPlayerSeat(room.id, creator.id)).connected).toBe(true);
+    });
+
+    it('getRoomState returns players, ready flags and startersTaken', async () => {
+      const creator = await createPlayer('WsStateCreator');
+      const j2 = await createPlayer('WsStateJ2');
+      const room = await createRoomWithCreator(4, creator.id);
+      await joinRoom(room.code, j2.id, 'WsStateJ2');
+      await setPlayerReady(room.id, creator.id, true);
+      const { rows: pokemons } = await pool.query('SELECT id FROM pokemons LIMIT 1');
+      await pool.query(
+        'INSERT INTO team_selections (room_id, player_id, pokemon_id, is_starter, slot) VALUES ($1, $2, $3, TRUE, 1)',
+        [room.id, creator.id, pokemons[0].id],
+      );
+
+      const state = await getRoomState(room.id);
+      expect(state.roomId).toBe(room.id);
+      expect(state.code).toBe(room.code);
+      expect(state.status).toBe('waiting');
+      expect(state.maxPlayers).toBe(4);
+      expect(state.players).toHaveLength(2);
+      const creatorState = state.players.find((p) => p.playerId === creator.id);
+      expect(creatorState.nickname).toBe('WsStateCreator');
+      expect(creatorState.ready).toBe(true);
+      expect(creatorState.connected).toBe(true);
+      expect(state.startersTaken).toEqual([pokemons[0].id]);
     });
   });
 
