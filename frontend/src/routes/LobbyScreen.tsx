@@ -15,6 +15,7 @@ import {
   roomModeLabel,
   roomStatusLabel,
 } from '../lib/rooms'
+import { onSocketEvent } from '../lib/socket'
 import { validateNickname } from '../lib/validation'
 import ErrorBanner from '../components/ErrorBanner'
 
@@ -242,6 +243,7 @@ function LobbyScreen() {
   const navigate = useNavigate()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [wsError, setWsError] = useState<string | null>(null)
 
   const loadRooms = useCallback(() => {
     setError(null)
@@ -254,6 +256,22 @@ function LobbyScreen() {
     loadRooms()
   }, [loadRooms])
 
+  // Generic WS disconnect/reconnect banner (decision #1, obs #192): no
+  // countdown of the backend grace window, manual retry only — the roster
+  // restores from the next room:state automatically on reconnect.
+  useEffect(() => {
+    const offDisconnect = onSocketEvent('disconnect', () => {
+      setWsError('Se perdió la conexión con el servidor')
+    })
+    const offConnect = onSocketEvent('connect', () => {
+      setWsError(null)
+    })
+    return () => {
+      offDisconnect()
+      offConnect()
+    }
+  }, [])
+
   async function handleCreated(maxPlayers: 2 | 4) {
     setError(null)
     try {
@@ -263,6 +281,9 @@ function LobbyScreen() {
         maxPlayers,
         status: room.status,
       })
+      // Establish the WS room subscription so the live roster arrives via
+      // room:state (design data flow: roomShellReceived → room:join).
+      actions.joinRoomWs(room.code)
       navigate('/team-select')
     } catch (err) {
       setError(describeApiError(err))
@@ -278,6 +299,7 @@ function LobbyScreen() {
         maxPlayers: room.max_players,
         status: room.status,
       })
+      actions.joinRoomWs(room.code)
       navigate('/team-select')
     } catch (err) {
       setError(describeApiError(err))
@@ -315,6 +337,7 @@ function LobbyScreen() {
             </div>
           </div>
 
+          {wsError && <ErrorBanner message={wsError} onRetry={() => {}} />}
           {error && <ErrorBanner message={error} onRetry={loadRooms} />}
           <RoomList rooms={rooms} />
         </main>
