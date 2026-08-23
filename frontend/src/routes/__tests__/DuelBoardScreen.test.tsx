@@ -9,8 +9,8 @@ import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
 import type { MockStateActions } from '../../state/useMockState'
 import { STORAGE_KEY, serializeMockState } from '../../state/store'
-import { setCachedSeedData } from '../../data/seedData'
-import type { SeedData } from '../../data/seedData'
+import { setCachedCatalog } from '../../lib/catalog'
+import type { Pokemon } from '../../lib/catalog'
 import type {
   DuelPokemonState,
   DuelState,
@@ -22,21 +22,16 @@ import DuelBoardScreen from '../DuelBoardScreen'
 
 // Catalog resolved by enterDuel at duel start: Pikachu is the human starter
 // and Eevee leads the fixed bot roster, so those two drive the active HUDs.
-const duelSeedFixture: SeedData = {
-  _meta: { version: '1', description: 'test', total_starters: 1, total_catalog: 7, notes: [] },
-  starters: [
-    { name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'front-pikachu', back_sprite_url: 'back-pikachu', is_starter: true },
-  ],
-  catalog: [
-    { name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'front-snorlax', back_sprite_url: 'back-snorlax', is_starter: false },
-    { name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'front-eevee', back_sprite_url: 'back-eevee', is_starter: false },
-    { name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'front-pidgeot', back_sprite_url: 'back-pidgeot', is_starter: false },
-    { name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'front-sceptile', back_sprite_url: 'back-sceptile', is_starter: false },
-    { name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'front-machamp', back_sprite_url: 'back-machamp', is_starter: false },
-    { name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'front-onix', back_sprite_url: 'back-onix', is_starter: false },
-    { name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'front-gengar', back_sprite_url: 'back-gengar', is_starter: false },
-  ],
-}
+const duelSeedFixture: Pokemon[] = [
+  { id: 25, name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'front-pikachu', back_sprite_url: 'back-pikachu', is_starter: true },
+  { id: 5, name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'front-snorlax', back_sprite_url: 'back-snorlax', is_starter: false },
+  { id: 6, name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'front-eevee', back_sprite_url: 'back-eevee', is_starter: false },
+  { id: 23, name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'front-pidgeot', back_sprite_url: 'back-pidgeot', is_starter: false },
+  { id: 14, name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'front-sceptile', back_sprite_url: 'back-sceptile', is_starter: false },
+  { id: 17, name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'front-machamp', back_sprite_url: 'back-machamp', is_starter: false },
+  { id: 33, name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'front-onix', back_sprite_url: 'back-onix', is_starter: false },
+  { id: 15, name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'front-gengar', back_sprite_url: 'back-gengar', is_starter: false },
+]
 
 function SeedProbe({ seed }: { seed?: (actions: MockStateActions) => void }) {
   const [, actions] = useMockState()
@@ -159,7 +154,7 @@ function buildInProgressDuel(
   tournament: TournamentState,
 ): MockState {
   return {
-    player: { nickname: 'Ash' },
+    player: { nickname: 'Ash', playerId: null, sessionToken: null },
     room: {
       code: 'AB12',
       mode: 'tournament',
@@ -168,8 +163,8 @@ function buildInProgressDuel(
       players: ['Ash'],
     },
     teamSelection: {
-      starterId: 'Pikachu',
-      rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+      starterId: 25,
+      rosterIds: [5, 23, 14, 17, 33],
     },
     tournament,
     duelPokemonState: [
@@ -224,8 +219,8 @@ function seed1v1Duel(actions: MockStateActions) {
   actions.setNickname('Ash')
   actions.createRoom('1v1', 2)
   actions.updateTeamSelection({
-    starterId: 'Pikachu',
-    rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+    starterId: 25,
+    rosterIds: [5, 23, 14, 17, 33],
   })
   actions.enterDuel('1v1')
 }
@@ -237,7 +232,7 @@ afterEach(() => {
 
 beforeEach(() => {
   // The store resolves the duel roster through the cached catalog.
-  setCachedSeedData(duelSeedFixture)
+  setCachedCatalog(duelSeedFixture)
 })
 
 describe('DuelBoardScreen — HUD', () => {
@@ -431,11 +426,11 @@ describe('DuelBoardScreen — Rules of Hooks safety', () => {
     localStorage.setItem(
       STORAGE_KEY,
       serializeMockState({
-        player: { nickname: 'Ash' },
+        player: { nickname: 'Ash', playerId: null, sessionToken: null },
         room: { code: 'AB12', mode: '1v1', maxPlayers: 2, status: 'waiting', players: ['Ash'] },
         teamSelection: {
-          starterId: 'Pikachu',
-          rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+          starterId: 25,
+          rosterIds: [5, 23, 14, 17, 33],
         },
         tournament: null,
         duelPokemonState: [],

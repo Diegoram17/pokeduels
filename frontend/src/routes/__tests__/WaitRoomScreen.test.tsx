@@ -71,8 +71,8 @@ function seedTournament(actions: MockStateActions) {
   actions.setNickname('Ash')
   actions.createRoom('tournament', 4)
   actions.updateTeamSelection({
-    starterId: 'Pikachu',
-    rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+    starterId: 25,
+    rosterIds: [5, 6, 14, 17, 23],
   })
 }
 
@@ -80,8 +80,8 @@ function seed1v1(actions: MockStateActions) {
   actions.setNickname('Ash')
   actions.createRoom('1v1', 2)
   actions.updateTeamSelection({
-    starterId: 'Pikachu',
-    rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+    starterId: 25,
+    rosterIds: [5, 6, 14, 17, 23],
   })
 }
 

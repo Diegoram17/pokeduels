@@ -50,9 +50,9 @@ function makeState(
   const humanActive = makePokemon(duelId, NICKNAME, 'pikachu', humanHp, true)
   const botActive = makePokemon(duelId, 'bot', 'rattata', botHp, true)
   return {
-    player: { nickname: NICKNAME },
+    player: { nickname: NICKNAME, playerId: null, sessionToken: null },
     room: null,
-    teamSelection: { starterId: 'pikachu', rosterIds: [] },
+    teamSelection: { starterId: 25, rosterIds: [] },
     tournament: null,
     duelPokemonState: [
       humanActive,

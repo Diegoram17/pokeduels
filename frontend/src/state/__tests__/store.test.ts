@@ -10,26 +10,22 @@ import {
   type StorageLike,
 } from '../store'
 import type { MockState } from '../schema'
-import { setCachedSeedData } from '../../data/seedData'
-import type { SeedData } from '../../data/seedData'
+import { setCachedCatalog } from '../../lib/catalog'
+import type { Pokemon } from '../../lib/catalog'
 
-const duelCatalog: SeedData = {
-  _meta: { version: '1', description: 'test', total_starters: 1, total_catalog: 6, notes: [] },
-  starters: [
-    { name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'front-pikachu', back_sprite_url: 'back-pikachu', is_starter: true },
-  ],
-  catalog: [
-    { name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'front-eevee', back_sprite_url: 'back-eevee', is_starter: false },
-    { name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'front-pidgeot', back_sprite_url: 'back-pidgeot', is_starter: false },
-    { name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'front-sceptile', back_sprite_url: 'back-sceptile', is_starter: false },
-    { name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'front-machamp', back_sprite_url: 'back-machamp', is_starter: false },
-    { name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'front-onix', back_sprite_url: 'back-onix', is_starter: false },
-    { name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'front-gengar', back_sprite_url: 'back-gengar', is_starter: false },
-  ],
-}
+const duelCatalog: Pokemon[] = [
+  { id: 25, name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'front-pikachu', back_sprite_url: 'back-pikachu', is_starter: true },
+  { id: 5, name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'front-snorlax', back_sprite_url: 'back-snorlax', is_starter: false },
+  { id: 6, name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'front-eevee', back_sprite_url: 'back-eevee', is_starter: false },
+  { id: 23, name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'front-pidgeot', back_sprite_url: 'back-pidgeot', is_starter: false },
+  { id: 14, name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'front-sceptile', back_sprite_url: 'back-sceptile', is_starter: false },
+  { id: 17, name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'front-machamp', back_sprite_url: 'back-machamp', is_starter: false },
+  { id: 33, name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'front-onix', back_sprite_url: 'back-onix', is_starter: false },
+  { id: 15, name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'front-gengar', back_sprite_url: 'back-gengar', is_starter: false },
+]
 
 beforeEach(() => {
-  setCachedSeedData(null)
+  setCachedCatalog(null)
 })
 
 function makeMemoryStorage(): StorageLike {
@@ -57,7 +53,7 @@ describe('createInitialState', () => {
 describe('serializeMockState / parseMockState', () => {
   it('round-trips a non-trivial state through serialize and parse', () => {
     const state: MockState = {
-      player: { nickname: 'Ash' },
+      player: { nickname: 'Ash', playerId: null, sessionToken: null },
       room: {
         code: 'AB12',
         mode: 'tournament',
@@ -65,7 +61,7 @@ describe('serializeMockState / parseMockState', () => {
         status: 'waiting',
         players: ['Ash'],
       },
-      teamSelection: { starterId: 'pikachu', rosterIds: ['a', 'b', 'c', 'd', 'e'] },
+      teamSelection: { starterId: 25, rosterIds: [5, 23, 14, 17, 33] },
       tournament: {
         bracket: { semiA: null, semiB: null },
         queue: ['semiA', 'semiB'],
@@ -98,7 +94,7 @@ describe('loadMockState / saveMockState', () => {
     const storage = makeMemoryStorage()
     const state: MockState = {
       ...createInitialState(),
-      player: { nickname: 'Misty' },
+      player: { nickname: 'Ash', playerId: null, sessionToken: null },
     }
     saveMockState(state, storage)
     expect(loadMockState(storage)).toEqual(state)
@@ -123,6 +119,38 @@ describe('reduceMockState — setNickname', () => {
       nickname: 'Ash',
     })
     expect(s.player.nickname).toBe('Ash')
+  })
+})
+
+describe('reduceMockState — sessionEstablished', () => {
+  it('stores the playerId, sessionToken and nickname from the backend session', () => {
+    const s = reduceMockState(createInitialState(), {
+      type: 'sessionEstablished',
+      playerId: 'player-1',
+      sessionToken: 'token-1',
+      nickname: 'Ash',
+    })
+    expect(s.player).toEqual({
+      nickname: 'Ash',
+      playerId: 'player-1',
+      sessionToken: 'token-1',
+    })
+  })
+
+  it('overwrites a previously set nickname with the session nickname', () => {
+    const base = reduceMockState(createInitialState(), {
+      type: 'setNickname',
+      nickname: 'Old',
+    })
+    const s = reduceMockState(base, {
+      type: 'sessionEstablished',
+      playerId: 'player-2',
+      sessionToken: 'token-2',
+      nickname: 'Ash',
+    })
+    expect(s.player.nickname).toBe('Ash')
+    expect(s.player.playerId).toBe('player-2')
+    expect(s.player.sessionToken).toBe('token-2')
   })
 })
 
@@ -198,14 +226,14 @@ describe('reduceMockState — updateTeamSelection', () => {
     })
     const s1 = reduceMockState(base, {
       type: 'updateTeamSelection',
-      selection: { starterId: 'pikachu' },
+      selection: { starterId: 25 },
     })
-    expect(s1.teamSelection.starterId).toBe('pikachu')
+    expect(s1.teamSelection.starterId).toBe(25)
     const s2 = reduceMockState(s1, {
       type: 'updateTeamSelection',
-      selection: { rosterIds: ['a', 'b', 'c', 'd', 'e'] },
+      selection: { rosterIds: [5, 23, 14, 17, 33] },
     })
-    expect(s2.teamSelection.starterId).toBe('pikachu')
+    expect(s2.teamSelection.starterId).toBe(25)
     expect(s2.teamSelection.rosterIds).toHaveLength(5)
   })
 })
@@ -219,8 +247,8 @@ function makeTeamState(): MockState {
   s = reduceMockState(s, {
     type: 'updateTeamSelection',
     selection: {
-      starterId: 'pikachu',
-      rosterIds: ['a', 'b', 'c', 'd', 'e'],
+      starterId: 25,
+      rosterIds: [5, 23, 14, 17, 33],
     },
   })
   return s
@@ -236,7 +264,7 @@ describe('reduceMockState — enterDuel', () => {
     const humanActive = s.duelPokemonState.find(
       (p) => p.ownerId === 'Ash' && p.isActive,
     )
-    expect(humanActive?.pokemonId).toBe('pikachu')
+    expect(humanActive?.pokemonId).toBe('25')
     expect(s.duelPokemonState.filter((p) => p.currentHp === 100)).toHaveLength(12)
   })
 
@@ -248,7 +276,7 @@ describe('reduceMockState — enterDuel', () => {
     s = reduceMockState(s, { type: 'createRoom', mode: '1v1', maxPlayers: 2 })
     s = reduceMockState(s, {
       type: 'updateTeamSelection',
-      selection: { starterId: 'pikachu', rosterIds: ['a', 'b'] },
+      selection: { starterId: 25, rosterIds: [5, 23] },
     })
     const after = reduceMockState(s, { type: 'enterDuel', slot: '1v1' })
     expect(after.duel).toBeNull()
@@ -258,7 +286,7 @@ describe('reduceMockState — enterDuel', () => {
 
 describe('reduceMockState — enterDuel resolves real catalog data', () => {
   it('populates name, type and both sprite urls from the catalog when loaded', () => {
-    setCachedSeedData(duelCatalog)
+    setCachedCatalog(duelCatalog)
     const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
     const humanActive = s.duelPokemonState.find(
       (p) => p.ownerId === 'Ash' && p.isActive,
@@ -268,13 +296,13 @@ describe('reduceMockState — enterDuel resolves real catalog data', () => {
     expect(humanActive?.spriteUrl).toBe('front-pikachu')
     expect(humanActive?.backSpriteUrl).toBe('back-pikachu')
     // Unknown roster ids keep the stub shape instead of crashing the duel.
-    const fakeRoster = s.duelPokemonState.find((p) => p.pokemonId === 'a')
-    expect(fakeRoster?.name).toBe('a')
-    expect(fakeRoster?.spriteUrl).toBe('')
+    const fakeRoster = s.duelPokemonState.find((p) => p.pokemonId === '5')
+    expect(fakeRoster?.name).toBe('Snorlax')
+    expect(fakeRoster?.spriteUrl).toBe('front-snorlax')
   })
 
-  it('resolves the bot roster through the catalog (case-insensitive lookup)', () => {
-    setCachedSeedData(duelCatalog)
+  it('resolves the bot roster through the catalog (numeric ids)', () => {
+    setCachedCatalog(duelCatalog)
     const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
     const botActive = s.duelPokemonState.find(
       (p) => p.ownerId === 'bot' && p.isActive,
@@ -291,7 +319,7 @@ describe('reduceMockState — enterDuel resolves real catalog data', () => {
     const humanActive = s.duelPokemonState.find(
       (p) => p.ownerId === 'Ash' && p.isActive,
     )
-    expect(humanActive?.name).toBe('pikachu')
+    expect(humanActive?.name).toBe('25')
     expect(humanActive?.type).toBe('normal')
     expect(humanActive?.spriteUrl).toBe('')
     expect(humanActive?.backSpriteUrl).toBe('')
@@ -327,14 +355,14 @@ describe('reduceMockState — confirmSwap', () => {
       type: 'enterDuel',
       slot: '1v1',
     })
-    const s = reduceMockState(inDuel, { type: 'confirmSwap', pokemonId: 'a' })
+    const s = reduceMockState(inDuel, { type: 'confirmSwap', pokemonId: '5' })
     const humanActive = s.duelPokemonState.find(
       (p) => p.ownerId === 'Ash' && p.isActive,
     )
-    expect(humanActive?.pokemonId).toBe('a')
+    expect(humanActive?.pokemonId).toBe('5')
     expect(s.duel?.phase).toBe('awaiting_actions')
     const oldStarter = s.duelPokemonState.find(
-      (p) => p.ownerId === 'Ash' && p.pokemonId === 'pikachu',
+      (p) => p.ownerId === 'Ash' && p.pokemonId === '25',
     )
     expect(oldStarter?.isActive).toBe(false)
   })
@@ -367,8 +395,8 @@ describe('reduceMockState — advanceTournament', () => {
     s = reduceMockState(s, {
       type: 'updateTeamSelection',
       selection: {
-        starterId: 'pikachu',
-        rosterIds: ['a', 'b', 'c', 'd', 'e'],
+        starterId: 25,
+        rosterIds: [5, 23, 14, 17, 33],
       },
     })
     s = reduceMockState(s, { type: 'enterDuel', slot: 'semiA' })
@@ -408,7 +436,7 @@ describe('reduceMockState — resetSession', () => {
     s = reduceMockState(s, { type: 'createRoom', mode: 'tournament', maxPlayers: 4 })
     s = reduceMockState(s, {
       type: 'updateTeamSelection',
-      selection: { starterId: 'pikachu', rosterIds: ['a', 'b', 'c', 'd', 'e'] },
+      selection: { starterId: 25, rosterIds: [5, 23, 14, 17, 33] },
     })
     s = reduceMockState(s, { type: 'enterDuel', slot: 'semiA' })
 

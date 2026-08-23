@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { render, screen } from '@testing-library/react'
@@ -9,8 +9,27 @@ import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
 import type { MockStateActions } from '../../state/useMockState'
 import { STORAGE_KEY, serializeMockState } from '../../state/store'
+import { setCachedCatalog } from '../../lib/catalog'
+import type { Pokemon } from '../../lib/catalog'
 import type { DuelPokemonState, MockState } from '../../state/schema'
 import SwapScreen from '../SwapScreen'
+
+// Catalog resolved by enterDuel when seedLiveDuel starts the duel: Pikachu
+// (25) is the starter and Snorlax (5) leads the bench shown in the tests.
+const swapCatalog: Pokemon[] = [
+  { id: 25, name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'x', back_sprite_url: 'x', is_starter: true },
+  { id: 5, name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+  { id: 6, name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+  { id: 23, name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+  { id: 14, name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+  { id: 17, name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+  { id: 33, name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+  { id: 15, name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'x', back_sprite_url: 'x', is_starter: false },
+]
+
+beforeEach(() => {
+  setCachedCatalog(swapCatalog)
+})
 
 function SeedProbe({ seed }: { seed?: (actions: MockStateActions) => void }) {
   const [, actions] = useMockState()
@@ -91,8 +110,8 @@ function seedLiveDuel(actions: MockStateActions) {
   actions.setNickname('Ash')
   actions.createRoom('1v1', 2)
   actions.updateTeamSelection({
-    starterId: 'Pikachu',
-    rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+    starterId: 25,
+    rosterIds: [5, 23, 14, 17, 33],
   })
   actions.enterDuel('1v1')
 }
@@ -123,7 +142,7 @@ function makePokemon(
 // State mirroring a KO: the human active fainted, bench healthy, duel paused.
 function buildForcedSwapState(): MockState {
   return {
-    player: { nickname: 'Ash' },
+    player: { nickname: 'Ash', playerId: null, sessionToken: null },
     room: {
       code: 'AB12',
       mode: '1v1',
@@ -132,8 +151,8 @@ function buildForcedSwapState(): MockState {
       players: ['Ash'],
     },
     teamSelection: {
-      starterId: 'Pikachu',
-      rosterIds: ['Snorlax', 'Pidgey', 'Charmeleon', 'Vulpix', 'Machop'],
+      starterId: 25,
+      rosterIds: [5, 23, 14, 17, 33],
     },
     tournament: null,
     duelPokemonState: [
@@ -190,7 +209,7 @@ describe('SwapScreen — voluntary mode', () => {
     await user.click(screen.getByRole('button', { name: /volver al combate/i }))
 
     expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
-    expect(screen.getByTestId('active-probe').textContent).toContain('active:Pikachu')
+    expect(screen.getByTestId('active-probe').textContent).toContain('active:25')
   })
 
   it('labels the active pokemon as currently deployed and disables it', () => {
@@ -213,6 +232,6 @@ describe('SwapScreen — voluntary mode', () => {
     await user.click(screen.getByRole('button', { name: /confirmar cambio/i }))
 
     expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
-    expect(screen.getByTestId('active-probe').textContent).toContain('active:Snorlax')
+    expect(screen.getByTestId('active-probe').textContent).toContain('active:5')
   })
 })

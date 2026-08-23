@@ -12,9 +12,8 @@ import type {
 import { resolveTurn, type TurnResult } from '../engine/turnResolution'
 import { advanceQueue } from '../engine/tournamentQueue'
 import { slotLoserId } from '../lib/duelFlow'
-import { pokemonById } from '../lib/catalog'
-import { getCachedSeedData } from '../data/seedData'
-import type { PokemonSeed } from '../data/seedData'
+import { pokemonById, getCachedCatalog } from '../lib/catalog'
+import type { Pokemon } from '../lib/catalog'
 import type { MoveIndex } from '../engine/damage'
 
 export const STORAGE_KEY = 'pokeduels:mockState'
@@ -32,7 +31,7 @@ interface PersistedBlob {
 
 export function createInitialState(): MockState {
   return {
-    player: { nickname: '' },
+    player: { nickname: '', playerId: null, sessionToken: null },
     room: null,
     teamSelection: { starterId: null, rosterIds: [] },
     tournament: null,
@@ -81,6 +80,7 @@ export function saveMockState(state: MockState, storage?: StorageLike): void {
 
 export type MockStateAction =
   | { type: 'setNickname'; nickname: string }
+  | { type: 'sessionEstablished'; playerId: string; sessionToken: string; nickname: string }
   | { type: 'createRoom'; mode: RoomMode; maxPlayers: 2 | 4 }
   | { type: 'joinRoom'; code: string }
   | { type: 'updateTeamSelection'; selection: Partial<TeamSelectionState> }
@@ -97,7 +97,7 @@ function makeDuelPokemon(
   duelId: string,
   ownerId: string,
   pokemonId: string,
-  seed: PokemonSeed | null,
+  seed: Pokemon | null,
   isActive: boolean,
   hp = 100,
 ): DuelPokemonState {
@@ -118,9 +118,11 @@ function makeDuelPokemon(
   }
 }
 
-// The rival's fixed team. Kept to catalog names so the duel resolves real
-// sprites for both sides (original first-stage picks were never in the seed).
-const BOT_ROSTER = ['Eevee', 'Pidgeot', 'Sceptile', 'Machamp', 'Onix', 'Gengar']
+// The rival's fixed team, keyed by the catalog's numeric backend ids (sourced
+// from a real GET /api/pokemons response during implementation — see
+// apply-decisions for the id→name mapping). Kept to catalog entries so the
+// duel resolves real sprites for both sides.
+const BOT_ROSTER = [6, 23, 14, 17, 33, 15]
 
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -158,9 +160,11 @@ function enterDuel(state: MockState, slot: DuelSlot): MockState {
 
   const duelId = `${slot}-${Date.now()}`
   const humanIds = [teamSelection.starterId!, ...teamSelection.rosterIds]
-  const catalog = getCachedSeedData()
-  const toDuelPokemon = (id: string, ownerId: string, isActive: boolean) =>
-    makeDuelPokemon(duelId, ownerId, id, pokemonById(catalog, id) ?? null, isActive)
+  const catalog = getCachedCatalog()
+  // Duel-level identity stays a string (DuelPokemonState.pokemonId: string is
+  // #10's contract) — numeric ids are stringified at this boundary.
+  const toDuelPokemon = (id: number, ownerId: string, isActive: boolean) =>
+    makeDuelPokemon(duelId, ownerId, String(id), pokemonById(catalog, id) ?? null, isActive)
 
   const duelPokemonState: DuelPokemonState[] = [
     ...humanIds.map((id, i) => toDuelPokemon(id, player.nickname, i === 0)),
@@ -195,7 +199,17 @@ function recordResultAndAdvance(state: MockState): MockState {
 export function reduceMockState(state: MockState, action: MockStateAction): MockState {
   switch (action.type) {
     case 'setNickname':
-      return { ...state, player: { nickname: action.nickname } }
+      return { ...state, player: { ...state.player, nickname: action.nickname } }
+
+    case 'sessionEstablished':
+      return {
+        ...state,
+        player: {
+          nickname: action.nickname,
+          playerId: action.playerId,
+          sessionToken: action.sessionToken,
+        },
+      }
 
     case 'createRoom': {
       const room: RoomState = {

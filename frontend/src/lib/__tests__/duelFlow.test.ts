@@ -41,9 +41,9 @@ function makePokemon(
 
 function makeState(roster: DuelPokemonState[]): MockState {
   return {
-    player: { nickname: NICKNAME },
+    player: { nickname: NICKNAME, playerId: null, sessionToken: null },
     room: null,
-    teamSelection: { starterId: 'pikachu', rosterIds: [] },
+    teamSelection: { starterId: 25, rosterIds: [] },
     tournament: null,
     duelPokemonState: roster,
     duel: null,
@@ -121,7 +121,7 @@ function makeTournamentState(
   tournament: TournamentState,
 ): MockState {
   return {
-    player: { nickname: NICKNAME },
+    player: { nickname: NICKNAME, playerId: null, sessionToken: null },
     room: {
       code: 'AB12',
       mode: 'tournament',
@@ -129,7 +129,7 @@ function makeTournamentState(
       status: 'in_progress',
       players: [NICKNAME],
     },
-    teamSelection: { starterId: 'pikachu', rosterIds: [] },
+    teamSelection: { starterId: 25, rosterIds: [] },
     tournament,
     duelPokemonState: [
       makePokemon(NICKNAME, 'pikachu', true),

@@ -64,9 +64,9 @@ function makeFinishedDuel(winnerId: string): DuelState {
 
 function make1v1FinishedState(): MockState {
   return {
-    player: { nickname: 'Ash' },
+    player: { nickname: 'Ash', playerId: null, sessionToken: null },
     room: { code: 'AB12', mode: '1v1', maxPlayers: 2, status: 'finished', players: ['Ash'] },
-    teamSelection: { starterId: 'pikachu', rosterIds: [] },
+    teamSelection: { starterId: 25, rosterIds: [] },
     tournament: null,
     duelPokemonState: [makePokemon('Ash', true), makePokemon('bot', true)],
     duel: makeFinishedDuel('Ash'),
@@ -87,7 +87,7 @@ function makeTournamentFinishedState(): MockState {
     results,
   }
   return {
-    player: { nickname: 'Ash' },
+    player: { nickname: 'Ash', playerId: null, sessionToken: null },
     room: {
       code: 'AB12',
       mode: 'tournament',
@@ -95,7 +95,7 @@ function makeTournamentFinishedState(): MockState {
       status: 'finished',
       players: ['Ash'],
     },
-    teamSelection: { starterId: 'pikachu', rosterIds: [] },
+    teamSelection: { starterId: 25, rosterIds: [] },
     tournament,
     duelPokemonState: [makePokemon('Ash', true), makePokemon('bot', true)],
     duel: makeFinishedDuel('Ash'),

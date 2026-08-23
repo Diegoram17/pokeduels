@@ -11,6 +11,7 @@ import type { MoveIndex } from '../engine/damage'
 
 export interface MockStateActions {
   setNickname(nickname: string): void
+  sessionEstablished(payload: { playerId: string; sessionToken: string; nickname: string }): void
   createRoom(mode: RoomMode, maxPlayers: 2 | 4): void
   joinRoom(code: string): void
   updateTeamSelection(selection: Partial<TeamSelectionState>): void
@@ -44,6 +45,13 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
     const send = dispatchAndPersist(dispatch)
     return {
       setNickname: (nickname) => send({ type: 'setNickname', nickname }),
+      sessionEstablished: (payload) =>
+        send({
+          type: 'sessionEstablished',
+          playerId: payload.playerId,
+          sessionToken: payload.sessionToken,
+          nickname: payload.nickname,
+        }),
       createRoom: (mode, maxPlayers) => send({ type: 'createRoom', mode, maxPlayers }),
       joinRoom: (code) => send({ type: 'joinRoom', code }),
       updateTeamSelection: (selection) =>

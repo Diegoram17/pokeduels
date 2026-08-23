@@ -2,6 +2,8 @@
 
 export interface PlayerState {
   nickname: string
+  playerId: string | null // backend player id (POST /api/session)
+  sessionToken: string | null // bearer token used for REST + WS auth
 }
 
 export type RoomMode = '1v1' | 'tournament'
@@ -16,8 +18,8 @@ export interface RoomState {
 }
 
 export interface TeamSelectionState {
-  starterId: string | null
-  rosterIds: string[] // exactly 5 when complete
+  starterId: number | null // numeric backend pokemon id (canonical identity)
+  rosterIds: number[] // exactly 5 when complete
 }
 
 export type TournamentSlot = 'semiA' | 'semiB' | 'thirdPlace' | 'final'
