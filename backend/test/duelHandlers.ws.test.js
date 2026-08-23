@@ -453,4 +453,56 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     expect(getRoundStateStore().get(duelId)).toBeUndefined();
     expect(getPhaseStore().get(duelId)).toBe('finished');
   }, 120000);
+
+  it('advances sub-state to AWAITING_SWITCH after a single-Pokémon KO round (no team wipe)', async () => {
+    const harness = await startHarness({ turnTimeoutMs: 60000 });
+    const { c1, c2, duelId, p1 } = await createActingDuel(harness);
+
+    // Only P1's active lead is brought to 1 HP; the rest of the bench stays
+    // untouched (alive), so the round KOs exactly one pokemon -- not a wipe.
+    await pool.query(
+      `UPDATE duel_pokemon_state SET current_hp = 1
+       WHERE duel_id = $1 AND player_id = $2 AND is_active = TRUE`,
+      [duelId, p1.id],
+    );
+
+    const resolvedP = waitForEvent(c1, 'duel:turn_resolved', 45000);
+    const switchP = waitForEvent(c1, 'duel:awaiting_switch', 45000);
+    c1.emit('duel:select_action', { duelId, moveIndex: 4 });
+    c2.emit('duel:select_action', { duelId, moveIndex: 4 });
+    const resolved = await resolvedP;
+    expect(resolved.duelId).toBe(duelId);
+
+    const awaitingSwitch = await switchP;
+    expect(awaitingSwitch).toMatchObject({ duelId });
+
+    // Not a wipe: duel stays in progress, sub-state AWAITING_SWITCH.
+    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_SWITCH');
+    expect(getPhaseStore().get(duelId)).toBe('in_progress');
+    const { rows } = await pool.query('SELECT status FROM duels WHERE id = $1', [duelId]);
+    expect(rows[0].status).not.toBe('finished');
+  }, 120000);
+
+  it('returns sub-state to AWAITING_ACTIONS from a forced-switch precondition', async () => {
+    const harness = await startHarness();
+    const ctx = await createSeatedAndTeamedRoom(harness);
+    const { duelId } = await readyBoth(ctx);
+    await selectLeads(ctx, duelId);
+
+    // Simulate the forced-switch precondition left behind by a KO round.
+    getRoundStateStore().set(duelId, 'AWAITING_SWITCH');
+
+    ctx.c1.emit('duel:switch_decision', { duelId, switchTo: ctx.p1Team[1] });
+    await waitUntil(
+      () =>
+        pool.query(
+          `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
+           WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3 AND is_active = TRUE`,
+          [duelId, ctx.p1.id, ctx.p1Team[1]],
+        ).then((r) => r.rows[0].n === 1),
+      20000,
+    );
+
+    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+  }, 60000);
 });
