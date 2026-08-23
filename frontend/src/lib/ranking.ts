@@ -1,4 +1,5 @@
 import type { MockState } from '../state/schema'
+import { roomMode } from './rooms'
 
 // Ranking podium builder. Scoped to the current room/session only (ADR-0002:
 // no persistent cross-session ranking) — the entries come straight from the
@@ -20,7 +21,7 @@ export function buildRanking(state: MockState): RankingEntry[] {
   const { room, duel, tournament, duelPokemonState } = state
   if (!room) return []
 
-  if (room.mode !== 'tournament' || !tournament) {
+  if (roomMode(room.maxPlayers) !== 'tournament' || !tournament) {
     if (!duel || !duel.winnerId) return []
     const loser = duelPokemonState.find((p) => p.ownerId !== duel.winnerId)?.ownerId
     return [

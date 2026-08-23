@@ -108,7 +108,7 @@ function renderSwapFromState(state: MockState, initialPath: string) {
 
 function seedLiveDuel(actions: MockStateActions) {
   actions.setNickname('Ash')
-  actions.createRoom('1v1', 2)
+  actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
   actions.updateTeamSelection({
     starterId: 25,
     rosterIds: [5, 23, 14, 17, 33],
@@ -145,10 +145,9 @@ function buildForcedSwapState(): MockState {
     player: { nickname: 'Ash', playerId: null, sessionToken: null },
     room: {
       code: 'AB12',
-      mode: '1v1',
       maxPlayers: 2,
       status: 'in_progress',
-      players: ['Ash'],
+      players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
     },
     teamSelection: {
       starterId: 25,

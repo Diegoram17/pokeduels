@@ -46,7 +46,7 @@ function makeTournament(overrides: Partial<TournamentState> = {}): TournamentSta
 function make1v1State(winnerId: string | null): MockState {
   return {
     player: { nickname: NICKNAME, playerId: null, sessionToken: null },
-    room: { code: 'AB12', mode: '1v1', maxPlayers: 2, status: 'finished', players: [NICKNAME] },
+    room: { code: 'AB12', maxPlayers: 2, status: 'finished', players: [{ playerId: 'p1', nickname: NICKNAME, ready: false, connected: true }] },
     teamSelection: { starterId: 25, rosterIds: [] },
     tournament: null,
     duelPokemonState: [makePokemon(NICKNAME, true), makePokemon('bot', true)],
@@ -66,10 +66,9 @@ function makeTournamentState(results: TournamentState['results']): MockState {
     player: { nickname: NICKNAME, playerId: null, sessionToken: null },
     room: {
       code: 'AB12',
-      mode: 'tournament',
       maxPlayers: 4,
       status: 'finished',
-      players: [NICKNAME],
+      players: [{ playerId: 'p1', nickname: NICKNAME, ready: false, connected: true }],
     },
     teamSelection: { starterId: 25, rosterIds: [] },
     tournament: makeTournament({ results }),

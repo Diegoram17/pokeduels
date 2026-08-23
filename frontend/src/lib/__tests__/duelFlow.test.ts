@@ -124,10 +124,9 @@ function makeTournamentState(
     player: { nickname: NICKNAME, playerId: null, sessionToken: null },
     room: {
       code: 'AB12',
-      mode: 'tournament',
       maxPlayers: 4,
       status: 'in_progress',
-      players: [NICKNAME],
+      players: [{ playerId: 'p1', nickname: NICKNAME, ready: false, connected: true }],
     },
     teamSelection: { starterId: 25, rosterIds: [] },
     tournament,
@@ -242,10 +241,9 @@ describe('computePostDuelRoute', () => {
       ...makeTournamentState('1v1', 'finished', NICKNAME, makeTournament()),
       room: {
         code: 'AB12',
-        mode: '1v1',
         maxPlayers: 2,
         status: 'finished',
-        players: [NICKNAME],
+        players: [{ playerId: 'p1', nickname: NICKNAME, ready: false, connected: true }],
       },
       tournament: null,
     }

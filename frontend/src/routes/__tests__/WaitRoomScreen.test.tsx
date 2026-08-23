@@ -69,7 +69,13 @@ function renderWaitRoom(seed?: (actions: MockStateActions) => void) {
 
 function seedTournament(actions: MockStateActions) {
   actions.setNickname('Ash')
-  actions.createRoom('tournament', 4)
+  actions.receiveRoomShell({ code: 'Z009', maxPlayers: 4, status: 'waiting' })
+  actions.receiveRoomState({
+    code: 'Z009',
+    maxPlayers: 4,
+    status: 'waiting',
+    players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
+  })
   actions.updateTeamSelection({
     starterId: 25,
     rosterIds: [5, 6, 14, 17, 23],
@@ -78,7 +84,13 @@ function seedTournament(actions: MockStateActions) {
 
 function seed1v1(actions: MockStateActions) {
   actions.setNickname('Ash')
-  actions.createRoom('1v1', 2)
+  actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
+  actions.receiveRoomState({
+    code: 'AB12',
+    maxPlayers: 2,
+    status: 'waiting',
+    players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
+  })
   actions.updateTeamSelection({
     starterId: 25,
     rosterIds: [5, 6, 14, 17, 23],

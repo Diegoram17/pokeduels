@@ -157,10 +157,9 @@ function buildInProgressDuel(
     player: { nickname: 'Ash', playerId: null, sessionToken: null },
     room: {
       code: 'AB12',
-      mode: 'tournament',
       maxPlayers: 4,
       status: 'in_progress',
-      players: ['Ash'],
+      players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
     },
     teamSelection: {
       starterId: 25,
@@ -217,7 +216,7 @@ function renderDuelBoardFromState(state: MockState) {
 
 function seed1v1Duel(actions: MockStateActions) {
   actions.setNickname('Ash')
-  actions.createRoom('1v1', 2)
+  actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
   actions.updateTeamSelection({
     starterId: 25,
     rosterIds: [5, 23, 14, 17, 33],
@@ -427,7 +426,7 @@ describe('DuelBoardScreen — Rules of Hooks safety', () => {
       STORAGE_KEY,
       serializeMockState({
         player: { nickname: 'Ash', playerId: null, sessionToken: null },
-        room: { code: 'AB12', mode: '1v1', maxPlayers: 2, status: 'waiting', players: ['Ash'] },
+        room: { code: 'AB12', maxPlayers: 2, status: 'waiting', players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }] },
         teamSelection: {
           starterId: 25,
           rosterIds: [5, 23, 14, 17, 33],

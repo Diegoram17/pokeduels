@@ -22,7 +22,7 @@ export function slotLabel(slot: TournamentSlot): string {
 }
 
 export function buildPlayerList(room: RoomState): PlayerEntry[] {
-  const humans = room.players.map((name) => ({ name, isBot: false }))
+  const humans = room.players.map((player) => ({ name: player.nickname, isBot: false }))
   const missing = Math.max(0, room.maxPlayers - room.players.length)
   const bots = BOT_NAMES.slice(0, missing).map((name) => ({ name, isBot: true }))
   return [...humans, ...bots]

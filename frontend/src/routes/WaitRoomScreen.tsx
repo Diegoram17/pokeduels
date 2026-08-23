@@ -6,6 +6,7 @@ import {
   semifinalPairings,
   slotLabel,
 } from '../lib/waitRoom'
+import { roomMode } from '../lib/rooms'
 
 /**
  * Screen 4: Wait Room. Reused for every duel slot of a tournament (semifinal
@@ -160,7 +161,7 @@ function WaitRoomScreen() {
     return <Navigate to="/lobby" replace />
   }
 
-  const isTournament = room.mode === 'tournament'
+  const isTournament = roomMode(room.maxPlayers) === 'tournament'
   const slot: DuelSlot = isTournament && state.tournament
     ? state.tournament.activeSlot
     : '1v1'

@@ -1,5 +1,6 @@
 import type { DuelPokemonState, MockState, TournamentSlot, TournamentState } from '../state/schema'
 import { advanceQueue } from '../engine/tournamentQueue'
+import { roomMode } from './rooms'
 
 // Duel-flow helpers: which pokemon is on the field for each side, plus the
 // tournament routing decisions taken when a duel finishes. The mock engine
@@ -52,7 +53,7 @@ export type PostDuelRoute = { path: '/wait-room' } | { path: '/ranking' }
 export function computePostDuelRoute(state: MockState): PostDuelRoute | null {
   const { duel, room } = state
   if (!duel || duel.phase !== 'finished') return null
-  if (room?.mode !== 'tournament') return { path: '/ranking' }
+  if (!room || roomMode(room.maxPlayers) !== 'tournament') return { path: '/ranking' }
   const next = tournamentAfterCurrentDuel(state)
   if (!next) return null
   const allDone = next.queue.every((slot) => next.results[slot] != null)

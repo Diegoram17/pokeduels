@@ -4,26 +4,28 @@ import { slotLabel, buildPlayerList, semifinalPairings } from '../waitRoom'
 
 const room1v1: RoomState = {
   code: 'AB12',
-  mode: '1v1',
   maxPlayers: 2,
   status: 'waiting',
-  players: ['Ash'],
+  players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
 }
 
 const roomTournament: RoomState = {
   code: 'Z009',
-  mode: 'tournament',
   maxPlayers: 4,
   status: 'waiting',
-  players: ['Ash'],
+  players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
 }
 
 const fullRoom: RoomState = {
   code: 'Z009',
-  mode: 'tournament',
   maxPlayers: 4,
   status: 'waiting',
-  players: ['Ash', 'Brock', 'Misty', 'Red'],
+  players: [
+    { playerId: 'p1', nickname: 'Ash', ready: false, connected: true },
+    { playerId: 'p2', nickname: 'Brock', ready: false, connected: true },
+    { playerId: 'p3', nickname: 'Misty', ready: false, connected: true },
+    { playerId: 'p4', nickname: 'Red', ready: false, connected: true },
+  ],
 }
 
 describe('slotLabel', () => {
