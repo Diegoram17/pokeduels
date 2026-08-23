@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
@@ -20,8 +20,26 @@ const BACKEND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATE = 'node node_modules/node-pg-migrate/bin/node-pg-migrate.js';
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
+/**
+ * Runs a CLI command synchronously from the backend dir, inheriting the
+ * current environment. Uses spawnSync with stdio:'inherit' (not execSync with
+ * piped stdio): piped stdio deadlocks inside vitest's fork workers on Windows
+ * when the spawned child is another node process (e.g. node-pg-migrate) -- the
+ * worker's inherited IPC handle keeps the pipe open and execSync never
+ * returns. stdio:'inherit' attaches the child directly to the worker's fds.
+ * The command's exit code is the contract: non-zero throws.
+ */
 function run(cmd) {
-  return execSync(cmd, { cwd: BACKEND_DIR, env: { ...process.env }, stdio: 'pipe' });
+  const result = spawnSync(cmd, {
+    cwd: BACKEND_DIR,
+    env: { ...process.env },
+    stdio: 'inherit',
+    shell: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`Command failed (exit ${result.status}): ${cmd}`);
+  }
 }
 
 describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATABASE_URL)', () => {
@@ -30,6 +48,12 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
   afterAll(async () => {
     await pool.end();
   });
+
+  // The run()-based tests are slow by design: each `node seed/index.js`
+  // invocation takes ~70-120s (324-row upsert over Neon TLS, pre-existing
+  // seed-script characteristic), so the vitest default 5s timeout is far too
+  // tight. 600s of headroom covers migrate up + seed + migrate down.
+  const SLOW_TEST_TIMEOUT = 600000;
 
   it('migrates up, seeds 18/54/324 with full 18x18 coverage, then migrates down to empty', () => {
     run(`${MIGRATE} up`);
@@ -50,7 +74,7 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
       expect(attacking).toBe(18);
       expect(defending).toBe(18);
     });
-  });
+  }, SLOW_TEST_TIMEOUT);
 
   it('seeds idempotently: a second run keeps 54 pokemons and 324 rows', () => {
     run('node seed/index.js');
@@ -65,7 +89,7 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
       expect(pokemons).toBe(54);
       expect(effectiveness).toBe(324);
     });
-  });
+  }, SLOW_TEST_TIMEOUT);
 
   // Constraint-rejection scenarios (spec obs #127, scenarios #1-#15). These
   // can only be proven against a real Postgres instance -- CHECK/FK/UNIQUE
@@ -210,6 +234,16 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
     ).rejects.toMatchObject({ code: '23514' });
   });
 
+  // Regression guard for chk_move_index_required_for_attack (db-schema-seed
+  // migration-fix change): an attack MUST carry its move_index (1..4). A NULL
+  // move_index passes the column CHECK (NULL evaluates unknown) but violates
+  // the table-level CHECK.
+  it('moves: action_type = "attack" with move_index = NULL is rejected on the move_index-required CHECK constraint', async () => {
+    await expect(
+      pool.query(`INSERT INTO moves (turn_number, action_type, move_index) VALUES (1, 'attack', NULL)`),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
   it('reverts every table on migrate down', () => {
     run(`${MIGRATE} down`);
 
@@ -221,5 +255,5 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
       .then((result) => {
         expect(result.rows).toHaveLength(0);
       });
-  });
+  }, SLOW_TEST_TIMEOUT);
 });

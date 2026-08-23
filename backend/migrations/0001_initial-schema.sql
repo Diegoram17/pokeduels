@@ -1,3 +1,4 @@
+-- Up Migration
 -- 0001_initial-schema (up)
 -- Schema per TECH-DESIGN 3.1 (ADR-0002 / ADR-0007): 10 tables.
 -- Closes the 4 resolved CHECK gaps from the db-schema-seed design:
@@ -117,5 +118,22 @@ CREATE TABLE moves (
   damage_dealt      SMALLINT,
   effectiveness     NUMERIC(2,1) CHECK (effectiveness IN (2.0, 1.0, 0.5)),
   was_timeout       BOOLEAN DEFAULT FALSE,
-  created_at        TIMESTAMPTZ DEFAULT NOW()
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  -- Business rule (user-confirmed): an attack must always carry its move_index.
+  CONSTRAINT chk_move_index_required_for_attack
+    CHECK (action_type <> 'attack' OR move_index IS NOT NULL)
 );
+
+-- Down Migration
+-- 0001_initial-schema (down)
+-- Reverts the full schema in reverse foreign-key order.
+DROP TABLE IF EXISTS moves;
+DROP TABLE IF EXISTS duel_pokemon_state;
+DROP TABLE IF EXISTS duels;
+DROP TABLE IF EXISTS team_selections;
+DROP TABLE IF EXISTS room_players;
+DROP TABLE IF EXISTS rooms;
+DROP TABLE IF EXISTS pokemons;
+DROP TABLE IF EXISTS type_effectiveness;
+DROP TABLE IF EXISTS types;
+DROP TABLE IF EXISTS players;

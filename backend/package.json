@@ -3,11 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "migrate:up": "node-pg-migrate up",
-    "migrate:down": "node-pg-migrate down",
+    "migrate:up": "node --env-file=.env ./node_modules/node-pg-migrate/bin/node-pg-migrate.js up",
+    "migrate:down": "node --env-file=.env ./node_modules/node-pg-migrate/bin/node-pg-migrate.js down",
     "migrate:create": "node-pg-migrate create",
     "preseed": "node ../scripts/sync-seed-data.mjs",
-    "seed": "node seed/index.js",
+    "seed": "node --env-file=.env seed/index.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
