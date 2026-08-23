@@ -5,7 +5,7 @@ import { createRoomWithCreator } from '../db/rooms.js';
 import { selectStarter, selectRoster } from '../db/teamSelections.js';
 import { getDuelState } from '../repositories/duelRepository.js';
 import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
-import { startWsHarness, waitForEvent, joinRoomViaWs } from './wsHelpers.js';
+import { startWsHarness, waitForEvent, waitUntil, joinRoomViaWs } from './wsHelpers.js';
 import { resetPhaseStore, getPhaseStore } from '../engine/duelPhaseStore.js';
 import { resetRoundStateStore, getRoundStateStore } from '../ws/duelRoundState.js';
 
@@ -142,7 +142,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     });
     expect(s2.duelId).toBe(duelId);
     expect(s2.pokemonStates.find((p) => p.ownerId === ctx.p2.id).pokemonId).toBe(ctx.p2Team[0]);
-  });
+  }, 90000);
 
   it('does not bootstrap a second duel on a repeat room:ready', async () => {
     const harness = await startHarness();
@@ -165,7 +165,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     expect(await count()).toBe(1);
     const { rows } = await pool.query('SELECT id FROM duels WHERE room_id = $1', [ctx.room.id]);
     expect(rows[0].id).toBe(duelId);
-  });
+  }, 90000);
 
   it('registers the WS-layer round sub-state as AWAITING_LEAD after bootstrap', async () => {
     const harness = await startHarness();
@@ -177,5 +177,138 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     // fine-grained signal.
     expect(getPhaseStore().get(duelId)).toBe('lead_selection');
     expect(getRoundStateStore().get(duelId)).toBe('AWAITING_LEAD');
-  });
+  }, 90000);
+
+  /**
+   * Both players pick their first lead; waits until both are active in the DB
+   * (light count query; generous timeout for slow Neon round trips).
+   */
+  async function selectLeads(ctx, duelId) {
+    const { c1, c2, p1Team, p2Team } = ctx;
+    c1.emit('duel:select_lead', { duelId, pokemonId: p1Team[0] });
+    c2.emit('duel:select_lead', { duelId, pokemonId: p2Team[0] });
+    await waitUntil(
+      () =>
+        pool.query(
+          `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
+           WHERE duel_id = $1 AND is_active = TRUE`,
+          [duelId],
+        ).then((r) => r.rows[0].n === 2),
+      20000,
+    );
+  }
+
+  it('advances the duel to AWAITING_ACTIONS once both players pick a valid lead', async () => {
+    const harness = await startHarness();
+    const ctx = await createSeatedAndTeamedRoom(harness);
+    const { duelId } = await readyBoth(ctx);
+
+    await selectLeads(ctx, duelId);
+
+    // DB: exactly the two picked leads are active
+    const state = await getDuelState(duelId);
+    expect(state.pokemonStates.filter((p) => p.is_active).map((p) => p.pokemon_id).sort((a, b) => a - b))
+      .toEqual([ctx.p1Team[0], ctx.p2Team[0]].sort((a, b) => a - b));
+
+    // WS sub-state advanced; the coarse engine FSM advanced to in_progress
+    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+    expect(getPhaseStore().get(duelId)).toBe('in_progress');
+  }, 60000);
+
+  it('rejects an invalid lead with duel:lead_rejected and no state change', async () => {
+    const harness = await startHarness();
+    const ctx = await createSeatedAndTeamedRoom(harness);
+    const { duelId } = await readyBoth(ctx);
+
+    // wrong_owner: P1 targets a pokemon owned by P2
+    const rej1P = waitForEvent(ctx.c1, 'duel:lead_rejected');
+    ctx.c1.emit('duel:select_lead', { duelId, pokemonId: ctx.p2Team[0] });
+    const rej1 = await rej1P;
+    expect(rej1.reason).toBe('wrong_owner');
+
+    // fainted: mark P1's second team pokemon fainted, then target it
+    await pool.query(
+      `UPDATE duel_pokemon_state SET fainted = TRUE
+       WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3`,
+      [duelId, ctx.p1.id, ctx.p1Team[1]],
+    );
+    const rej2P = waitForEvent(ctx.c1, 'duel:lead_rejected');
+    ctx.c1.emit('duel:select_lead', { duelId, pokemonId: ctx.p1Team[1] });
+    const rej2 = await rej2P;
+    expect(rej2.reason).toBe('fainted');
+
+    // no state change: nothing active, sub-state still AWAITING_LEAD
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
+       WHERE duel_id = $1 AND is_active = TRUE`,
+      [duelId],
+    );
+    expect(rows[0].n).toBe(0);
+    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_LEAD');
+  }, 60000);
+
+  it('persists a valid switch: is_active toggle + switch move row', async () => {
+    const harness = await startHarness();
+    const ctx = await createSeatedAndTeamedRoom(harness);
+    const { duelId } = await readyBoth(ctx);
+    await selectLeads(ctx, duelId);
+
+    // P1 switches from their lead (p1Team[0]) to bench (p1Team[1])
+    ctx.c1.emit('duel:switch_decision', { duelId, switchTo: ctx.p1Team[1] });
+    await waitUntil(
+      () =>
+        pool.query(
+          `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
+           WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3 AND is_active = TRUE`,
+          [duelId, ctx.p1.id, ctx.p1Team[1]],
+        ).then((r) => r.rows[0].n === 1),
+      20000,
+    );
+
+    const state = await getDuelState(duelId);
+    const p1 = state.pokemonStates.filter((p) => p.player_id === ctx.p1.id);
+    expect(p1.find((p) => p.pokemon_id === ctx.p1Team[0]).is_active).toBe(false);
+    expect(p1.find((p) => p.pokemon_id === ctx.p1Team[1]).is_active).toBe(true);
+
+    const { rows } = await pool.query(
+      `SELECT action_type, move_index, target_pokemon_id FROM moves WHERE duel_id = $1`,
+      [duelId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      action_type: 'switch',
+      move_index: null,
+      target_pokemon_id: ctx.p1Team[0], // the previous active is the row's target
+    });
+
+    // sub-state returned to AWAITING_ACTIONS
+    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+  }, 60000);
+
+  it('rejects a switch to a fainted target with duel:switch_rejected and unchanged is_active', async () => {
+    const harness = await startHarness();
+    const ctx = await createSeatedAndTeamedRoom(harness);
+    const { duelId } = await readyBoth(ctx);
+    await selectLeads(ctx, duelId);
+
+    await pool.query(
+      `UPDATE duel_pokemon_state SET fainted = TRUE
+       WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3`,
+      [duelId, ctx.p1.id, ctx.p1Team[2]],
+    );
+
+    const rejP = waitForEvent(ctx.c1, 'duel:switch_rejected');
+    ctx.c1.emit('duel:switch_decision', { duelId, switchTo: ctx.p1Team[2] });
+    const rej = await rejP;
+    expect(rej.reason).toBe('fainted');
+
+    const state = await getDuelState(duelId);
+    const p1 = state.pokemonStates.filter((p) => p.player_id === ctx.p1.id);
+    expect(p1.find((p) => p.pokemon_id === ctx.p1Team[0]).is_active).toBe(true);
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM moves WHERE duel_id = $1',
+      [duelId],
+    );
+    expect(rows[0].n).toBe(0);
+  }, 60000);
 });

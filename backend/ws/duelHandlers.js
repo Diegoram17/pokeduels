@@ -1,5 +1,14 @@
 import { WsError } from '../lib/wsError.js';
-import { getDuelState, mapDuelStateToCamelCase } from '../repositories/duelRepository.js';
+import {
+  getDuelState,
+  mapDuelStateToCamelCase,
+  activateLead,
+  applySwitchDecision,
+} from '../repositories/duelRepository.js';
+import { ValidationError } from '../engine/switchValidation.js';
+import { PHASES, EVENTS, transition } from '../engine/stateMachine.js';
+import { getPhaseStore } from '../engine/duelPhaseStore.js';
+import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
 import { withWsHandler } from './wsFaultIsolation.js';
 
 /**
@@ -14,6 +23,12 @@ import { withWsHandler } from './wsFaultIsolation.js';
  * Participant gate: a socket may only act on duels where its player id is
  * player1 or player2. Broadcasts go to the `duel:{duelId}` channel, which
  * sockets enter via `duel:join`.
+ *
+ * @param {import('socket.io').Server} io
+ * @param {import('socket.io').Socket} socket
+ * @param {{ turnTimers?: object }} [deps] - injected per-duel turn timer
+ *        registry (created in the composition root with an injectable
+ *        timeoutMs, mirrors the reconnectTimers wiring)
  */
 
 /**
@@ -31,10 +46,14 @@ async function fetchDuelForParticipant(duelId, playerId) {
   return state;
 }
 
-/**
- * @param {import('socket.io').Server} io
- * @param {import('socket.io').Socket} socket
- */
+/** Maps a switchValidation ValidationError to the handler's rejection WsError. */
+function toRejectionWsError(event, err, extra = {}) {
+  if (err instanceof ValidationError) {
+    return new WsError(event, { ...extra, reason: err.reason });
+  }
+  throw err;
+}
+
 export function registerDuelHandlers(io, socket) {
   socket.on('duel:join', (payload) =>
     withWsHandler(socket, async () => {
@@ -48,6 +67,66 @@ export function registerDuelHandlers(io, socket) {
 
       socket.join(`duel:${duelId}`);
       socket.emit('duel:state', mapDuelStateToCamelCase(state));
+    }),
+  );
+
+  socket.on('duel:select_lead', (payload) =>
+    withWsHandler(socket, async () => {
+      const { duelId, pokemonId } = payload ?? {};
+      const playerId = socket.data.player.id;
+
+      if (!Number.isInteger(pokemonId) || pokemonId <= 0) {
+        throw new WsError('duel:lead_rejected', { pokemonId, reason: 'invalid' });
+      }
+      const state = await fetchDuelForParticipant(duelId, playerId);
+      if (!state) {
+        throw new WsError('duel:lead_rejected', { pokemonId, reason: 'not_participant' });
+      }
+
+      try {
+        await activateLead(duelId, playerId, pokemonId);
+      } catch (err) {
+        throw toRejectionWsError('duel:lead_rejected', err, { pokemonId });
+      }
+
+      // Lead readiness is tracked in the WS layer; only when BOTH players
+      // picked does the coarse engine FSM advance lead_selection ->
+      // in_progress (design: stateMachine.js is never widened).
+      const roundState = getRoundStateStore();
+      roundState.markLeadReady(duelId, playerId);
+      if (roundState.bothLeadsReady(duelId) && getPhaseStore().get(duelId) === PHASES.LEAD_SELECTION) {
+        getPhaseStore().set(duelId, transition(PHASES.LEAD_SELECTION, EVENTS.SELECT_LEADS));
+        roundState.set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
+      }
+    }),
+  );
+
+  socket.on('duel:switch_decision', (payload) =>
+    withWsHandler(socket, async () => {
+      const { duelId, switchTo } = payload ?? {};
+      const playerId = socket.data.player.id;
+
+      const state = await fetchDuelForParticipant(duelId, playerId);
+      if (!state) {
+        throw new WsError('duel:switch_rejected', { switchTo, reason: 'not_participant' });
+      }
+
+      // switchTo null/undefined = keep the current active (TECH-DESIGN §5.2);
+      // the forced-switch prompt is cleared and play resumes.
+      if (switchTo === null || switchTo === undefined) {
+        getRoundStateStore().set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
+        return;
+      }
+      if (!Number.isInteger(switchTo) || switchTo <= 0) {
+        throw new WsError('duel:switch_rejected', { switchTo, reason: 'invalid' });
+      }
+
+      try {
+        await applySwitchDecision(duelId, playerId, switchTo);
+      } catch (err) {
+        throw toRejectionWsError('duel:switch_rejected', err, { switchTo });
+      }
+      getRoundStateStore().set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
     }),
   );
 }
