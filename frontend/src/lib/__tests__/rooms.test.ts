@@ -3,16 +3,16 @@ import type { RoomState } from '../../state/schema'
 import {
   normalizeRoomCode,
   matchesRoomCode,
+  roomMode,
   roomModeLabel,
   roomStatusLabel,
 } from '../rooms'
 
 const room: RoomState = {
   code: 'AB12',
-  mode: '1v1',
   maxPlayers: 2,
   status: 'waiting',
-  players: ['Ash'],
+  players: [],
 }
 
 describe('normalizeRoomCode', () => {
@@ -32,6 +32,16 @@ describe('matchesRoomCode', () => {
 
   it('never matches when there is no room in state', () => {
     expect(matchesRoomCode('AB12', null)).toBe(false)
+  })
+})
+
+describe('roomMode', () => {
+  it('derives 1v1 from maxPlayers 2', () => {
+    expect(roomMode(2)).toBe('1v1')
+  })
+
+  it('derives tournament from maxPlayers 4', () => {
+    expect(roomMode(4)).toBe('tournament')
   })
 })
 
