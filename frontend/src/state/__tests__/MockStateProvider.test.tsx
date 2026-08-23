@@ -1,0 +1,138 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, act } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { MockStateProvider } from '../MockStateProvider'
+import { useMockState } from '../useMockState'
+import { io } from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
+
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(),
+}))
+
+import { disconnectSocket } from '../../lib/socket'
+
+function makeFakeSocket(): Socket & { _fire: (event: string, payload?: unknown) => void } {
+  const handlers = new Map<string, (payload?: unknown) => void>()
+  const fakeSocketRef: Socket & { _fire: (event: string, payload?: unknown) => void } = {
+    on: vi.fn((event: string, handler: (payload?: unknown) => void) => {
+      handlers.set(event, handler)
+      return fakeSocketRef
+    }),
+    off: vi.fn((event: string) => {
+      handlers.delete(event)
+      return fakeSocketRef
+    }),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+    // test helper: fire a server event through the registered handlers
+    _fire: (event: string, payload?: unknown) => {
+      handlers.get(event)?.(payload)
+    },
+  } as unknown as Socket & { _fire: (event: string, payload?: unknown) => void }
+  return fakeSocketRef
+}
+
+let fakeSocket: ReturnType<typeof makeFakeSocket>
+
+function SessionProbe() {
+  const [state, actions] = useMockState()
+  return (
+    <div>
+      <span data-testid="token">{state.player.sessionToken ?? 'none'}</span>
+      <span data-testid="roster">
+        {state.room?.players.map((p) => p.nickname).join(',') ?? 'no-room'}
+      </span>
+      <button
+        type="button"
+        onClick={() =>
+          actions.sessionEstablished({
+            playerId: 'p1',
+            sessionToken: 'token-1',
+            nickname: 'Ash',
+          })
+        }
+      >
+        establish
+      </button>
+      <button type="button" onClick={() => actions.resetSession()}>
+        reset
+      </button>
+    </div>
+  )
+}
+
+function renderProvider() {
+  return render(
+    <MockStateProvider>
+      <MemoryRouter>
+        <SessionProbe />
+      </MemoryRouter>
+    </MockStateProvider>,
+  )
+}
+
+beforeEach(() => {
+  fakeSocket = makeFakeSocket()
+  vi.mocked(io).mockReturnValue(fakeSocket as never)
+})
+
+afterEach(() => {
+  vi.clearAllMocks()
+  disconnectSocket()
+})
+
+describe('MockStateProvider socket lifecycle', () => {
+  it('connects the socket with the session token after sessionEstablished', () => {
+    renderProvider()
+    expect(io).not.toHaveBeenCalled()
+
+    act(() => {
+      screen.getByRole('button', { name: 'establish' }).click()
+    })
+
+    expect(io).toHaveBeenCalledTimes(1)
+    const [, opts] = vi.mocked(io).mock.calls[0]
+    expect((opts as { auth: { sessionToken: string } }).auth.sessionToken).toBe('token-1')
+  })
+
+  it('subscribes to room:state and dispatches the enriched roster into state', () => {
+    renderProvider()
+    act(() => {
+      screen.getByRole('button', { name: 'establish' }).click()
+    })
+
+    expect(fakeSocket.on).toHaveBeenCalledWith('room:state', expect.any(Function))
+
+    act(() => {
+      fakeSocket._fire('room:state', {
+        roomId: 1,
+        code: 'AB12',
+        status: 'waiting',
+        maxPlayers: 2,
+        players: [
+          { playerId: 'p1', nickname: 'Ash', ready: false, connected: true },
+          { playerId: 'p2', nickname: 'Misty', ready: true, connected: true },
+        ],
+        startersTaken: [],
+      })
+    })
+
+    expect(screen.getByTestId('roster').textContent).toBe('Ash,Misty')
+  })
+
+  it('disconnects the socket on resetSession', () => {
+    renderProvider()
+    act(() => {
+      screen.getByRole('button', { name: 'establish' }).click()
+    })
+    expect(fakeSocket.disconnect).not.toHaveBeenCalled()
+
+    act(() => {
+      screen.getByRole('button', { name: 'reset' }).click()
+    })
+
+    expect(fakeSocket.disconnect).toHaveBeenCalled()
+  })
+})
