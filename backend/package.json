@@ -8,14 +8,20 @@
     "migrate:create": "node-pg-migrate create",
     "preseed": "node ../scripts/sync-seed-data.mjs",
     "seed": "node --env-file=.env seed/index.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "pg": "^8",
-    "node-pg-migrate": "^7"
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "node-pg-migrate": "^7",
+    "pg": "^8"
   },
   "devDependencies": {
+    "supertest": "^7.2.2",
     "vitest": "^4"
   }
 }
