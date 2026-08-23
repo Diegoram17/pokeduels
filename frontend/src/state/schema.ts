@@ -7,14 +7,21 @@ export interface PlayerState {
 }
 
 export type RoomMode = '1v1' | 'tournament'
-export type RoomStatus = 'waiting' | 'in_progress' | 'finished'
+export type RoomStatus = 'waiting' | 'in_progress' | 'finished' | 'aborted'
+
+/** A seated player in the enriched room roster (WS room:state payload). */
+export interface RoomPlayer {
+  playerId: string
+  nickname: string
+  ready: boolean
+  connected: boolean
+}
 
 export interface RoomState {
   code: string
-  mode: RoomMode
   maxPlayers: 2 | 4
   status: RoomStatus
-  players: string[]
+  players: RoomPlayer[]
 }
 
 export interface TeamSelectionState {

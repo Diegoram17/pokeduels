@@ -3,8 +3,9 @@ import type {
   DuelSlot,
   DuelState,
   MockState,
-  RoomMode,
+  RoomPlayer,
   RoomState,
+  RoomStatus,
   TeamSelectionState,
   TournamentSlot,
   TournamentState,
@@ -81,8 +82,8 @@ export function saveMockState(state: MockState, storage?: StorageLike): void {
 export type MockStateAction =
   | { type: 'setNickname'; nickname: string }
   | { type: 'sessionEstablished'; playerId: string; sessionToken: string; nickname: string }
-  | { type: 'createRoom'; mode: RoomMode; maxPlayers: 2 | 4 }
-  | { type: 'joinRoom'; code: string }
+  | { type: 'roomShellReceived'; code: string; maxPlayers: 2 | 4; status: RoomStatus }
+  | { type: 'roomStateReceived'; code: string; maxPlayers: 2 | 4; status: RoomStatus; players: RoomPlayer[] }
   | { type: 'updateTeamSelection'; selection: Partial<TeamSelectionState> }
   | { type: 'enterDuel'; slot: DuelSlot }
   | { type: 'applyPlayerAttack'; moveIndex: MoveIndex }
@@ -123,15 +124,6 @@ function makeDuelPokemon(
 // apply-decisions for the id→name mapping). Kept to catalog entries so the
 // duel resolves real sprites for both sides.
 const BOT_ROSTER = [6, 23, 14, 17, 33, 15]
-
-function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let code = ''
-  for (let i = 0; i < 4; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return code
-}
 
 function makeDuel(duelId: string, slot: DuelSlot): DuelState {
   return {
@@ -211,30 +203,32 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
         },
       }
 
-    case 'createRoom': {
+    case 'roomShellReceived': {
+      // REST create/join returns a room shell (code/maxPlayers/status) with an
+      // empty roster — the live roster arrives later via WS room:state. A
+      // 4-player shell seeds the tournament queue so the existing wait-room /
+      // duel/tournament mock flow keeps working (reducer surface untouched).
       const room: RoomState = {
-        code: generateRoomCode(),
-        mode: action.mode,
+        code: action.code,
         maxPlayers: action.maxPlayers,
-        status: 'waiting',
-        players: [state.player.nickname],
+        status: action.status,
+        players: [],
       }
       return {
-        ...createInitialState(),
-        player: state.player,
+        ...state,
         room,
-        tournament: action.mode === 'tournament' ? makeTournament() : null,
+        tournament: action.maxPlayers === 4 ? makeTournament() : null,
       }
     }
 
-    case 'joinRoom': {
-      const room = state.room
-      if (!room || room.code !== action.code.trim().toUpperCase()) return state
-      if (room.players.includes(state.player.nickname)) return state
-      return {
-        ...state,
-        room: { ...room, players: [...room.players, state.player.nickname] },
+    case 'roomStateReceived': {
+      const room: RoomState = {
+        code: action.code,
+        maxPlayers: action.maxPlayers,
+        status: action.status,
+        players: action.players,
       }
+      return { ...state, room }
     }
 
     case 'updateTeamSelection':

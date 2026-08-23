@@ -56,10 +56,9 @@ describe('serializeMockState / parseMockState', () => {
       player: { nickname: 'Ash', playerId: null, sessionToken: null },
       room: {
         code: 'AB12',
-        mode: 'tournament',
         maxPlayers: 4,
         status: 'waiting',
-        players: ['Ash'],
+        players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
       },
       teamSelection: { starterId: 25, rosterIds: [5, 23, 14, 17, 33] },
       tournament: {
@@ -154,67 +153,47 @@ describe('reduceMockState — sessionEstablished', () => {
   })
 })
 
-describe('reduceMockState — createRoom', () => {
-  it('creates a 1v1 room with the player listed', () => {
+describe('reduceMockState — roomShellReceived', () => {
+  it('stores a 1v1 room shell with an empty roster and no tournament', () => {
     const base = reduceMockState(createInitialState(), {
-      type: 'setNickname',
-      nickname: 'Ash',
-    })
-    const s = reduceMockState(base, { type: 'createRoom', mode: '1v1', maxPlayers: 2 })
-    expect(s.room?.mode).toBe('1v1')
-    expect(s.room?.maxPlayers).toBe(2)
-    expect(s.room?.status).toBe('waiting')
-    expect(s.room?.players).toEqual(['Ash'])
-    expect(s.room?.code).toMatch(/^[A-Z0-9]{4}$/)
-    expect(s.tournament).toBeNull()
-  })
-
-  it('creates a tournament room and seeds the semi-final queue', () => {
-    const base = reduceMockState(createInitialState(), {
-      type: 'setNickname',
+      type: 'sessionEstablished',
+      playerId: 'p1',
+      sessionToken: 't1',
       nickname: 'Ash',
     })
     const s = reduceMockState(base, {
-      type: 'createRoom',
-      mode: 'tournament',
-      maxPlayers: 4,
+      type: 'roomShellReceived',
+      code: 'AB12',
+      maxPlayers: 2,
+      status: 'waiting',
     })
-    expect(s.room?.mode).toBe('tournament')
+    expect(s.room).toEqual({
+      code: 'AB12',
+      maxPlayers: 2,
+      status: 'waiting',
+      players: [],
+    })
+    expect(s.tournament).toBeNull()
+  })
+
+  it('stores a tournament room shell and seeds the semi-final queue', () => {
+    const base = reduceMockState(createInitialState(), {
+      type: 'sessionEstablished',
+      playerId: 'p1',
+      sessionToken: 't1',
+      nickname: 'Ash',
+    })
+    const s = reduceMockState(base, {
+      type: 'roomShellReceived',
+      code: 'Z009',
+      maxPlayers: 4,
+      status: 'waiting',
+    })
     expect(s.room?.maxPlayers).toBe(4)
+    expect(s.room?.code).toBe('Z009')
     expect(s.tournament?.queue).toEqual(['semiA', 'semiB'])
     expect(s.tournament?.activeSlot).toBe('semiA')
     expect(s.tournament?.results).toEqual({})
-  })
-})
-
-describe('reduceMockState — joinRoom', () => {
-  it('adds the player to the room when the code matches', () => {
-    const base = reduceMockState(createInitialState(), {
-      type: 'setNickname',
-      nickname: 'Ash',
-    })
-    const withRoom = reduceMockState(base, {
-      type: 'createRoom',
-      mode: '1v1',
-      maxPlayers: 2,
-    })
-    const code = withRoom.room!.code
-    const s = reduceMockState(withRoom, { type: 'joinRoom', code })
-    expect(s.room?.players).toContain('Ash')
-  })
-
-  it('leaves the state unchanged when the code does not match', () => {
-    const base = reduceMockState(createInitialState(), {
-      type: 'setNickname',
-      nickname: 'Ash',
-    })
-    const withRoom = reduceMockState(base, {
-      type: 'createRoom',
-      mode: '1v1',
-      maxPlayers: 2,
-    })
-    const s = reduceMockState(withRoom, { type: 'joinRoom', code: 'ZZ99' })
-    expect(s.room).toEqual(withRoom.room)
   })
 })
 
@@ -243,7 +222,12 @@ function makeTeamState(): MockState {
     type: 'setNickname',
     nickname: 'Ash',
   })
-  s = reduceMockState(s, { type: 'createRoom', mode: '1v1', maxPlayers: 2 })
+  s = reduceMockState(s, {
+    type: 'roomShellReceived',
+    code: 'AB12',
+    maxPlayers: 2,
+    status: 'waiting',
+  })
   s = reduceMockState(s, {
     type: 'updateTeamSelection',
     selection: {
@@ -273,7 +257,12 @@ describe('reduceMockState — enterDuel', () => {
       type: 'setNickname',
       nickname: 'Ash',
     })
-    s = reduceMockState(s, { type: 'createRoom', mode: '1v1', maxPlayers: 2 })
+    s = reduceMockState(s, {
+      type: 'roomShellReceived',
+      code: 'AB12',
+      maxPlayers: 2,
+      status: 'waiting',
+    })
     s = reduceMockState(s, {
       type: 'updateTeamSelection',
       selection: { starterId: 25, rosterIds: [5, 23] },
@@ -388,9 +377,10 @@ describe('reduceMockState — advanceTournament', () => {
       nickname: 'Ash',
     })
     s = reduceMockState(s, {
-      type: 'createRoom',
-      mode: 'tournament',
+      type: 'roomShellReceived',
+      code: 'Z009',
       maxPlayers: 4,
+      status: 'waiting',
     })
     s = reduceMockState(s, {
       type: 'updateTeamSelection',
@@ -433,7 +423,12 @@ describe('reduceMockState — resetSession', () => {
       type: 'setNickname',
       nickname: 'Ash',
     })
-    s = reduceMockState(s, { type: 'createRoom', mode: 'tournament', maxPlayers: 4 })
+    s = reduceMockState(s, {
+      type: 'roomShellReceived',
+      code: 'Z009',
+      maxPlayers: 4,
+      status: 'waiting',
+    })
     s = reduceMockState(s, {
       type: 'updateTeamSelection',
       selection: { starterId: 25, rosterIds: [5, 23, 14, 17, 33] },

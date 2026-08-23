@@ -6,14 +6,20 @@ import {
   reduceMockState,
   type MockStateAction,
 } from './store'
-import type { MockState, RoomMode, DuelSlot, TeamSelectionState } from './schema'
+import type {
+  MockState,
+  RoomPlayer,
+  RoomStatus,
+  DuelSlot,
+  TeamSelectionState,
+} from './schema'
 import type { MoveIndex } from '../engine/damage'
 
 export interface MockStateActions {
   setNickname(nickname: string): void
   sessionEstablished(payload: { playerId: string; sessionToken: string; nickname: string }): void
-  createRoom(mode: RoomMode, maxPlayers: 2 | 4): void
-  joinRoom(code: string): void
+  receiveRoomShell(payload: { code: string; maxPlayers: 2 | 4; status: RoomStatus }): void
+  receiveRoomState(payload: { code: string; maxPlayers: 2 | 4; status: RoomStatus; players: RoomPlayer[] }): void
   updateTeamSelection(selection: Partial<TeamSelectionState>): void
   enterDuel(slot: DuelSlot): void
   applyPlayerAttack(moveIndex: MoveIndex): void
@@ -52,8 +58,21 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
           sessionToken: payload.sessionToken,
           nickname: payload.nickname,
         }),
-      createRoom: (mode, maxPlayers) => send({ type: 'createRoom', mode, maxPlayers }),
-      joinRoom: (code) => send({ type: 'joinRoom', code }),
+      receiveRoomShell: (payload) =>
+        send({
+          type: 'roomShellReceived',
+          code: payload.code,
+          maxPlayers: payload.maxPlayers,
+          status: payload.status,
+        }),
+      receiveRoomState: (payload) =>
+        send({
+          type: 'roomStateReceived',
+          code: payload.code,
+          maxPlayers: payload.maxPlayers,
+          status: payload.status,
+          players: payload.players,
+        }),
       updateTeamSelection: (selection) =>
         send({ type: 'updateTeamSelection', selection }),
       enterDuel: (slot) => send({ type: 'enterDuel', slot }),
