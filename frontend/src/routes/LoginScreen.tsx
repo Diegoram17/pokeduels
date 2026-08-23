@@ -3,11 +3,16 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import { validateNickname } from '../lib/validation'
+import { createSession, describeApiError } from '../lib/api'
+import ErrorBanner from '../components/ErrorBanner'
 import loginBg from '../assets/login-bg.jpg'
 
 /**
  * Screen 1: Login. Static arena artwork (non-editable) plus a nickname form
- * that validates 3–20 characters (trimmed) before entering the lobby.
+ * that validates 3–20 characters (trimmed) before POSTing a real backend
+ * session (POST /api/session). The returned playerId/sessionToken are stored
+ * in app state before navigating to the lobby; failures render an inline
+ * error banner with a manual retry (no automatic redirects).
  */
 
 function LoginBackground() {
@@ -25,17 +30,32 @@ function NicknameForm() {
   const [, actions] = useMockState()
   const navigate = useNavigate()
   const [value, setValue] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const [sessionError, setSessionError] = useState<string | null>(null)
+
+  async function establishSession() {
+    setSessionError(null)
+    try {
+      const session = await createSession(value)
+      actions.sessionEstablished({
+        playerId: session.playerId,
+        sessionToken: session.sessionToken,
+        nickname: value.trim(),
+      })
+      navigate('/lobby')
+    } catch (err) {
+      setSessionError(describeApiError(err))
+    }
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const message = validateNickname(value)
     if (message) {
-      setError(message)
+      setValidationError(message)
       return
     }
-    actions.setNickname(value.trim())
-    navigate('/lobby')
+    void establishSession()
   }
 
   return (
@@ -58,15 +78,17 @@ function NicknameForm() {
             value={value}
             onChange={(event) => {
               setValue(event.target.value)
-              setError(null)
+              setValidationError(null)
+              setSessionError(null)
             }}
           />
         </div>
-        {error && (
+        {validationError && (
           <p role="alert" className="pd-meta" style={{ color: 'var(--pd-danger)' }}>
-            {error}
+            {validationError}
           </p>
         )}
+        {sessionError && <ErrorBanner message={sessionError} onRetry={() => void establishSession()} />}
       </div>
 
       <button type="submit" className="pd-btn pd-btn--primary pd-btn--block pd-btn--lg">
