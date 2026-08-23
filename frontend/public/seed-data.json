@@ -18,6 +18,7 @@
       "type": "electric",
       "pokeapi_id": 25,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/25.png",
       "is_starter": true
     },
     {
@@ -25,6 +26,7 @@
       "type": "grass",
       "pokeapi_id": 1,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/1.png",
       "is_starter": true
     },
     {
@@ -32,6 +34,7 @@
       "type": "water",
       "pokeapi_id": 7,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/7.png",
       "is_starter": true
     },
     {
@@ -39,6 +42,7 @@
       "type": "fire",
       "pokeapi_id": 4,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/4.png",
       "is_starter": true
     }
   ],
@@ -48,6 +52,7 @@
       "type": "normal",
       "pokeapi_id": 143,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/143.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/143.png",
       "is_starter": false
     },
     {
@@ -55,6 +60,7 @@
       "type": "normal",
       "pokeapi_id": 133,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/133.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/133.png",
       "is_starter": false
     },
     {
@@ -62,6 +68,7 @@
       "type": "fire",
       "pokeapi_id": 6,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/6.png",
       "is_starter": false
     },
     {
@@ -69,6 +76,7 @@
       "type": "fire",
       "pokeapi_id": 59,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/59.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/59.png",
       "is_starter": false
     },
     {
@@ -76,6 +84,7 @@
       "type": "water",
       "pokeapi_id": 9,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/9.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/9.png",
       "is_starter": false
     },
     {
@@ -83,6 +92,7 @@
       "type": "water",
       "pokeapi_id": 131,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/131.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/131.png",
       "is_starter": false
     },
     {
@@ -90,6 +100,7 @@
       "type": "electric",
       "pokeapi_id": 26,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/26.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/26.png",
       "is_starter": false
     },
     {
@@ -97,6 +108,7 @@
       "type": "electric",
       "pokeapi_id": 145,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/145.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/145.png",
       "is_starter": false
     },
     {
@@ -104,6 +116,7 @@
       "type": "grass",
       "pokeapi_id": 3,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/3.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/3.png",
       "is_starter": false
     },
     {
@@ -111,6 +124,7 @@
       "type": "grass",
       "pokeapi_id": 254,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/254.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/254.png",
       "is_starter": false
     },
     {
@@ -118,6 +132,7 @@
       "type": "ghost",
       "pokeapi_id": 94,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/94.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/94.png",
       "is_starter": false
     },
     {
@@ -125,6 +140,7 @@
       "type": "ghost",
       "pokeapi_id": 778,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/778.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/778.png",
       "is_starter": false
     },
     {
@@ -132,6 +148,7 @@
       "type": "fighting",
       "pokeapi_id": 68,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/68.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/68.png",
       "is_starter": false
     },
     {
@@ -139,6 +156,7 @@
       "type": "fighting",
       "pokeapi_id": 448,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/448.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/448.png",
       "is_starter": false
     },
     {
@@ -146,6 +164,7 @@
       "type": "poison",
       "pokeapi_id": 34,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/34.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/34.png",
       "is_starter": false
     },
     {
@@ -153,6 +172,7 @@
       "type": "poison",
       "pokeapi_id": 169,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/169.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/169.png",
       "is_starter": false
     },
     {
@@ -160,6 +180,7 @@
       "type": "ground",
       "pokeapi_id": 445,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/445.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/445.png",
       "is_starter": false
     },
     {
@@ -167,6 +188,7 @@
       "type": "ground",
       "pokeapi_id": 112,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/112.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/112.png",
       "is_starter": false
     },
     {
@@ -174,6 +196,7 @@
       "type": "flying",
       "pokeapi_id": 18,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/18.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/18.png",
       "is_starter": false
     },
     {
@@ -181,6 +204,7 @@
       "type": "flying",
       "pokeapi_id": 130,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/130.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/130.png",
       "is_starter": false
     },
     {
@@ -188,6 +212,7 @@
       "type": "flying",
       "pokeapi_id": 249,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/249.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/249.png",
       "is_starter": false
     },
     {
@@ -195,6 +220,7 @@
       "type": "psychic",
       "pokeapi_id": 150,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/150.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/150.png",
       "is_starter": false
     },
     {
@@ -202,6 +228,7 @@
       "type": "psychic",
       "pokeapi_id": 65,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/65.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/65.png",
       "is_starter": false
     },
     {
@@ -209,6 +236,7 @@
       "type": "psychic",
       "pokeapi_id": 282,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/282.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/282.png",
       "is_starter": false
     },
     {
@@ -216,6 +244,7 @@
       "type": "bug",
       "pokeapi_id": 123,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/123.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/123.png",
       "is_starter": false
     },
     {
@@ -223,6 +252,7 @@
       "type": "bug",
       "pokeapi_id": 12,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/12.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/12.png",
       "is_starter": false
     },
     {
@@ -230,6 +260,7 @@
       "type": "bug",
       "pokeapi_id": 214,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/214.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/214.png",
       "is_starter": false
     },
     {
@@ -237,6 +268,7 @@
       "type": "rock",
       "pokeapi_id": 248,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/248.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/248.png",
       "is_starter": false
     },
     {
@@ -244,6 +276,7 @@
       "type": "rock",
       "pokeapi_id": 95,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/95.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/95.png",
       "is_starter": false
     },
     {
@@ -251,6 +284,7 @@
       "type": "rock",
       "pokeapi_id": 142,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/142.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/142.png",
       "is_starter": false
     },
     {
@@ -258,6 +292,7 @@
       "type": "dragon",
       "pokeapi_id": 149,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/149.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/149.png",
       "is_starter": false
     },
     {
@@ -265,6 +300,7 @@
       "type": "dragon",
       "pokeapi_id": 384,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/384.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/384.png",
       "is_starter": false
     },
     {
@@ -272,6 +308,7 @@
       "type": "dark",
       "pokeapi_id": 197,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/197.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/197.png",
       "is_starter": false
     },
     {
@@ -279,6 +316,7 @@
       "type": "dark",
       "pokeapi_id": 359,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/359.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/359.png",
       "is_starter": false
     },
     {
@@ -286,6 +324,7 @@
       "type": "dark",
       "pokeapi_id": 491,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/491.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/491.png",
       "is_starter": false
     },
     {
@@ -293,6 +332,7 @@
       "type": "steel",
       "pokeapi_id": 208,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/208.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/208.png",
       "is_starter": false
     },
     {
@@ -300,6 +340,7 @@
       "type": "steel",
       "pokeapi_id": 212,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/212.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/212.png",
       "is_starter": false
     },
     {
@@ -307,6 +348,7 @@
       "type": "steel",
       "pokeapi_id": 376,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/376.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/376.png",
       "is_starter": false
     },
     {
@@ -314,6 +356,7 @@
       "type": "fairy",
       "pokeapi_id": 700,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/700.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/700.png",
       "is_starter": false
     },
     {
@@ -321,6 +364,7 @@
       "type": "fairy",
       "pokeapi_id": 468,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/468.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/468.png",
       "is_starter": false
     },
     {
@@ -328,6 +372,7 @@
       "type": "fairy",
       "pokeapi_id": 39,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/39.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/39.png",
       "is_starter": false
     },
     {
@@ -335,6 +380,7 @@
       "type": "ice",
       "pokeapi_id": 144,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/144.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/144.png",
       "is_starter": false
     },
     {
@@ -342,6 +388,7 @@
       "type": "ice",
       "pokeapi_id": 471,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/471.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/471.png",
       "is_starter": false
     },
     {
@@ -349,6 +396,7 @@
       "type": "ice",
       "pokeapi_id": 473,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/473.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/473.png",
       "is_starter": false
     },
     {
@@ -356,6 +404,7 @@
       "type": "water",
       "pokeapi_id": 658,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/658.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/658.png",
       "is_starter": false
     },
     {
@@ -363,6 +412,7 @@
       "type": "normal",
       "pokeapi_id": 474,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/474.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/474.png",
       "is_starter": false
     },
     {
@@ -370,6 +420,7 @@
       "type": "fire",
       "pokeapi_id": 257,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/257.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/257.png",
       "is_starter": false
     },
     {
@@ -377,6 +428,7 @@
       "type": "dragon",
       "pokeapi_id": 373,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/373.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/373.png",
       "is_starter": false
     },
     {
@@ -384,6 +436,7 @@
       "type": "psychic",
       "pokeapi_id": 151,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/151.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/151.png",
       "is_starter": false
     },
     {
@@ -391,6 +444,7 @@
       "type": "dark",
       "pokeapi_id": 461,
       "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/461.png",
+      "back_sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/461.png",
       "is_starter": false
     }
   ],
