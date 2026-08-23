@@ -170,4 +170,26 @@ describe('LobbyScreen WS', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
   })
+
+  it('shows an inline banner via connect_error with manual retry only, no auto-redirect or countdown', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, [])))
+    renderLobby(true)
+    await waitFor(() => {
+      expect(fakeSocket.on).toHaveBeenCalledWith('room:state', expect.any(Function))
+    })
+
+    fakeSocket._fire('connect_error')
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/conectar|conexión/i)
+    expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
+    expect(screen.queryByText(/60|segundo|countdown/i)).not.toBeInTheDocument()
+    // No auto-redirect: stays on the lobby screen.
+    expect(screen.getByText('SALAS DE BATALLA')).toBeInTheDocument()
+
+    fakeSocket._fire('connect')
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+  })
 })

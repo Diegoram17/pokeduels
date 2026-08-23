@@ -259,15 +259,22 @@ function LobbyScreen() {
   // Generic WS disconnect/reconnect banner (decision #1, obs #192): no
   // countdown of the backend grace window, manual retry only — the roster
   // restores from the next room:state automatically on reconnect.
+  // connect_error (session rejected or handshake failure, spec "Expired/
+  // Invalid Session Handling") routes through the same inline banner, no
+  // exceptions — same behavior as disconnect, no auto-redirect.
   useEffect(() => {
     const offDisconnect = onSocketEvent('disconnect', () => {
       setWsError('Se perdió la conexión con el servidor')
+    })
+    const offConnectError = onSocketEvent('connect_error', () => {
+      setWsError('No se pudo conectar con el servidor')
     })
     const offConnect = onSocketEvent('connect', () => {
       setWsError(null)
     })
     return () => {
       offDisconnect()
+      offConnectError()
       offConnect()
     }
   }, [])
