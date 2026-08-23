@@ -8,6 +8,7 @@ import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
 import { startWsHarness, waitForEvent, waitUntil, joinRoomViaWs } from './wsHelpers.js';
 import { resetPhaseStore, getPhaseStore } from '../engine/duelPhaseStore.js';
 import { resetRoundStateStore, getRoundStateStore } from '../ws/duelRoundState.js';
+import { resetTurnCycle } from '../ws/turnCycle.js';
 
 /**
  * End-to-end duel cycle over a real Socket.IO connection (item #5): room:ready
@@ -23,6 +24,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     await pool.query('SELECT 1'); // warm the Neon cold start
     resetPhaseStore();
     resetRoundStateStore();
+    resetTurnCycle();
   }, SEED_TIMEOUT);
 
   const roomIds = [];
@@ -38,6 +40,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     while (harnesses.length) await harnesses.pop().teardown();
     resetPhaseStore();
     resetRoundStateStore();
+    resetTurnCycle();
   });
 
   afterAll(async () => {
@@ -311,4 +314,143 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     );
     expect(rows[0].n).toBe(0);
   }, 60000);
+
+  /**
+   * Full acting state: bootstrapped + joined + both leads picked. Resolves
+   * with the joined snapshots (unused here) for symmetry with the other tests.
+   */
+  async function createActingDuel(harness) {
+    const ctx = await createSeatedAndTeamedRoom(harness);
+    const { duelId } = await readyBoth(ctx);
+    await joinDuel(ctx, duelId);
+    await selectLeads(ctx, duelId);
+    return { ...ctx, duelId };
+  }
+
+  it('resolves a round once both players act: duel:turn_resolved with camelCase state', async () => {
+    const harness = await startHarness({ turnTimeoutMs: 60000 }); // timer must not fire mid-test
+    const { c1, c2, duelId, p1 } = await createActingDuel(harness);
+
+    const resolvedP = waitForEvent(c1, 'duel:turn_resolved', 45000);
+    c1.emit('duel:select_action', { duelId, moveIndex: 4 });
+    c2.emit('duel:select_action', { duelId, moveIndex: 4 });
+    const resolved = await resolvedP;
+
+    expect(resolved.duelId).toBe(duelId);
+    // 2 executed actions -> computed turn_number = 1 + COUNT(moves) = 3
+    expect(resolved.turnNumber).toBe(3);
+    expect(resolved.pokemonStates).toHaveLength(12);
+    const p1Active = resolved.pokemonStates.find((x) => x.ownerId === p1.id && x.isActive);
+    // move 4 (10 base dmg, no PP) always deals damage -> HP dropped from 100
+    expect(p1Active.currentHp).toBeLessThan(100);
+    expect(p1Active.ppMove1).toBe(4); // move 4 costs no PP
+
+    const { rows } = await pool.query(
+      'SELECT player_id, move_index, was_timeout FROM moves WHERE duel_id = $1 ORDER BY id',
+      [duelId],
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.move_index === 4 && r.was_timeout === false)).toBe(true);
+
+    // No KO -> sub-state back to AWAITING_ACTIONS; coarse phase unchanged
+    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+    expect(getPhaseStore().get(duelId)).toBe('in_progress');
+  }, 120000);
+
+  it('rejects a 0-PP action with duel:action_rejected targeted only, timer keeps running, re-pick succeeds', async () => {
+    const harness = await startHarness({ turnTimeoutMs: 60000 });
+    const { c1, c2, duelId, p2, p2Team } = await createActingDuel(harness);
+
+    // P1 acts first -> arms the 10s turn timer
+    c1.emit('duel:select_action', { duelId, moveIndex: 4 });
+    await waitUntil(() => harness.turnTimers.has(duelId), 20000);
+    expect(harness.turnTimers.has(duelId)).toBe(true);
+
+    // P2's move 1 is spent -> targeted rejection, no buffer, no timer reset
+    await pool.query(
+      `UPDATE duel_pokemon_state SET pp_move_1 = 0
+       WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3`,
+      [duelId, p2.id, p2Team[0]],
+    );
+    const rejP = waitForEvent(c2, 'duel:action_rejected', 30000);
+    c2.emit('duel:select_action', { duelId, moveIndex: 1 });
+    const rej = await rejP;
+    expect(rej).toMatchObject({ moveIndex: 1, reason: 'insufficient_pp' });
+    // the timer keeps running unaffected by the rejection
+    expect(harness.turnTimers.has(duelId)).toBe(true);
+
+    // P2 re-picks a valid move -> pair completes -> round resolves
+    const resolvedP = waitForEvent(c1, 'duel:turn_resolved', 45000);
+    c2.emit('duel:select_action', { duelId, moveIndex: 4 });
+    const resolved = await resolvedP;
+    expect(resolved.duelId).toBe(duelId);
+
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM moves WHERE duel_id = $1',
+      [duelId],
+    );
+    expect(rows[0].n).toBe(2);
+    expect(harness.turnTimers.has(duelId)).toBe(false); // consumed by the resolution
+  }, 120000);
+
+  it('auto-injects a timeout action for the missing player when the 10s timer expires', async () => {
+    const harness = await startHarness({ turnTimeoutMs: 3000 });
+    const { c1, c2, duelId, p1, p2 } = await createActingDuel(harness);
+
+    // P1 acts; P2 never does. After the injected 3s window the timer fills
+    // P2's action with {moveIndex:4, wasTimeout:true} and resolves the round.
+    const resolvedP = waitForEvent(c1, 'duel:turn_resolved', 45000);
+    c1.emit('duel:select_action', { duelId, moveIndex: 4 });
+    const resolved = await resolvedP;
+    expect(resolved.duelId).toBe(duelId);
+
+    const { rows } = await pool.query(
+      'SELECT player_id, move_index, was_timeout FROM moves WHERE duel_id = $1 ORDER BY id',
+      [duelId],
+    );
+    expect(rows).toHaveLength(2);
+    const p2Row = rows.find((r) => r.player_id === p2.id);
+    expect(p2Row).toMatchObject({ move_index: 4, was_timeout: true });
+    const p1Row = rows.find((r) => r.player_id === p1.id);
+    expect(p1Row.was_timeout).toBe(false);
+    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+  }, 120000);
+
+  it('finishes the duel when a whole team is knocked out', async () => {
+    const harness = await startHarness({ turnTimeoutMs: 60000 });
+    const { c1, c2, duelId, p1, p2, p1Team } = await createActingDuel(harness);
+
+    // Bring P1's team to the brink: everything fainted except the active lead
+    // at 1 HP, so ANY hit (min 5 dmg) knocks it out and wipes the team.
+    await pool.query(
+      `UPDATE duel_pokemon_state SET fainted = TRUE, current_hp = 0, is_active = FALSE
+       WHERE duel_id = $1 AND player_id = $2`,
+      [duelId, p1.id],
+    );
+    await pool.query(
+      `UPDATE duel_pokemon_state SET fainted = FALSE, current_hp = 1, is_active = TRUE
+       WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3`,
+      [duelId, p1.id, p1Team[0]],
+    );
+
+    const resolvedP = waitForEvent(c1, 'duel:turn_resolved', 45000);
+    const finishedP = waitForEvent(c1, 'duel:finished', 45000);
+    c1.emit('duel:select_action', { duelId, moveIndex: 4 });
+    c2.emit('duel:select_action', { duelId, moveIndex: 4 });
+    const resolved = await resolvedP;
+    expect(resolved.duelId).toBe(duelId);
+
+    const finished = await finishedP;
+    expect(finished).toMatchObject({ duelId, winnerId: p2.id, endReason: 'ko' });
+
+    const { rows } = await pool.query(
+      'SELECT status, winner_id, end_reason FROM duels WHERE id = $1',
+      [duelId],
+    );
+    expect(rows[0]).toMatchObject({ status: 'finished', winner_id: p2.id, end_reason: 'ko' });
+
+    // sub-state cleaned up; coarse FSM terminal
+    expect(getRoundStateStore().get(duelId)).toBeUndefined();
+    expect(getPhaseStore().get(duelId)).toBe('finished');
+  }, 120000);
 });

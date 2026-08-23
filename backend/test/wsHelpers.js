@@ -2,6 +2,8 @@ import { createServer } from 'node:http';
 import { io as ioClient } from 'socket.io-client';
 import { createApp } from '../app.js';
 import { createSocketServer } from '../ws/index.js';
+import { pool } from '../db/pool.js';
+import { loadTypeEffectivenessCache } from '../engine/typeEffectiveness.js';
 
 /**
  * WS integration-test harness (design: "backend/test/wsHelpers.js — ephemeral
@@ -71,6 +73,11 @@ export async function startWsHarness({
   turnTimeoutMs,
   corsOrigin,
 } = {}) {
+  // Mirror server.js boot: the duel engine's type-effectiveness cache must be
+  // loaded before any round can resolve (resolverRonda faults otherwise). The
+  // singleton is reloaded per harness so a prior file's resetEffectivenessCache
+  // teardown never starves this one.
+  await loadTypeEffectivenessCache(pool);
   const httpServer = createServer(createApp());
   const { io, reconnectTimers, turnTimers } = createSocketServer(httpServer, {
     reconnectGraceMs,

@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { touchSession } from '../db/players.js';
 import { createReconnectTimerRegistry } from './reconnectTimers.js';
 import { createTurnTimerRegistry, DEFAULT_TURN_TIMEOUT_MS } from './turnTimers.js';
+import { getTurnCycle } from './turnCycle.js';
 import { registerRoomHandlers } from './roomHandlers.js';
 import { registerTeamHandlers } from './teamHandlers.js';
 import { registerDuelHandlers } from './duelHandlers.js';
@@ -44,7 +45,7 @@ export function createSocketServer(
   io.on('connection', (socket) => {
     registerRoomHandlers(io, socket, reconnectTimers);
     registerTeamHandlers(io, socket);
-    registerDuelHandlers(io, socket, { turnTimers });
+    registerDuelHandlers(io, socket, { turnTimers, turnCycle: getTurnCycle() });
   });
 
   return { io, reconnectTimers, turnTimers };
