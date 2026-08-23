@@ -59,6 +59,7 @@ export function registerRoomHandlers(io, socket, reconnectTimers) {
       await leaveRoom(roomId, playerId);
       socket.data.roomId = undefined;
       await broadcastRoomState(io, roomId);
+      socket.leave(`room:${roomId}`);
     }),
   );
 
