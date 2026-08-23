@@ -50,14 +50,15 @@ async function main() {
 
     for (const p of pokemons) {
       await client.query(
-        `INSERT INTO pokemons (name, type, pokeapi_id, sprite_url, is_starter)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO pokemons (name, type, pokeapi_id, sprite_url, back_sprite_url, is_starter)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (name) DO UPDATE SET
            type = EXCLUDED.type,
            pokeapi_id = EXCLUDED.pokeapi_id,
            sprite_url = EXCLUDED.sprite_url,
+           back_sprite_url = EXCLUDED.back_sprite_url,
            is_starter = EXCLUDED.is_starter`,
-        [p.name, p.type, p.pokeapi_id, p.sprite_url ?? null, p.is_starter ?? false],
+        [p.name, p.type, p.pokeapi_id, p.sprite_url ?? null, p.back_sprite_url ?? null, p.is_starter ?? false],
       );
     }
 

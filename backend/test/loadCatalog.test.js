@@ -39,6 +39,21 @@ describe('loadCatalogFromFile', () => {
     expect(new Set(rows.map((p) => p.name)).size).toBe(54);
   });
 
+  it('carries a non-empty back_sprite_url for all 54 pokemon', () => {
+    const rows = loadCatalogFromFile();
+    const withBackSprite = rows.filter(
+      (p) => typeof p.back_sprite_url === 'string' && p.back_sprite_url.length > 0,
+    );
+    expect(withBackSprite).toHaveLength(54);
+  });
+
+  it('mirrors the front-sprite convention: every back_sprite_url points at the back/{pokeapi_id} path', () => {
+    const rows = loadCatalogFromFile();
+    expect(
+      rows.every((p) => p.back_sprite_url.endsWith(`/sprites/pokemon/back/${p.pokeapi_id}.png`)),
+    ).toBe(true);
+  });
+
   it('exposes a default path pointing at the repo-root seed-data.json', () => {
     expect(DEFAULT_SEED_DATA_PATH.endsWith('seed-data.json')).toBe(true);
   });
