@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
-import { fetchSeedData, type PokemonSeed } from '../data/seedData'
-import { filterCatalog, typeOptions, ALL_TYPES } from '../lib/catalog'
+import { fetchCatalog, filterCatalog, pokemonById, typeOptions, ALL_TYPES, type Pokemon } from '../lib/catalog'
+import { describeApiError } from '../lib/api'
 import { isTeamComplete, toggleRoster, toggleStarter } from '../lib/teamSelection'
+import ErrorBanner from '../components/ErrorBanner'
 
 /**
  * Screen 3: Team Select. Exclusive starter picker (deselect-first), a
  * searchable/type-filtered catalog for the 5 roster picks, and a live team
- * panel backed by mock state (RF-3.1).
+ * panel backed by mock state (RF-3.1). The catalog is fetched from the
+ * backend (GET /api/pokemons) on mount; numeric backend ids are the stored
+ * identity while names are resolved for display via catalog lookup.
  */
 
 const TYPE_LABELS: Record<string, string> = {
@@ -36,24 +39,18 @@ function typeLabel(type: string): string {
   return TYPE_LABELS[type] ?? type.toUpperCase()
 }
 
-function StarterPicker() {
+function StarterPicker({
+  catalog,
+}: {
+  catalog: Pokemon[] | null
+}) {
   const [state, actions] = useMockState()
   const [blockedHint, setBlockedHint] = useState(false)
-  const [starters, setStarters] = useState<PokemonSeed[]>([])
 
-  useEffect(() => {
-    let alive = true
-    fetchSeedData().then((seed) => {
-      if (alive) setStarters(seed.starters)
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-
+  const starters = catalog?.filter((pokemon) => pokemon.is_starter) ?? []
   const current = state.teamSelection.starterId
 
-  function handlePick(id: string) {
+  function handlePick(id: number) {
     const next = toggleStarter(current, id)
     if (next === current && current !== id) {
       setBlockedHint(true)
@@ -73,15 +70,16 @@ function StarterPicker() {
       </h3>
       <div className="starter-grid">
         {starters.map((pokemon) => {
-          const selected = current === pokemon.name
-          const blocked = current !== null && current !== pokemon.name
+          const selected = current === pokemon.id
+          const blocked = current !== null && current !== pokemon.id
           return (
             <button
               type="button"
-              key={pokemon.name}
+              key={pokemon.id}
               className={`pd-card pd-card--flush mon-card${selected ? ' mon-card--selected' : ''}${blocked ? ' mon-card--taken' : ''}`}
-              onClick={() => handlePick(pokemon.name)}
+              onClick={() => handlePick(pokemon.id)}
               aria-pressed={selected}
+              disabled={catalog === null}
             >
               <div className="art">
                 <img src={pokemon.sprite_url} alt="" />
@@ -168,20 +166,20 @@ function PokemonCatalogGrid({
   selectedIds,
   onToggle,
 }: {
-  pokemon: PokemonSeed[]
-  selectedIds: string[]
-  onToggle: (id: string) => void
+  pokemon: Pokemon[]
+  selectedIds: number[]
+  onToggle: (id: number) => void
 }) {
   return (
     <div className="catalog-grid">
       {pokemon.map((mon) => {
-        const selected = selectedIds.includes(mon.name)
+        const selected = selectedIds.includes(mon.id)
         return (
           <button
             type="button"
-            key={mon.name}
+            key={mon.id}
             className={`pd-card pd-card--flush catalog-card${selected ? ' mon-card--selected' : ''}`}
-            onClick={() => onToggle(mon.name)}
+            onClick={() => onToggle(mon.id)}
             aria-pressed={selected}
           >
             <div className="art">
@@ -207,26 +205,22 @@ function PokemonCatalogGrid({
   )
 }
 
-function RosterPicker() {
+function RosterPicker({
+  catalog,
+}: {
+  catalog: Pokemon[] | null
+}) {
   const [state, actions] = useMockState()
   const [search, setSearch] = useState('')
   const [type, setType] = useState(ALL_TYPES)
-  const [catalog, setCatalog] = useState<PokemonSeed[]>([])
 
-  useEffect(() => {
-    let alive = true
-    fetchSeedData().then((seed) => {
-      if (alive) setCatalog(seed.catalog)
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const types = useMemo(() => typeOptions(catalog), [catalog])
+  // Starters are chosen exclusively in StarterPicker — the catalog grid only
+  // offers the remaining roster options.
+  const roster = useMemo(() => catalog?.filter((pokemon) => !pokemon.is_starter) ?? [], [catalog])
+  const types = useMemo(() => typeOptions(roster), [roster])
   const visible = useMemo(
-    () => filterCatalog(catalog, search, type),
-    [catalog, search, type],
+    () => filterCatalog(roster, search, type),
+    [roster, search, type],
   )
   const rosterIds = state.teamSelection.rosterIds
 
@@ -254,13 +248,15 @@ function RosterPicker() {
   )
 }
 
-function TeamPanel() {
+function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
   const [state] = useMockState()
   const navigate = useNavigate()
   const { starterId, rosterIds } = state.teamSelection
   const complete = isTeamComplete(starterId, rosterIds)
   const total = (starterId ? 1 : 0) + rosterIds.length
   const remaining = 6 - total
+  const starterName = starterId ? pokemonById(catalog, starterId)?.name ?? String(starterId) : null
+  const rosterNames = rosterIds.map((id) => pokemonById(catalog, id)?.name ?? String(id))
 
   return (
     <aside className="pd-card draft-side" aria-label="TU EQUIPO">
@@ -275,13 +271,13 @@ function TeamPanel() {
 
       <div className="squad-list pd-scroll">
         <div className={`squad-slot${!starterId ? ' squad-slot--empty' : ''}`}>
-          {starterId ? (
+          {starterName ? (
             <>
               <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 44, color: 'var(--pd-yellow)' }}>
                 star
               </span>
               <div>
-                <h4>{starterId}</h4>
+                <h4>{starterName}</h4>
                 <span className="pd-label" style={{ color: 'var(--pd-yellow)', fontSize: 9 }}>
                   INICIAL
                 </span>
@@ -296,7 +292,7 @@ function TeamPanel() {
         </div>
 
         {Array.from({ length: 5 }).map((_, index) => {
-          const picked = rosterIds[index]
+          const picked = rosterNames[index]
           return (
             <div key={index} className={`squad-slot${!picked ? ' squad-slot--empty' : ''}`}>
               {picked ? (
@@ -346,6 +342,20 @@ function TeamPanel() {
 
 function TeamSelectScreen() {
   const [state] = useMockState()
+  const [catalog, setCatalog] = useState<Pokemon[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadCatalog = useCallback(() => {
+    setError(null)
+    fetchCatalog()
+      .then(setCatalog)
+      .catch((err: unknown) => setError(describeApiError(err)))
+  }, [])
+
+  useEffect(() => {
+    loadCatalog()
+  }, [loadCatalog])
+
   return (
     <div className="pd-page draft-shell">
       <div className="pd-glow-blob" style={{ left: '-10%', bottom: '-10%', width: 520, height: 520 }} />
@@ -377,11 +387,13 @@ function TeamSelectScreen() {
             </div>
           </section>
 
-          <StarterPicker />
-          <RosterPicker />
+          {error && <ErrorBanner message={error} onRetry={loadCatalog} />}
+
+          <StarterPicker catalog={catalog} />
+          <RosterPicker catalog={catalog} />
         </div>
 
-        <TeamPanel />
+        <TeamPanel catalog={catalog} />
       </div>
     </div>
   )
