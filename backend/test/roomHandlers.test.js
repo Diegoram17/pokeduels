@@ -9,6 +9,7 @@ import {
   markPlayerDisconnected,
 } from '../db/rooms.js';
 import { broadcastRoomState } from '../ws/roomState.js';
+import { bootstrapDuelIfReady } from '../ws/duelBootstrap.js';
 import { registerRoomHandlers } from '../ws/roomHandlers.js';
 
 // Handler-glue tests: the DB functions and the broadcast helper are mocked
@@ -24,6 +25,9 @@ vi.mock('../db/rooms.js', () => ({
 }));
 vi.mock('../ws/roomState.js', () => ({
   broadcastRoomState: vi.fn(),
+}));
+vi.mock('../ws/duelBootstrap.js', () => ({
+  bootstrapDuelIfReady: vi.fn(),
 }));
 
 describe('registerRoomHandlers', () => {
@@ -55,6 +59,7 @@ describe('registerRoomHandlers', () => {
     markPlayerConnected.mockResolvedValue(undefined);
     markPlayerDisconnected.mockResolvedValue(undefined);
     broadcastRoomState.mockResolvedValue(undefined);
+    bootstrapDuelIfReady.mockResolvedValue(undefined);
 
     registerRoomHandlers(io, socket, reconnectTimers);
   });
@@ -100,6 +105,15 @@ describe('registerRoomHandlers', () => {
 
       expect(setPlayerReady).toHaveBeenCalledWith(7, 5, true);
       expect(broadcastRoomState).toHaveBeenCalledWith(io, 7);
+    });
+
+    it('runs the duel bootstrap after the broadcast so a full ready 1v1 room starts a duel', async () => {
+      socket.data.roomId = 7;
+      socket.emit('room:ready', { ready: true });
+      await vi.waitFor(() => expect(bootstrapDuelIfReady).toHaveBeenCalled());
+
+      expect(broadcastRoomState).toHaveBeenCalledWith(io, 7);
+      expect(bootstrapDuelIfReady).toHaveBeenCalledWith(io, 7);
     });
 
     it('persists ready=false when the client un-readies', async () => {

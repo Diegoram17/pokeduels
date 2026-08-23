@@ -3,6 +3,7 @@ import { touchSession } from '../db/players.js';
 import { createReconnectTimerRegistry } from './reconnectTimers.js';
 import { registerRoomHandlers } from './roomHandlers.js';
 import { registerTeamHandlers } from './teamHandlers.js';
+import { registerDuelHandlers } from './duelHandlers.js';
 
 /**
  * Composition root for the WS lobby layer (design decision: "http.Server
@@ -38,6 +39,7 @@ export function createSocketServer(httpServer, { reconnectGraceMs, corsOrigin = 
   io.on('connection', (socket) => {
     registerRoomHandlers(io, socket, reconnectTimers);
     registerTeamHandlers(io, socket);
+    registerDuelHandlers(io, socket);
   });
 
   return { io, reconnectTimers };

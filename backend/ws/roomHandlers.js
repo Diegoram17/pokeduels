@@ -7,6 +7,7 @@ import {
 } from '../db/rooms.js';
 import { broadcastRoomState } from '../ws/roomState.js';
 import { withWsHandler } from '../ws/wsFaultIsolation.js';
+import { bootstrapDuelIfReady } from '../ws/duelBootstrap.js';
 
 const MAX_NICKNAME_LENGTH = 30;
 
@@ -47,6 +48,9 @@ export function registerRoomHandlers(io, socket, reconnectTimers) {
       const playerId = socket.data.player.id;
       await setPlayerReady(roomId, playerId, Boolean(payload?.ready));
       await broadcastRoomState(io, roomId);
+      // Item #5: when this ready completes a full ready 1v1 room, bootstrap
+      // the duel (create duels + seed duel_pokemon_state + duel:start).
+      await bootstrapDuelIfReady(io, roomId);
     }),
   );
 
