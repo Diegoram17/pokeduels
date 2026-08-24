@@ -133,12 +133,12 @@ export async function markDuelInProgress(duelId) {
  * `socket.data.duelId` field anywhere in the WS layer (only room membership).
  *
  * @param {number} playerId
- * @returns {Promise<{ id: number, player1_id: number, player2_id: number,
- *                     status: string } | null>}
+ * @returns {Promise<{ id: number, room_id: number, player1_id: number,
+ *                     player2_id: number, status: string } | null>}
  */
 export async function findActiveDuelForPlayer(playerId) {
   const { rows } = await pool.query(
-    `SELECT id, player1_id, player2_id, status
+    `SELECT id, room_id, player1_id, player2_id, status
      FROM duels
      WHERE (player1_id = $1 OR player2_id = $1) AND status = 'in_progress'`,
     [playerId],
@@ -180,11 +180,12 @@ export async function finishDuelByWalkover(duelId, winnerId) {
  *
  * @param {number} roomId
  * @param {number} playerId
- * @returns {Promise<{ id: number, round: string, status: string } | null>}
+ * @returns {Promise<{ id: number, round: string, status: string,
+ *                     player1_id: number, player2_id: number } | null>}
  */
 export async function findPendingBracketDuelForPlayer(roomId, playerId) {
   const { rows } = await pool.query(
-    `SELECT id, round, status
+    `SELECT id, round, status, player1_id, player2_id
      FROM duels
      WHERE room_id = $1 AND status = 'pending'
        AND (player1_id = $2 OR player2_id = $2)

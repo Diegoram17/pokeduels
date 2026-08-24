@@ -368,6 +368,26 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
     expect(await findActiveDuelForPlayer(player2Id)).toBeNull();
   });
 
+  it('findActiveDuelForPlayer returns the duel\'s room_id (needed by the mid-duel disconnect advance hook)', async () => {
+    // The PR 3 disconnect wiring must know which room a forfeited duel belongs
+    // to so it can call advanceTournamentOrRematch(io, room_id, duelId).
+    const { roomId, players } = await createBareRoom(4, 2);
+    const [p1, p2] = players;
+    const semi = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+    createdDuelIds.push(semi.id);
+    // The mid-duel forfeit only fires for an in_progress duel; mark it live.
+    await pool.query("UPDATE duels SET status = 'in_progress' WHERE id = $1", [semi.id]);
+
+    const found = await findActiveDuelForPlayer(p1);
+    expect(found).toMatchObject({
+      id: semi.id,
+      room_id: roomId,
+      player1_id: p1,
+      player2_id: p2,
+      status: 'in_progress',
+    });
+  });
+
   // ---------- markDuelInProgress (pending -> in_progress at lead-selection completion) ----------
 
   it('markDuelInProgress transitions a pending duel to in_progress', async () => {
@@ -495,6 +515,24 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
       `INSERT INTO players (nickname) VALUES ('WalkoverOutsider') RETURNING id`,
     )).rows;
     expect(await findPendingBracketDuelForPlayer(roomId, outsider.id)).toBeNull();
+  });
+
+  it('findPendingBracketDuelForPlayer returns player1_id and player2_id for the walkover opponent lookup', async () => {
+    const { roomId, players } = await createBareRoom(4, 2);
+    const [p1, p2] = players;
+    const semi = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+    createdDuelIds.push(semi.id);
+
+    // The walkover arm site must credit the opponent: it needs both seats.
+    const found = await findPendingBracketDuelForPlayer(roomId, p1);
+    expect(found).toMatchObject({
+      id: semi.id,
+      round: 'semifinal',
+      status: 'pending',
+      player1_id: p1,
+      player2_id: p2,
+    });
+    expect(found.player1_id).not.toBe(found.player2_id);
   });
 
   // ---------- resolverRonda (I/O orchestrator) ----------
