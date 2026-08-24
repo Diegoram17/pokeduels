@@ -99,9 +99,6 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle } = {})
 
       // Lead readiness is tracked in the WS layer; only when BOTH players
       // picked does the coarse engine FSM advance lead_selection ->
-      // in_progress (design: stateMachine.js is never widened).
-      // Lead readiness is tracked in the WS layer; only when BOTH players
-      // picked does the coarse engine FSM advance lead_selection ->
       // in_progress (design: stateMachine.js is never widened). The coarse
       // duels.status column follows: this is the moment the duel goes LIVE
       // (item #6's in_progress-guarded repository operations depend on it).
