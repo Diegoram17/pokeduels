@@ -218,8 +218,7 @@ describe('advanceTournamentOrRematch — 4-player bracket branch (item #7, PR 3)
     expect(queriesHaveRoomClose(client)).toBe(false);
   });
 
-  it('closes the room and writes final ranks 1-4 once final and third-place are both finished', async () => {
-    const seats = [
+  it('closes the room and writes final ranks 1-4 once final and third-place are both finished', async () => {    const seats = [
       { player_id: 1, nickname: 'A' },
       { player_id: 2, nickname: 'B' },
       { player_id: 3, nickname: 'C' },
@@ -249,6 +248,25 @@ describe('advanceTournamentOrRematch — 4-player bracket branch (item #7, PR 3)
     });
     // A finished bracket never emits awaiting_round.
     expect(emitted.some((e) => e.mock.calls.some((c) => c[0] === 'tournament:awaiting_round'))).toBe(false);
+  });
+
+  it('is an idempotent no-op (no re-rank, no re-emit) when the 4p room is already finished', async () => {
+    // Two finish events (final + third-place) trigger advance near-simultaneously.
+    // The second trigger reads the room as already 'finished' and must not
+    // re-write ranks or re-emit room:final_ranking (concurrent-close safety).
+    const finishedRoom = { id: 7, max_players: 4, status: 'finished' };
+    const { client } = makeClient(finishedRoom, { duels: [semiA, semiB, final, thirdPlace] });
+    pool.connect.mockResolvedValue(client);
+
+    await advanceTournamentOrRematch(io, 7, 12);
+
+    const rankUpdates = client.query.mock.calls
+      .map((c) => c[0])
+      .filter((sql) => sql.includes('UPDATE room_players SET final_rank'));
+    expect(rankUpdates).toHaveLength(0);
+    const emitted = io.to.mock.results.map((r) => r.value.emit);
+    expect(emitted.some((e) => e.mock.calls.some((c) => c[0] === 'room:final_ranking'))).toBe(false);
+    expect(client.release).toHaveBeenCalled();
   });
 });
 

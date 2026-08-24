@@ -153,6 +153,14 @@ export async function advanceTournamentOrRematch(io, roomId, duelId, deps = {}) 
       return;
     }
 
+    // 4-player bracket branch (PR 3). An already-finished/aborted room is an
+    // idempotent no-op: a second finish event (both finals resolving
+    // near-simultaneously) must never re-rank or re-emit room:final_ranking.
+    if (room.status !== 'in_progress') {
+      await client.query('COMMIT');
+      return;
+    }
+
     // ---- 4-player bracket branch (PR 3) ----
     const { rows: duels } = await client.query(
       'SELECT id, player1_id, player2_id, round, status, winner_id FROM duels WHERE room_id = $1 ORDER BY id ASC',
