@@ -1,4 +1,11 @@
 // Mock-state schema — mirrors ADR-0002 entity shapes for the client-local mock.
+// #10 PR 1: reshaped for server-driven duel/tournament state — the bracket is a
+// local projection merged from tournament:bracket broadcasts, and duel pokemon
+// identity is numeric (server-issued ids).
+
+import type { RankingEntry } from '../lib/ranking'
+
+export type { RankingEntry }
 
 export interface PlayerState {
   nickname: string
@@ -32,22 +39,26 @@ export interface TeamSelectionState {
 export type TournamentSlot = 'semiA' | 'semiB' | 'thirdPlace' | 'final'
 
 export interface BracketPairing {
+  duelId: string // the duel created for this slot (stringified server id)
   playerA: string
   playerB: string
 }
 
+/**
+ * Local UI projection of the room's bracket, merged incrementally from each
+ * `tournament:bracket` broadcast (semis arrive first, then final + third place
+ * with non-overlapping slot keys). The mock-engine FIFO (queue/activeSlot/
+ * results) is gone — "which slot is live" is answered by matching
+ * `state.duel.duelId` against `bracket.<slot>.duelId`.
+ */
 export interface TournamentState {
   bracket: Partial<Record<TournamentSlot, BracketPairing | null>>
-  // FIFO; seeded ["semiA","semiB"], appends ["thirdPlace","final"] once both semis resolve
-  queue: TournamentSlot[]
-  activeSlot: TournamentSlot
-  results: Partial<Record<TournamentSlot, { winner: string; loser: string }>>
 }
 
 export interface DuelPokemonState {
   duelId: string
-  ownerId: string
-  pokemonId: string
+  ownerId: number // server-issued numeric player id
+  pokemonId: number // server-issued numeric pokemon id
   name: string
   type: string
   spriteUrl: string
@@ -60,7 +71,7 @@ export interface DuelPokemonState {
   fainted: boolean
 }
 
-export type DuelPhase = 'awaiting_actions' | 'awaiting_switch' | 'finished'
+export type DuelPhase = 'lead_selection' | 'awaiting_actions' | 'awaiting_switch' | 'finished'
 export type DuelSlot = TournamentSlot | '1v1'
 
 export interface DuelState {
@@ -69,14 +80,22 @@ export interface DuelState {
   phase: DuelPhase
   turnNumber: number
   winnerId: string | null
-  endReason: 'ko' | 'surrender' | null
+  endReason: 'ko' | 'surrender' | 'disconnect' | 'walkover' | null
+  /** True from `duel:opponent_disconnected` until the next snapshot arrives. */
+  opponentDisconnected: boolean
+  /** Last `duel:action_rejected` payload (insufficient_pp etc.); cleared on the next resolution. */
+  lastRejection: { moveIndex: number; reason: string } | null
 }
 
 export interface MockState {
   player: PlayerState
   room: RoomState | null
   teamSelection: TeamSelectionState
-  tournament: TournamentState | null // null for 1v1
+  tournament: TournamentState | null // null for 1v1 / before the first bracket broadcast
   duelPokemonState: DuelPokemonState[]
   duel: DuelState | null
+  /** duelId of a server-announced duel the player can enter (duel:start); cleared once duel:state resolves. */
+  pendingDuelId: string | null
+  /** Authoritative podium, set only by room:final_ranking. */
+  finalRanking: RankingEntry[] | null
 }
