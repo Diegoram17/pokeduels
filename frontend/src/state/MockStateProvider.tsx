@@ -5,16 +5,22 @@ import {
   loadMockState,
   saveMockState,
   reduceMockState,
+  duelFromSnapshot,
+  type DuelSnapshot,
   type MockStateAction,
 } from './store'
 import type {
+  BracketPairing,
+  DuelState,
   MockState,
   RoomPlayer,
   RoomStatus,
-  DuelSlot,
   TeamSelectionState,
+  TournamentSlot,
 } from './schema'
+import type { RankingEntry } from '../lib/ranking'
 import { connectSocket, disconnectSocket } from '../lib/socket'
+import { getCachedCatalog } from '../lib/catalog'
 import type { MoveIndex } from '../engine/damage'
 
 export interface MockStateActions {
@@ -28,11 +34,18 @@ export interface MockStateActions {
   selectRoster(pokemonIds: number[]): void
   leaveRoomWs(): void
   updateTeamSelection(selection: Partial<TeamSelectionState>): void
-  enterDuel(slot: DuelSlot): void
-  applyPlayerAttack(moveIndex: MoveIndex): void
-  confirmSwap(pokemonId: string): void
-  surrender(): void
-  advanceTournament(): void
+  /** Emits duel:select_lead and optimistically activates the picked lead. */
+  selectLead(pokemonId: number): void
+  /** Emits duel:select_action with the 1-based move index the backend expects. */
+  submitAction(moveIndex: MoveIndex): void
+  /** Emits duel:switch_decision. */
+  submitSwitch(pokemonId: number): void
+  /** Legacy alias of submitSwitch kept for the pre-#10 SwapScreen. */
+  confirmSwap(pokemonId: number): void
+  /** Emits duel:surrender. */
+  surrenderDuel(): void
+  /** Emits duel:join for a server-announced duel id. */
+  joinDuel(duelId: string): void
   resetSession(): void
 }
 
@@ -49,6 +62,13 @@ function dispatchAndPersist(dispatch: (action: MockStateAction) => void) {
 export function MockStateProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduceMockState, undefined, loadMockState)
   const socketRef = useRef<Socket | null>(null)
+  // Always-current state for socket listeners and emitting actions (the
+  // connect effect and the actions memo capture the first render otherwise).
+  const stateRef = useRef(state)
+
+  useEffect(() => {
+    stateRef.current = state
+  })
 
   // Persist on every change so the mock state survives reloads.
   useEffect(() => {
@@ -56,8 +76,10 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
   }, [state])
 
   // WS lifecycle: connect once a backend session token exists (post-login),
-  // subscribe to room:state for the enriched live roster, and disconnect
-  // when the session resets or the provider unmounts.
+  // subscribe to room:state for the enriched live roster plus every duel and
+  // tournament event (single mount/unmount-safe subscription boundary — the
+  // duel screens remount often, so per-screen listeners would miss events),
+  // and disconnect when the session resets or the provider unmounts.
   useEffect(() => {
     const token = state.player.sessionToken
     if (!token) return
@@ -80,8 +102,101 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       })
     })
 
+    // duel:start — the server announced a duel the player can enter.
+    socket.on('duel:start', (payload: unknown) => {
+      const { duelId } = payload as { duelId: number }
+      send({ type: 'pendingDuelSet', duelId: String(duelId) })
+    })
+
+    // duel:state / duel:turn_resolved — camelCase snapshots mapped into client
+    // state (phase derived, names/sprites enriched from the catalog; the slot
+    // is resolved by the reducer against the current bracket projection).
+    socket.on('duel:state', (payload: unknown) => {
+      const { duel, duelPokemonState } = duelFromSnapshot(
+        payload as DuelSnapshot,
+        getCachedCatalog() ?? [],
+      )
+      send({ type: 'duelStateReceived', duel, duelPokemonState })
+    })
+
+    socket.on('duel:turn_resolved', (payload: unknown) => {
+      const { duel, duelPokemonState } = duelFromSnapshot(
+        payload as DuelSnapshot,
+        getCachedCatalog() ?? [],
+      )
+      send({ type: 'duelTurnResolved', duel, duelPokemonState })
+    })
+
+    // duel:finished — server-finalized outcome; the client only records it.
+    socket.on('duel:finished', (payload: unknown) => {
+      const { duelId, winnerId, endReason } = payload as {
+        duelId: number
+        winnerId: number | null
+        endReason: string | null
+      }
+      send({
+        type: 'duelFinished',
+        duelId: String(duelId),
+        winnerId: winnerId != null ? String(winnerId) : '',
+        endReason: (endReason ?? null) as DuelState['endReason'],
+      })
+    })
+
+    // duel:action_rejected — surface the rejection without touching the turn.
+    socket.on('duel:action_rejected', (payload: unknown) => {
+      const { moveIndex, reason } = payload as { moveIndex: number; reason: string }
+      send({ type: 'duelActionRejected', moveIndex: moveIndex - 1, reason })
+    })
+
+    // duel:opponent_disconnected — non-blocking notice, cleared by the next
+    // snapshot (duelTurnResolved / duelFinished carry fresh duel state).
+    socket.on('duel:opponent_disconnected', () => {
+      send({ type: 'duelOpponentDisconnected' })
+    })
+
+    // tournament:bracket — merge the broadcast's slots into the projection.
+    socket.on('tournament:bracket', (payload: unknown) => {
+      const { bracket } = payload as {
+        bracket: Partial<
+          Record<TournamentSlot, { duelId: number; playerA: number; playerB: number } | null>
+        >
+      }
+      const mapped: Partial<Record<TournamentSlot, BracketPairing | null>> = {}
+      for (const [slot, pairing] of Object.entries(bracket)) {
+        mapped[slot as TournamentSlot] = pairing
+          ? {
+              duelId: String(pairing.duelId),
+              playerA: String(pairing.playerA),
+              playerB: String(pairing.playerB),
+            }
+          : null
+      }
+      send({ type: 'tournamentBracket', bracket: mapped })
+    })
+
+    // room:final_ranking — authoritative podium rows.
+    socket.on('room:final_ranking', (payload: unknown) => {
+      const { ranking } = payload as {
+        ranking: { playerId: number; nickname: string | null; finalRank: number }[]
+      }
+      const rows: RankingEntry[] = ranking.map((r) => ({
+        rank: r.finalRank,
+        name: r.nickname ?? String(r.playerId),
+        champion: r.finalRank === 1,
+      }))
+      send({ type: 'roomFinalRanking', ranking: rows })
+    })
+
     return () => {
       socket.off('room:state')
+      socket.off('duel:start')
+      socket.off('duel:state')
+      socket.off('duel:turn_resolved')
+      socket.off('duel:finished')
+      socket.off('duel:action_rejected')
+      socket.off('duel:opponent_disconnected')
+      socket.off('tournament:bracket')
+      socket.off('room:final_ranking')
       disconnectSocket()
       socketRef.current = null
     }
@@ -132,11 +247,48 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       },
       updateTeamSelection: (selection) =>
         send({ type: 'updateTeamSelection', selection }),
-      enterDuel: (slot) => send({ type: 'enterDuel', slot }),
-      applyPlayerAttack: (moveIndex) => send({ type: 'applyPlayerAttack', moveIndex }),
-      confirmSwap: (pokemonId) => send({ type: 'confirmSwap', pokemonId }),
-      surrender: () => send({ type: 'surrender' }),
-      advanceTournament: () => send({ type: 'advanceTournament' }),
+      selectLead: (pokemonId) => {
+        const duelId = stateRef.current.duel?.duelId
+        if (duelId == null) return
+        socketRef.current?.emit('duel:select_lead', { duelId: Number(duelId), pokemonId })
+        send({
+          type: 'duelLeadSelection',
+          ownerId: Number(stateRef.current.player.playerId),
+          pokemonId,
+        })
+      },
+      submitAction: (moveIndex) => {
+        const duelId = stateRef.current.duel?.duelId
+        if (duelId == null) return
+        socketRef.current?.emit('duel:select_action', {
+          duelId: Number(duelId),
+          moveIndex: moveIndex + 1,
+        })
+      },
+      submitSwitch: (pokemonId) => {
+        const duelId = stateRef.current.duel?.duelId
+        if (duelId == null) return
+        socketRef.current?.emit('duel:switch_decision', {
+          duelId: Number(duelId),
+          switchTo: pokemonId,
+        })
+      },
+      confirmSwap: (pokemonId) => {
+        const duelId = stateRef.current.duel?.duelId
+        if (duelId == null) return
+        socketRef.current?.emit('duel:switch_decision', {
+          duelId: Number(duelId),
+          switchTo: pokemonId,
+        })
+      },
+      surrenderDuel: () => {
+        const duelId = stateRef.current.duel?.duelId
+        if (duelId == null) return
+        socketRef.current?.emit('duel:surrender', { duelId: Number(duelId) })
+      },
+      joinDuel: (duelId) => {
+        socketRef.current?.emit('duel:join', { duelId: Number(duelId) })
+      },
       resetSession: () => {
         // "Play again" keeps the nickname/token but must drop the live WS
         // connection (design: disconnect on resetSession).
