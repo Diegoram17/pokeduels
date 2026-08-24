@@ -14,7 +14,11 @@ import { createSessionLimiter } from './middleware/rateLimit.js';
 export function createApp() {
   const app = express();
 
-  app.use(cors());
+  // CORS_ORIGIN restricts the REST API to a single trusted origin in
+  // production (Render env var, set to the Vercel deploy URL). Unset
+  // locally/in tests, it stays permissive so nothing else in the suite (or a
+  // dev running the app without env setup) needs the var.
+  app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
   app.use(express.json());
 
   // Session issuance is rate-limited per client IP (10/min).
