@@ -1,32 +1,25 @@
 import { describe, it, expect } from 'vitest'
-import {
-  computePostDuelRoute,
-  humanActivePokemon,
-  rivalActivePokemon,
-  slotLoserId,
-  tournamentAfterCurrentDuel,
-} from '../duelFlow'
-import type {
-  DuelPokemonState,
-  DuelState,
-  MockState,
-  TournamentSlot,
-  TournamentState,
-} from '../../state/schema'
+import { computePostDuelRoute, humanActivePokemon, rivalActivePokemon } from '../duelFlow'
+import type { DuelPokemonState, DuelState, MockState, TournamentState } from '../../state/schema'
 
-const NICKNAME = 'Ash'
+// #10 PR 2: duel-flow helpers are server-driven. ownerId is the numeric
+// server-issued player id (compare against Number(player.playerId)); the
+// finished-duel routing follows the design data flow (1v1 -> wait-room rematch,
+// bracket+finalRanking -> ranking, bracket+noFinalRanking -> stay/choice).
+
+const PLAYER_ID = '10'
 
 function makePokemon(
-  ownerId: string,
-  pokemonId: string,
+  ownerId: number,
+  pokemonId: number,
   isActive: boolean,
   fainted = false,
 ): DuelPokemonState {
   return {
-    duelId: 'duel-1',
+    duelId: '42',
     ownerId,
     pokemonId,
-    name: pokemonId,
+    name: `mon-${pokemonId}`,
     type: 'normal',
     spriteUrl: '',
     backSpriteUrl: '',
@@ -39,237 +32,128 @@ function makePokemon(
   }
 }
 
-function makeState(roster: DuelPokemonState[]): MockState {
-  return {
-    player: { nickname: NICKNAME, playerId: null, sessionToken: null },
-    room: null,
-    teamSelection: { starterId: 25, rosterIds: [] },
-    tournament: null,
-    duelPokemonState: roster,
-    duel: null,
-  }
-}
-
-describe('humanActivePokemon', () => {
-  it('returns the pokemon owned by the player with isActive set', () => {
-    const state = makeState([
-      makePokemon(NICKNAME, 'pikachu', true),
-      makePokemon('bot', 'rattata', true),
-    ])
-    expect(humanActivePokemon(state)?.pokemonId).toBe('pikachu')
-  })
-
-  it('returns undefined when the player has no active pokemon (after a KO)', () => {
-    const state = makeState([
-      makePokemon(NICKNAME, 'pikachu', false, true),
-      makePokemon(NICKNAME, 'bulbasaur', false),
-      makePokemon('bot', 'rattata', true),
-    ])
-    expect(humanActivePokemon(state)).toBeUndefined()
-  })
-})
-
-describe('rivalActivePokemon', () => {
-  it('returns the active pokemon owned by the opponent', () => {
-    const state = makeState([
-      makePokemon(NICKNAME, 'pikachu', true),
-      makePokemon('bot', 'rattata', true),
-    ])
-    expect(rivalActivePokemon(state)?.pokemonId).toBe('rattata')
-  })
-
-  it('returns undefined when the opponent has no active pokemon', () => {
-    const state = makeState([
-      makePokemon(NICKNAME, 'pikachu', true),
-      makePokemon('bot', 'rattata', false, true),
-    ])
-    expect(rivalActivePokemon(state)).toBeUndefined()
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Tournament routing fixtures
-// ---------------------------------------------------------------------------
-
-function makeDuel(slot: DuelState['slot'], phase: DuelState['phase'], winnerId: string | null): DuelState {
+function makeDuel(
+  slot: DuelState['slot'],
+  phase: DuelState['phase'],
+  winnerId: string | null,
+): DuelState {
   return {
     duelId: `duel-${slot}`,
     slot,
     phase,
     turnNumber: 1,
     winnerId,
-    endReason: phase === 'finished' ? 'surrender' : null,
+    endReason: phase === 'finished' ? 'ko' : null,
+    opponentDisconnected: false,
+    lastRejection: null,
   }
 }
 
-function makeTournament(
-  overrides: Partial<TournamentState> = {},
-): TournamentState {
+function makeState(overrides: Partial<MockState> = {}): MockState {
   return {
-    bracket: {},
-    queue: ['semiA', 'semiB'],
-    activeSlot: 'semiA',
-    results: {},
+    player: { nickname: 'Ash', playerId: PLAYER_ID, sessionToken: 'token-1' },
+    room: null,
+    teamSelection: { starterId: 25, rosterIds: [] },
+    tournament: null,
+    duelPokemonState: [],
+    duel: null,
+    pendingDuelId: null,
+    finalRanking: null,
     ...overrides,
   }
 }
 
-function makeTournamentState(
-  duelSlot: DuelState['slot'],
-  duelPhase: DuelState['phase'],
-  winnerId: string | null,
-  tournament: TournamentState,
-): MockState {
+function makeTournament(overrides: Partial<TournamentState> = {}): TournamentState {
   return {
-    player: { nickname: NICKNAME, playerId: null, sessionToken: null },
-    room: {
-      code: 'AB12',
-      maxPlayers: 4,
-      status: 'in_progress',
-      players: [{ playerId: 'p1', nickname: NICKNAME, ready: false, connected: true }],
+    bracket: {
+      semiA: { duelId: '42', playerA: '10', playerB: '11' },
+      semiB: { duelId: '43', playerA: '12', playerB: '13' },
     },
-    teamSelection: { starterId: 25, rosterIds: [] },
-    tournament,
-    duelPokemonState: [
-      makePokemon(NICKNAME, 'pikachu', true),
-      makePokemon('bot', 'rattata', true),
-    ],
-    duel: makeDuel(duelSlot, duelPhase, winnerId),
+    ...overrides,
   }
 }
 
-const QUEUE_FULL: TournamentSlot[] = ['semiA', 'semiB', 'thirdPlace', 'final']
-
-describe('slotLoserId', () => {
-  it('returns the bot as the loser when the human won the duel', () => {
-    const state = makeTournamentState('1v1', 'finished', NICKNAME, makeTournament())
-    expect(slotLoserId(state)).toBe('bot')
+describe('humanActivePokemon — numeric ownerId', () => {
+  it('returns the active pokemon whose ownerId matches the numeric player id', () => {
+    const state = makeState({
+      player: { nickname: 'Ash', playerId: PLAYER_ID, sessionToken: 'token-1' },
+      duelPokemonState: [makePokemon(10, 25, true), makePokemon(11, 5, true)],
+    })
+    expect(humanActivePokemon(state)?.pokemonId).toBe(25)
   })
 
-  it('returns the human as the loser when the bot won the duel', () => {
-    const state = makeTournamentState('1v1', 'finished', 'bot', makeTournament())
-    expect(slotLoserId(state)).toBe(NICKNAME)
-  })
-
-  it('returns null while the duel is still in progress', () => {
-    const state = makeTournamentState('1v1', 'awaiting_actions', null, makeTournament())
-    expect(slotLoserId(state)).toBeNull()
-  })
-})
-
-describe('tournamentAfterCurrentDuel', () => {
-  it('records the semiA result and moves the active slot to semiB', () => {
-    const state = makeTournamentState('semiA', 'finished', NICKNAME, makeTournament())
-    const next = tournamentAfterCurrentDuel(state)
-    expect(next?.results.semiA).toEqual({ winner: NICKNAME, loser: 'bot' })
-    expect(next?.activeSlot).toBe('semiB')
-    expect(next?.queue).toEqual(['semiA', 'semiB'])
-  })
-
-  it('appends the 3rd-place and final slots once both semifinals resolve', () => {
-    const state = makeTournamentState(
-      'semiB',
-      'finished',
-      NICKNAME,
-      makeTournament({
-        queue: ['semiA', 'semiB'],
-        activeSlot: 'semiB',
-        results: { semiA: { winner: NICKNAME, loser: 'bot' } },
-      }),
-    )
-    const next = tournamentAfterCurrentDuel(state)
-    expect(next?.queue).toEqual(['semiA', 'semiB', 'thirdPlace', 'final'])
-    expect(next?.activeSlot).toBe('thirdPlace')
-  })
-
-  it('moves to the final after the 3rd-place duel concludes', () => {
-    const state = makeTournamentState(
-      'thirdPlace',
-      'finished',
-      'bot',
-      makeTournament({
-        queue: QUEUE_FULL,
-        activeSlot: 'thirdPlace',
-        results: {
-          semiA: { winner: NICKNAME, loser: 'bot' },
-          semiB: { winner: NICKNAME, loser: 'bot' },
-        },
-      }),
-    )
-    const next = tournamentAfterCurrentDuel(state)
-    expect(next?.results.thirdPlace).toEqual({ winner: 'bot', loser: NICKNAME })
-    expect(next?.activeSlot).toBe('final')
-  })
-
-  it('settles on the final once every slot has a result', () => {
-    const state = makeTournamentState(
-      'final',
-      'finished',
-      NICKNAME,
-      makeTournament({
-        queue: QUEUE_FULL,
-        activeSlot: 'final',
-        results: {
-          semiA: { winner: NICKNAME, loser: 'bot' },
-          semiB: { winner: NICKNAME, loser: 'bot' },
-          thirdPlace: { winner: 'bot', loser: NICKNAME },
-        },
-      }),
-    )
-    const next = tournamentAfterCurrentDuel(state)
-    expect(next?.results.final).toEqual({ winner: NICKNAME, loser: 'bot' })
-    expect(next?.activeSlot).toBe('final')
-    for (const slot of QUEUE_FULL) {
-      expect(next?.results[slot]).toBeDefined()
-    }
-  })
-
-  it('returns null when the duel is not finished', () => {
-    const state = makeTournamentState('semiA', 'awaiting_actions', null, makeTournament())
-    expect(tournamentAfterCurrentDuel(state)).toBeNull()
+  it('returns undefined when the player has no active pokemon (after a KO)', () => {
+    const state = makeState({
+      player: { nickname: 'Ash', playerId: PLAYER_ID, sessionToken: 'token-1' },
+      duelPokemonState: [
+        makePokemon(10, 25, false, true),
+        makePokemon(10, 5, false),
+        makePokemon(11, 6, true),
+      ],
+    })
+    expect(humanActivePokemon(state)).toBeUndefined()
   })
 })
 
-describe('computePostDuelRoute', () => {
+describe('rivalActivePokemon — numeric ownerId', () => {
+  it('returns the active pokemon owned by a different numeric id', () => {
+    const state = makeState({
+      player: { nickname: 'Ash', playerId: PLAYER_ID, sessionToken: 'token-1' },
+      duelPokemonState: [makePokemon(10, 25, true), makePokemon(11, 5, true)],
+    })
+    expect(rivalActivePokemon(state)?.pokemonId).toBe(5)
+  })
+
+  it('returns undefined when the opponent has no active pokemon (lead not yet pushed)', () => {
+    // PR 1 contract: the opponent lead is unknown until the first
+    // duel:turn_resolved — the helper must simply return undefined.
+    const state = makeState({
+      player: { nickname: 'Ash', playerId: PLAYER_ID, sessionToken: 'token-1' },
+      duelPokemonState: [makePokemon(10, 25, true), makePokemon(11, 5, false)],
+    })
+    expect(rivalActivePokemon(state)).toBeUndefined()
+  })
+})
+
+describe('computePostDuelRoute — server-driven finish routing', () => {
   it('returns null while the duel is in progress', () => {
-    const state = makeTournamentState('semiA', 'awaiting_actions', null, makeTournament())
+    const state = makeState({
+      room: { code: 'AB12', maxPlayers: 4, status: 'in_progress', players: [] },
+      tournament: makeTournament(),
+      duelPokemonState: [makePokemon(10, 25, true), makePokemon(11, 5, true)],
+      duel: makeDuel('semiA', 'awaiting_actions', null),
+    })
     expect(computePostDuelRoute(state)).toBeNull()
   })
 
-  it('routes a finished 1v1 duel straight to the ranking screen', () => {
-    const state: MockState = {
-      ...makeTournamentState('1v1', 'finished', NICKNAME, makeTournament()),
-      room: {
-        code: 'AB12',
-        maxPlayers: 2,
-        status: 'finished',
-        players: [{ playerId: 'p1', nickname: NICKNAME, ready: false, connected: true }],
-      },
-      tournament: null,
-    }
-    expect(computePostDuelRoute(state)).toEqual({ path: '/ranking' })
-  })
-
-  it('routes back to the wait room while tournament slots remain', () => {
-    const state = makeTournamentState('semiA', 'finished', NICKNAME, makeTournament())
+  it('routes a finished 1v1 duel to the wait room (rematch panel, not ranking)', () => {
+    const state = makeState({
+      room: { code: 'AB12', maxPlayers: 2, status: 'in_progress', players: [] },
+      duelPokemonState: [makePokemon(10, 25, true), makePokemon(11, 5, true)],
+      duel: makeDuel('1v1', 'finished', '10'),
+    })
     expect(computePostDuelRoute(state)).toEqual({ path: '/wait-room' })
   })
 
-  it('routes to the ranking screen when the last tournament slot concludes', () => {
-    const state = makeTournamentState(
-      'final',
-      'finished',
-      NICKNAME,
-      makeTournament({
-        queue: QUEUE_FULL,
-        activeSlot: 'final',
-        results: {
-          semiA: { winner: NICKNAME, loser: 'bot' },
-          semiB: { winner: NICKNAME, loser: 'bot' },
-          thirdPlace: { winner: 'bot', loser: NICKNAME },
-        },
-      }),
-    )
+  it('routes a finished bracket duel to the ranking screen when the final ranking is in', () => {
+    const state = makeState({
+      room: { code: 'AB12', maxPlayers: 4, status: 'in_progress', players: [] },
+      tournament: makeTournament(),
+      duelPokemonState: [makePokemon(10, 25, true), makePokemon(11, 5, true)],
+      duel: makeDuel('semiA', 'finished', '10'),
+      finalRanking: [{ rank: 1, name: 'Ash', champion: true }],
+    })
     expect(computePostDuelRoute(state)).toEqual({ path: '/ranking' })
+  })
+
+  it('stays (null) after a bracket duel when the room has not closed yet — wait/go-now choice', () => {
+    const state = makeState({
+      room: { code: 'AB12', maxPlayers: 4, status: 'in_progress', players: [] },
+      tournament: makeTournament(),
+      duelPokemonState: [makePokemon(10, 25, true), makePokemon(11, 5, true)],
+      duel: makeDuel('semiA', 'finished', '10'),
+      finalRanking: null,
+    })
+    expect(computePostDuelRoute(state)).toBeNull()
   })
 })
