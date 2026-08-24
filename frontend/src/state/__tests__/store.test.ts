@@ -6,10 +6,15 @@ import {
   loadMockState,
   saveMockState,
   reduceMockState,
+  toDuelPokemonState,
+  deriveDuelSlot,
+  deriveDuelPhase,
+  duelFromSnapshot,
+  type DuelSnapshot,
   STORAGE_KEY,
   type StorageLike,
 } from '../store'
-import type { MockState } from '../schema'
+import type { DuelState, MockState, TournamentState } from '../schema'
 import { setCachedCatalog } from '../../lib/catalog'
 import type { Pokemon } from '../../lib/catalog'
 
@@ -17,11 +22,6 @@ const duelCatalog: Pokemon[] = [
   { id: 25, name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'front-pikachu', back_sprite_url: 'back-pikachu', is_starter: true },
   { id: 5, name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'front-snorlax', back_sprite_url: 'back-snorlax', is_starter: false },
   { id: 6, name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'front-eevee', back_sprite_url: 'back-eevee', is_starter: false },
-  { id: 23, name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'front-pidgeot', back_sprite_url: 'back-pidgeot', is_starter: false },
-  { id: 14, name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'front-sceptile', back_sprite_url: 'back-sceptile', is_starter: false },
-  { id: 17, name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'front-machamp', back_sprite_url: 'back-machamp', is_starter: false },
-  { id: 33, name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'front-onix', back_sprite_url: 'back-onix', is_starter: false },
-  { id: 15, name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'front-gengar', back_sprite_url: 'back-gengar', is_starter: false },
 ]
 
 beforeEach(() => {
@@ -38,8 +38,40 @@ function makeMemoryStorage(): StorageLike {
   }
 }
 
+function makeDuelStateFixture(): MockState {
+  let s = reduceMockState(createInitialState(), { type: 'setNickname', nickname: 'Ash' })
+  s = reduceMockState(s, {
+    type: 'roomShellReceived',
+    code: 'AB12',
+    maxPlayers: 2,
+    status: 'waiting',
+  })
+  s = reduceMockState(s, {
+    type: 'updateTeamSelection',
+    selection: { starterId: 25, rosterIds: [5, 23, 14, 17, 33] },
+  })
+  s = reduceMockState(s, {
+    type: 'duelStateReceived',
+    duel: {
+      duelId: '42',
+      slot: '1v1',
+      phase: 'awaiting_actions',
+      turnNumber: 1,
+      winnerId: null,
+      endReason: null,
+      opponentDisconnected: false,
+      lastRejection: null,
+    },
+    duelPokemonState: [
+      { duelId: '42', ownerId: 10, pokemonId: 25, name: 'Pikachu', type: 'electric', spriteUrl: 'front-pikachu', backSpriteUrl: 'back-pikachu', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+      { duelId: '42', ownerId: 11, pokemonId: 5, name: 'Snorlax', type: 'normal', spriteUrl: 'front-snorlax', backSpriteUrl: 'back-snorlax', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+    ],
+  })
+  return s
+}
+
 describe('createInitialState', () => {
-  it('starts with empty player, no room, no team, no duel', () => {
+  it('starts with empty player, no room, no team, no duel, no pending duel, no ranking', () => {
     const s = createInitialState()
     expect(s.player.nickname).toBe('')
     expect(s.room).toBeNull()
@@ -47,6 +79,8 @@ describe('createInitialState', () => {
     expect(s.tournament).toBeNull()
     expect(s.duelPokemonState).toHaveLength(0)
     expect(s.duel).toBeNull()
+    expect(s.pendingDuelId).toBeNull()
+    expect(s.finalRanking).toBeNull()
   })
 })
 
@@ -63,12 +97,11 @@ describe('serializeMockState / parseMockState', () => {
       teamSelection: { starterId: 25, rosterIds: [5, 23, 14, 17, 33] },
       tournament: {
         bracket: { semiA: null, semiB: null },
-        queue: ['semiA', 'semiB'],
-        activeSlot: 'semiA',
-        results: {},
       },
       duelPokemonState: [],
       duel: null,
+      pendingDuelId: '42',
+      finalRanking: [{ rank: 1, name: 'Ash', champion: true }],
     }
     const parsed = parseMockState(serializeMockState(state))
     expect(parsed).toEqual(state)
@@ -176,7 +209,7 @@ describe('reduceMockState — roomShellReceived', () => {
     expect(s.tournament).toBeNull()
   })
 
-  it('stores a tournament room shell and seeds the semi-final queue', () => {
+  it('stores a tournament room shell without seeding a bracket (server pushes it later)', () => {
     const base = reduceMockState(createInitialState(), {
       type: 'sessionEstablished',
       playerId: 'p1',
@@ -191,9 +224,30 @@ describe('reduceMockState — roomShellReceived', () => {
     })
     expect(s.room?.maxPlayers).toBe(4)
     expect(s.room?.code).toBe('Z009')
-    expect(s.tournament?.queue).toEqual(['semiA', 'semiB'])
-    expect(s.tournament?.activeSlot).toBe('semiA')
-    expect(s.tournament?.results).toEqual({})
+    expect(s.tournament).toBeNull()
+  })
+
+  it('resets room-scoped state when a new room shell arrives', () => {
+    let s = makeDuelStateFixture()
+    s = reduceMockState(s, {
+      type: 'tournamentBracket',
+      bracket: { semiA: { duelId: '42', playerA: '10', playerB: '11' } },
+    })
+    s = reduceMockState(s, { type: 'roomFinalRanking', ranking: [{ rank: 1, name: 'Ash', champion: true }] })
+    s = reduceMockState(s, { type: 'pendingDuelSet', duelId: '42' })
+
+    const after = reduceMockState(s, {
+      type: 'roomShellReceived',
+      code: 'NEW1',
+      maxPlayers: 2,
+      status: 'waiting',
+    })
+    expect(after.room?.code).toBe('NEW1')
+    expect(after.tournament).toBeNull()
+    expect(after.duel).toBeNull()
+    expect(after.duelPokemonState).toHaveLength(0)
+    expect(after.pendingDuelId).toBeNull()
+    expect(after.finalRanking).toBeNull()
   })
 })
 
@@ -217,223 +271,414 @@ describe('reduceMockState — updateTeamSelection', () => {
   })
 })
 
-function makeTeamState(): MockState {
-  let s = reduceMockState(createInitialState(), {
-    type: 'setNickname',
-    nickname: 'Ash',
+describe('reduceMockState — pendingDuelSet / pendingDuelClear', () => {
+  it('records a server-announced duel as pending', () => {
+    const s = reduceMockState(createInitialState(), { type: 'pendingDuelSet', duelId: '42' })
+    expect(s.pendingDuelId).toBe('42')
   })
-  s = reduceMockState(s, {
-    type: 'roomShellReceived',
-    code: 'AB12',
-    maxPlayers: 2,
-    status: 'waiting',
-  })
-  s = reduceMockState(s, {
-    type: 'updateTeamSelection',
-    selection: {
-      starterId: 25,
-      rosterIds: [5, 23, 14, 17, 33],
-    },
-  })
-  return s
-}
 
-describe('reduceMockState — enterDuel', () => {
-  it('builds a 6v6 duel with the starter active', () => {
-    const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
-    expect(s.duel?.slot).toBe('1v1')
+  it('clears the pending duel pointer', () => {
+    let s = reduceMockState(createInitialState(), { type: 'pendingDuelSet', duelId: '42' })
+    s = reduceMockState(s, { type: 'pendingDuelClear' })
+    expect(s.pendingDuelId).toBeNull()
+  })
+})
+
+describe('reduceMockState — duelStateReceived', () => {
+  it('populates the duel and pokemon from the server snapshot and clears the pending pointer', () => {
+    let s = reduceMockState(createInitialState(), { type: 'pendingDuelSet', duelId: '42' })
+    s = reduceMockState(s, {
+      type: 'duelStateReceived',
+      duel: {
+        duelId: '42',
+        slot: 'semiA',
+        phase: 'lead_selection',
+        turnNumber: 1,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [
+        { duelId: '42', ownerId: 10, pokemonId: 25, name: 'Pikachu', type: 'electric', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+        { duelId: '42', ownerId: 11, pokemonId: 5, name: 'Snorlax', type: 'normal', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+      ],
+    })
+    expect(s.duel?.duelId).toBe('42')
+    expect(s.duel?.phase).toBe('lead_selection')
+    expect(s.duelPokemonState).toHaveLength(2)
+    expect(s.pendingDuelId).toBeNull()
+  })
+})
+
+describe('reduceMockState — duelTurnResolved', () => {
+  it('replaces the snapshot and clears the opponent-disconnect banner and the rejection', () => {
+    const withBanner = reduceMockState(makeDuelStateFixture(), { type: 'duelOpponentDisconnected' })
+    const withRejection = reduceMockState(withBanner, {
+      type: 'duelActionRejected',
+      moveIndex: 1,
+      reason: 'insufficient_pp',
+    })
+
+    const resolved = reduceMockState(withRejection, {
+      type: 'duelTurnResolved',
+      duel: {
+        duelId: '42',
+        slot: '1v1',
+        phase: 'awaiting_actions',
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [
+        { duelId: '42', ownerId: 10, pokemonId: 25, name: 'Pikachu', type: 'electric', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 75, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+        { duelId: '42', ownerId: 11, pokemonId: 5, name: 'Snorlax', type: 'normal', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 75, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+      ],
+    })
+    expect(resolved.duel?.turnNumber).toBe(2)
+    expect(resolved.duel?.opponentDisconnected).toBe(false)
+    expect(resolved.duel?.lastRejection).toBeNull()
+    expect(resolved.duelPokemonState[0].currentHp).toBe(75)
+  })
+})
+
+describe('reduceMockState — duelFinished', () => {
+  it('marks the duel finished with the server winner and end reason', () => {
+    const s = reduceMockState(makeDuelStateFixture(), {
+      type: 'duelFinished',
+      duelId: '42',
+      winnerId: '11',
+      endReason: 'ko',
+    })
+    expect(s.duel?.phase).toBe('finished')
+    expect(s.duel?.winnerId).toBe('11')
+    expect(s.duel?.endReason).toBe('ko')
+  })
+
+  it('clears the opponent-disconnect banner on finish', () => {
+    const withBanner = reduceMockState(makeDuelStateFixture(), { type: 'duelOpponentDisconnected' })
+    const s = reduceMockState(withBanner, {
+      type: 'duelFinished',
+      duelId: '42',
+      winnerId: '10',
+      endReason: 'surrender',
+    })
+    expect(s.duel?.phase).toBe('finished')
+    expect(s.duel?.opponentDisconnected).toBe(false)
+  })
+
+  it('is a no-op when the finished duel id does not match the active duel', () => {
+    const s = reduceMockState(makeDuelStateFixture(), {
+      type: 'duelFinished',
+      duelId: '999',
+      winnerId: '11',
+      endReason: 'ko',
+    })
     expect(s.duel?.phase).toBe('awaiting_actions')
+    expect(s.duel?.winnerId).toBeNull()
+  })
+})
+
+describe('reduceMockState — duelLeadSelection', () => {
+  function makeLeadDuel(): MockState {
+    return reduceMockState(makeDuelStateFixture(), {
+      type: 'duelStateReceived',
+      duel: {
+        duelId: '42',
+        slot: '1v1',
+        phase: 'lead_selection',
+        turnNumber: 1,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [
+        { duelId: '42', ownerId: 10, pokemonId: 25, name: 'Pikachu', type: 'electric', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+        { duelId: '42', ownerId: 11, pokemonId: 5, name: 'Snorlax', type: 'normal', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+      ],
+    })
+  }
+
+  it('activates the picked lead and leaves the lead_selection phase', () => {
+    const s = reduceMockState(makeLeadDuel(), {
+      type: 'duelLeadSelection',
+      ownerId: 10,
+      pokemonId: 25,
+    })
+    expect(s.duel?.phase).toBe('awaiting_actions')
+    expect(s.duelPokemonState.find((p) => p.ownerId === 10)?.isActive).toBe(true)
+    expect(s.duelPokemonState.find((p) => p.ownerId === 11)?.isActive).toBe(false)
+  })
+
+  it('is a no-op once the duel is already past lead selection', () => {
+    const s = reduceMockState(makeDuelStateFixture(), {
+      type: 'duelLeadSelection',
+      ownerId: 10,
+      pokemonId: 25,
+    })
+    expect(s.duel?.phase).toBe('awaiting_actions')
+    expect(s.duelPokemonState.find((p) => p.ownerId === 10)?.isActive).toBe(true)
+  })
+})
+
+describe('reduceMockState — duelActionRejected', () => {
+  it('records the rejection without advancing the turn or changing the phase', () => {
+    const s = reduceMockState(makeDuelStateFixture(), {
+      type: 'duelActionRejected',
+      moveIndex: 1,
+      reason: 'insufficient_pp',
+    })
+    expect(s.duel?.lastRejection).toEqual({ moveIndex: 1, reason: 'insufficient_pp' })
     expect(s.duel?.turnNumber).toBe(1)
-    expect(s.duelPokemonState).toHaveLength(12)
-    const humanActive = s.duelPokemonState.find(
-      (p) => p.ownerId === 'Ash' && p.isActive,
-    )
-    expect(humanActive?.pokemonId).toBe('25')
-    expect(s.duelPokemonState.filter((p) => p.currentHp === 100)).toHaveLength(12)
+    expect(s.duel?.phase).toBe('awaiting_actions')
   })
 
-  it('is a no-op without a complete team', () => {
-    let s = reduceMockState(createInitialState(), {
-      type: 'setNickname',
-      nickname: 'Ash',
-    })
-    s = reduceMockState(s, {
-      type: 'roomShellReceived',
-      code: 'AB12',
-      maxPlayers: 2,
-      status: 'waiting',
-    })
-    s = reduceMockState(s, {
-      type: 'updateTeamSelection',
-      selection: { starterId: 25, rosterIds: [5, 23] },
-    })
-    const after = reduceMockState(s, { type: 'enterDuel', slot: '1v1' })
-    expect(after.duel).toBeNull()
-    expect(after.duelPokemonState).toHaveLength(0)
-  })
-})
-
-describe('reduceMockState — enterDuel resolves real catalog data', () => {
-  it('populates name, type and both sprite urls from the catalog when loaded', () => {
-    setCachedCatalog(duelCatalog)
-    const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
-    const humanActive = s.duelPokemonState.find(
-      (p) => p.ownerId === 'Ash' && p.isActive,
-    )
-    expect(humanActive?.name).toBe('Pikachu')
-    expect(humanActive?.type).toBe('electric')
-    expect(humanActive?.spriteUrl).toBe('front-pikachu')
-    expect(humanActive?.backSpriteUrl).toBe('back-pikachu')
-    // Unknown roster ids keep the stub shape instead of crashing the duel.
-    const fakeRoster = s.duelPokemonState.find((p) => p.pokemonId === '5')
-    expect(fakeRoster?.name).toBe('Snorlax')
-    expect(fakeRoster?.spriteUrl).toBe('front-snorlax')
-  })
-
-  it('resolves the bot roster through the catalog (numeric ids)', () => {
-    setCachedCatalog(duelCatalog)
-    const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
-    const botActive = s.duelPokemonState.find(
-      (p) => p.ownerId === 'bot' && p.isActive,
-    )
-    expect(botActive?.name).toBe('Eevee')
-    expect(botActive?.type).toBe('normal')
-    expect(botActive?.spriteUrl).toBe('front-eevee')
-    expect(botActive?.backSpriteUrl).toBe('back-eevee')
-    expect(s.duelPokemonState.filter((p) => p.ownerId === 'bot')).toHaveLength(6)
-  })
-
-  it('falls back to the stub shape when the catalog is not loaded yet', () => {
-    const s = reduceMockState(makeTeamState(), { type: 'enterDuel', slot: '1v1' })
-    const humanActive = s.duelPokemonState.find(
-      (p) => p.ownerId === 'Ash' && p.isActive,
-    )
-    expect(humanActive?.name).toBe('25')
-    expect(humanActive?.type).toBe('normal')
-    expect(humanActive?.spriteUrl).toBe('')
-    expect(humanActive?.backSpriteUrl).toBe('')
-  })
-})
-
-describe('reduceMockState — applyPlayerAttack', () => {
-  it('applies human damage to the bot active pokemon', () => {
-    const inDuel = reduceMockState(makeTeamState(), {
-      type: 'enterDuel',
-      slot: '1v1',
-    })
-    const s = reduceMockState(inDuel, { type: 'applyPlayerAttack', moveIndex: 0 })
-    const botActive = s.duelPokemonState.find(
-      (p) => p.ownerId !== 'Ash' && p.isActive,
-    )
-    expect(botActive?.currentHp).toBe(75)
-    expect(s.duel?.turnNumber).toBe(2)
-  })
-
-  it('is a no-op when no duel is active', () => {
+  it('is a no-op without an active duel', () => {
     const s = reduceMockState(createInitialState(), {
-      type: 'applyPlayerAttack',
-      moveIndex: 0,
+      type: 'duelActionRejected',
+      moveIndex: 1,
+      reason: 'insufficient_pp',
     })
     expect(s).toEqual(createInitialState())
   })
 })
 
-describe('reduceMockState — confirmSwap', () => {
-  it('activates the chosen bench pokemon and resumes actions', () => {
-    const inDuel = reduceMockState(makeTeamState(), {
-      type: 'enterDuel',
-      slot: '1v1',
-    })
-    const s = reduceMockState(inDuel, { type: 'confirmSwap', pokemonId: '5' })
-    const humanActive = s.duelPokemonState.find(
-      (p) => p.ownerId === 'Ash' && p.isActive,
-    )
-    expect(humanActive?.pokemonId).toBe('5')
+describe('reduceMockState — duelOpponentDisconnected', () => {
+  it('flags the opponent as disconnected while keeping the duel interactive', () => {
+    const s = reduceMockState(makeDuelStateFixture(), { type: 'duelOpponentDisconnected' })
+    expect(s.duel?.opponentDisconnected).toBe(true)
     expect(s.duel?.phase).toBe('awaiting_actions')
-    const oldStarter = s.duelPokemonState.find(
-      (p) => p.ownerId === 'Ash' && p.pokemonId === '25',
-    )
-    expect(oldStarter?.isActive).toBe(false)
+  })
+
+  it('is a no-op without an active duel', () => {
+    const s = reduceMockState(createInitialState(), { type: 'duelOpponentDisconnected' })
+    expect(s).toEqual(createInitialState())
   })
 })
 
-describe('reduceMockState — surrender', () => {
-  it('finishes the duel with the bot as winner', () => {
-    const inDuel = reduceMockState(makeTeamState(), {
-      type: 'enterDuel',
-      slot: '1v1',
-    })
-    const s = reduceMockState(inDuel, { type: 'surrender' })
-    expect(s.duel?.phase).toBe('finished')
-    expect(s.duel?.endReason).toBe('surrender')
-    expect(s.duel?.winnerId).not.toBe('Ash')
-  })
-})
-
-describe('reduceMockState — advanceTournament', () => {
-  it('records the finished duel result and advances the queue', () => {
+describe('reduceMockState — tournamentBracket', () => {
+  it('merges slot pairings incrementally across broadcasts', () => {
     let s = reduceMockState(createInitialState(), {
-      type: 'setNickname',
-      nickname: 'Ash',
+      type: 'tournamentBracket',
+      bracket: { semiA: { duelId: '1', playerA: '10', playerB: '11' } },
     })
     s = reduceMockState(s, {
-      type: 'roomShellReceived',
-      code: 'Z009',
-      maxPlayers: 4,
-      status: 'waiting',
+      type: 'tournamentBracket',
+      bracket: { final: { duelId: '9', playerA: '10', playerB: '11' } },
     })
-    s = reduceMockState(s, {
-      type: 'updateTeamSelection',
-      selection: {
-        starterId: 25,
-        rosterIds: [5, 23, 14, 17, 33],
-      },
-    })
-    s = reduceMockState(s, { type: 'enterDuel', slot: 'semiA' })
-    // Simulate a finished duel where the human won.
-    const finished: MockState = {
-      ...s,
-      duel: { ...s.duel!, phase: 'finished', winnerId: 'Ash', endReason: 'ko' },
-    }
-    const after = reduceMockState(finished, { type: 'advanceTournament' })
-    expect(after.tournament?.results.semiA).toEqual({
-      winner: 'Ash',
-      loser: expect.any(String),
-    })
-    expect(after.tournament?.activeSlot).toBe('semiB')
+    expect(s.tournament?.bracket.semiA).toEqual({ duelId: '1', playerA: '10', playerB: '11' })
+    expect(s.tournament?.bracket.final).toEqual({ duelId: '9', playerA: '10', playerB: '11' })
   })
 
-  it('is a no-op without a tournament', () => {
-    const inDuel = reduceMockState(makeTeamState(), {
-      type: 'enterDuel',
-      slot: '1v1',
+  it('leaves an empty bracket when the broadcast carries no pairings', () => {
+    const s = reduceMockState(createInitialState(), {
+      type: 'tournamentBracket',
+      bracket: {},
     })
-    const finished: MockState = {
-      ...inDuel,
-      duel: { ...inDuel.duel!, phase: 'finished', winnerId: 'Ash', endReason: 'ko' },
+    expect(s.tournament?.bracket).toEqual({})
+  })
+})
+
+describe('reduceMockState — roomFinalRanking', () => {
+  it('stores the authoritative ranking', () => {
+    const s = reduceMockState(createInitialState(), {
+      type: 'roomFinalRanking',
+      ranking: [
+        { rank: 1, name: 'Ash', champion: true },
+        { rank: 2, name: 'Misty', champion: false },
+      ],
+    })
+    expect(s.finalRanking).toEqual([
+      { rank: 1, name: 'Ash', champion: true },
+      { rank: 2, name: 'Misty', champion: false },
+    ])
+  })
+})
+
+describe('deriveDuelSlot', () => {
+  it('returns 1v1 without a tournament', () => {
+    expect(deriveDuelSlot('42', null)).toBe('1v1')
+  })
+
+  it('finds the bracket slot owning the duel id', () => {
+    const tournament: TournamentState = {
+      bracket: {
+        semiA: { duelId: '1', playerA: '10', playerB: '11' },
+        semiB: { duelId: '2', playerA: '12', playerB: '13' },
+      },
     }
-    const after = reduceMockState(finished, { type: 'advanceTournament' })
-    expect(after.tournament).toBeNull()
+    expect(deriveDuelSlot('1', tournament)).toBe('semiA')
+    expect(deriveDuelSlot('2', tournament)).toBe('semiB')
+  })
+
+  it('falls back to 1v1 for an unknown duel id', () => {
+    const tournament: TournamentState = {
+      bracket: { semiA: { duelId: '1', playerA: '10', playerB: '11' } },
+    }
+    expect(deriveDuelSlot('999', tournament)).toBe('1v1')
+  })
+})
+
+describe('deriveDuelPhase', () => {
+  function pokemon(ownerId: number, pokemonId: number, isActive: boolean, fainted = false) {
+    return { duelId: '42', ownerId, pokemonId, name: 'X', type: 'normal', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive, fainted }
+  }
+
+  it('is finished when a winner is set', () => {
+    const states = [pokemon(10, 25, false), pokemon(11, 5, true)]
+    expect(deriveDuelPhase('11', states)).toBe('finished')
+  })
+
+  it('is lead_selection while no side has an active pokemon', () => {
+    const states = [pokemon(10, 25, false), pokemon(11, 5, false)]
+    expect(deriveDuelPhase(null, states)).toBe('lead_selection')
+  })
+
+  it('is awaiting_actions when both sides field an active pokemon', () => {
+    const states = [pokemon(10, 25, true), pokemon(11, 5, true)]
+    expect(deriveDuelPhase(null, states)).toBe('awaiting_actions')
+  })
+
+  it('is awaiting_switch when one side has no active pokemon but keeps bench', () => {
+    const states = [
+      pokemon(10, 25, true),
+      pokemon(11, 5, false),
+      pokemon(11, 6, false, true),
+      pokemon(11, 7, false),
+    ]
+    expect(deriveDuelPhase(null, states)).toBe('awaiting_switch')
+  })
+})
+
+describe('toDuelPokemonState', () => {
+  it('fills name, type and both sprite urls from the catalog', () => {
+    setCachedCatalog(duelCatalog)
+    const raw = { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 80, ppMove1: 3, ppMove2: 4, ppMove3: 2, isActive: true, fainted: false }
+    const p = toDuelPokemonState(raw, duelCatalog)
+    expect(p.duelId).toBe('42')
+    expect(p.ownerId).toBe(10)
+    expect(p.pokemonId).toBe(25)
+    expect(p.name).toBe('Pikachu')
+    expect(p.spriteUrl).toBe('front-pikachu')
+    expect(p.backSpriteUrl).toBe('back-pikachu')
+    expect(p.currentHp).toBe(80)
+    expect(p.ppMove1).toBe(3)
+  })
+
+  it('falls back to stub fields for unknown pokemon ids', () => {
+    const raw = { duelId: 42, ownerId: 10, pokemonId: 999, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false }
+    const p = toDuelPokemonState(raw, [])
+    expect(p.name).toBe('999')
+    expect(p.spriteUrl).toBe('')
+    expect(p.backSpriteUrl).toBe('')
+  })
+})
+
+describe('duelFromSnapshot', () => {
+  it('maps a camelCase snapshot into DuelState and DuelPokemonState', () => {
+    setCachedCatalog(duelCatalog)
+    const snapshot: DuelSnapshot = {
+      duelId: 42,
+      turnNumber: 3,
+      winnerId: null,
+      endReason: null,
+      pokemonStates: [
+        { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 60, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+        { duelId: 42, ownerId: 11, pokemonId: 5, type: 'normal', currentHp: 60, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+      ],
+    }
+    const { duel, duelPokemonState } = duelFromSnapshot(snapshot, duelCatalog)
+    const expectedDuel: DuelState = {
+      duelId: '42',
+      slot: '1v1',
+      phase: 'awaiting_actions',
+      turnNumber: 3,
+      winnerId: null,
+      endReason: null,
+      opponentDisconnected: false,
+      lastRejection: null,
+    }
+    expect(duel).toEqual(expectedDuel)
+    expect(duelPokemonState[0]).toMatchObject({ ownerId: 10, pokemonId: 25, name: 'Pikachu' })
+    expect(duelPokemonState[1]).toMatchObject({ ownerId: 11, pokemonId: 5, name: 'Snorlax' })
+  })
+
+  it('derives finished phase and stringified winner id from a finished snapshot', () => {
+    const snapshot: DuelSnapshot = {
+      duelId: 7,
+      turnNumber: 5,
+      winnerId: 11,
+      endReason: 'ko',
+      pokemonStates: [
+        { duelId: 7, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 0, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: true },
+        { duelId: 7, ownerId: 11, pokemonId: 5, type: 'normal', currentHp: 40, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+      ],
+    }
+    const { duel } = duelFromSnapshot(snapshot, [])
+    expect(duel.phase).toBe('finished')
+    expect(duel.winnerId).toBe('11')
+    expect(duel.endReason).toBe('ko')
+    expect(duel.slot).toBe('1v1')
+  })
+})
+
+describe('reduceMockState — duel snapshots resolve the bracket slot', () => {
+  it('derives the tournament slot from the bracket when duel:state resolves', () => {
+    let s = reduceMockState(createInitialState(), {
+      type: 'tournamentBracket',
+      bracket: { semiA: { duelId: '42', playerA: '10', playerB: '11' } },
+    })
+    s = reduceMockState(s, {
+      type: 'duelStateReceived',
+      duel: {
+        duelId: '42',
+        slot: '1v1',
+        phase: 'lead_selection',
+        turnNumber: 1,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [],
+    })
+    expect(s.duel?.slot).toBe('semiA')
+  })
+
+  it('keeps the 1v1 slot when no bracket owns the duel', () => {
+    const s = reduceMockState(createInitialState(), {
+      type: 'duelStateReceived',
+      duel: {
+        duelId: '42',
+        slot: '1v1',
+        phase: 'awaiting_actions',
+        turnNumber: 1,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [],
+    })
+    expect(s.duel?.slot).toBe('1v1')
   })
 })
 
 describe('reduceMockState — resetSession', () => {
-  it('clears the room, tournament, team and duel but keeps the nickname', () => {
-    let s = reduceMockState(createInitialState(), {
-      type: 'setNickname',
-      nickname: 'Ash',
-    })
+  it('clears the room, tournament, team, duel, pending duel and ranking but keeps the nickname', () => {
+    let s = makeDuelStateFixture()
     s = reduceMockState(s, {
-      type: 'roomShellReceived',
-      code: 'Z009',
-      maxPlayers: 4,
-      status: 'waiting',
+      type: 'tournamentBracket',
+      bracket: { semiA: { duelId: '42', playerA: '10', playerB: '11' } },
     })
+    s = reduceMockState(s, { type: 'pendingDuelSet', duelId: '42' })
     s = reduceMockState(s, {
-      type: 'updateTeamSelection',
-      selection: { starterId: 25, rosterIds: [5, 23, 14, 17, 33] },
+      type: 'roomFinalRanking',
+      ranking: [{ rank: 1, name: 'Ash', champion: true }],
     })
-    s = reduceMockState(s, { type: 'enterDuel', slot: 'semiA' })
 
     const after = reduceMockState(s, { type: 'resetSession' })
 
@@ -443,5 +688,7 @@ describe('reduceMockState — resetSession', () => {
     expect(after.teamSelection).toEqual({ starterId: null, rosterIds: [] })
     expect(after.duel).toBeNull()
     expect(after.duelPokemonState).toHaveLength(0)
+    expect(after.pendingDuelId).toBeNull()
+    expect(after.finalRanking).toBeNull()
   })
 })

@@ -1,4 +1,6 @@
 import type {
+  BracketPairing,
+  DuelPhase,
   DuelPokemonState,
   DuelSlot,
   DuelState,
@@ -10,12 +12,8 @@ import type {
   TournamentSlot,
   TournamentState,
 } from './schema'
-import { resolveTurn, type TurnResult } from '../engine/turnResolution'
-import { advanceQueue } from '../engine/tournamentQueue'
-import { slotLoserId } from '../lib/duelFlow'
-import { pokemonById, getCachedCatalog } from '../lib/catalog'
-import type { Pokemon } from '../lib/catalog'
-import type { MoveIndex } from '../engine/damage'
+import type { RankingEntry } from '../lib/ranking'
+import { pokemonById, type Pokemon } from '../lib/catalog'
 
 export const STORAGE_KEY = 'pokeduels:mockState'
 export const SCHEMA_VERSION = 1
@@ -38,6 +36,8 @@ export function createInitialState(): MockState {
     tournament: null,
     duelPokemonState: [],
     duel: null,
+    pendingDuelId: null,
+    finalRanking: null,
   }
 }
 
@@ -75,8 +75,128 @@ export function saveMockState(state: MockState, storage?: StorageLike): void {
 }
 
 // ---------------------------------------------------------------------------
+// WS snapshot mapping (#10 PR 1) — pure functions translating the backend's
+// camelCase duel snapshot (`mapDuelStateToCamelCase`) into client state. Kept
+// in store.ts (not the provider) so they are unit-testable; the provider feeds
+// them the live socket payloads.
+// ---------------------------------------------------------------------------
+
+/** One pokemon row of the backend's camelCase duel snapshot. */
+export interface DuelSnapshotPokemon {
+  duelId: number
+  ownerId: number
+  pokemonId: number
+  type: string
+  currentHp: number
+  ppMove1: number
+  ppMove2: number
+  ppMove3: number
+  isActive: boolean
+  fainted: boolean
+}
+
+/** The camelCase duel snapshot pushed by `duel:state` / `duel:turn_resolved`. */
+export interface DuelSnapshot {
+  duelId: number
+  turnNumber: number
+  winnerId: number | null
+  endReason: string | null
+  pokemonStates: DuelSnapshotPokemon[]
+}
+
+/**
+ * Maps one snapshot pokemon into client state, filling name/type/sprites from
+ * the catalog (the backend snapshot intentionally omits them — see
+ * mapDuelStateToCamelCase). Unknown ids keep a stub shape instead of crashing.
+ */
+export function toDuelPokemonState(raw: DuelSnapshotPokemon, catalog: Pokemon[]): DuelPokemonState {
+  const seed = pokemonById(catalog, raw.pokemonId)
+  return {
+    duelId: String(raw.duelId),
+    ownerId: raw.ownerId,
+    pokemonId: raw.pokemonId,
+    name: seed?.name ?? String(raw.pokemonId),
+    type: seed?.type ?? raw.type,
+    spriteUrl: seed?.sprite_url ?? '',
+    backSpriteUrl: seed?.back_sprite_url ?? '',
+    currentHp: raw.currentHp,
+    ppMove1: raw.ppMove1,
+    ppMove2: raw.ppMove2,
+    ppMove3: raw.ppMove3,
+    isActive: raw.isActive,
+    fainted: raw.fainted,
+  }
+}
+
+/**
+ * Which tournament slot a duel belongs to, answered by matching the duel id
+ * against the bracket projection (the mock-engine activeSlot pointer is gone).
+ * Falls back to '1v1' outside a bracket (or for an unknown duel id).
+ */
+export function deriveDuelSlot(duelId: string, tournament: TournamentState | null): DuelSlot {
+  if (!tournament) return '1v1'
+  const slots = Object.keys(tournament.bracket) as TournamentSlot[]
+  const slot = slots.find((s) => tournament.bracket[s]?.duelId === duelId)
+  return slot ?? '1v1'
+}
+
+/**
+ * Derives the client duel phase from a server snapshot. The backend does not
+ * push a coarse phase; it is inferred from the winner and the active/fainted
+ * flags (lead selection = no side fields a pokemon yet; awaiting_switch = one
+ * side lost its active but keeps bench).
+ */
+export function deriveDuelPhase(winnerId: string | null, pokemonStates: DuelPokemonState[]): DuelPhase {
+  if (winnerId != null) return 'finished'
+  const byOwner = new Map<number, DuelPokemonState[]>()
+  for (const p of pokemonStates) {
+    const group = byOwner.get(p.ownerId) ?? []
+    group.push(p)
+    byOwner.set(p.ownerId, group)
+  }
+  const sides = [...byOwner.values()]
+  if (sides.length < 2) return 'lead_selection'
+  if (!sides.some((roster) => roster.some((p) => p.isActive))) return 'lead_selection'
+  const needsSwitch = sides.some(
+    (roster) => !roster.some((p) => p.isActive) && roster.some((p) => !p.fainted),
+  )
+  return needsSwitch ? 'awaiting_switch' : 'awaiting_actions'
+}
+
+/**
+ * Full snapshot → client-state mapping: DuelState (phase derived, numeric ids
+ * stringified at this boundary to match the client identity contract) plus the
+ * enriched DuelPokemonState list. The slot starts as '1v1' and is corrected by
+ * the reducer against the current tournament projection (the provider must not
+ * read React state from socket listeners — the reducer owns fresh state).
+ */
+export function duelFromSnapshot(
+  snapshot: DuelSnapshot,
+  catalog: Pokemon[],
+): { duel: DuelState; duelPokemonState: DuelPokemonState[] } {
+  const duelPokemonState = snapshot.pokemonStates.map((p) => toDuelPokemonState(p, catalog))
+  const duelId = String(snapshot.duelId)
+  const winnerId = snapshot.winnerId != null ? String(snapshot.winnerId) : null
+  return {
+    duelPokemonState,
+    duel: {
+      duelId,
+      slot: '1v1',
+      phase: deriveDuelPhase(winnerId, duelPokemonState),
+      turnNumber: snapshot.turnNumber,
+      winnerId,
+      endReason: (snapshot.endReason ?? null) as DuelState['endReason'],
+      opponentDisconnected: false,
+      lastRejection: null,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Reducer — pure state transitions backing the MockStateActions exposed by the
 // provider. Kept here (instead of in the component) so it is unit-testable.
+// The local mock engine is gone: every duel/tournament transition originates
+// from a server WS push (or an optimistic local echo of one).
 // ---------------------------------------------------------------------------
 
 export type MockStateAction =
@@ -85,108 +205,17 @@ export type MockStateAction =
   | { type: 'roomShellReceived'; code: string; maxPlayers: 2 | 4; status: RoomStatus }
   | { type: 'roomStateReceived'; code: string; maxPlayers: 2 | 4; status: RoomStatus; players: RoomPlayer[] }
   | { type: 'updateTeamSelection'; selection: Partial<TeamSelectionState> }
-  | { type: 'enterDuel'; slot: DuelSlot }
-  | { type: 'applyPlayerAttack'; moveIndex: MoveIndex }
-  | { type: 'confirmSwap'; pokemonId: string }
-  | { type: 'surrender' }
-  | { type: 'advanceTournament' }
+  | { type: 'pendingDuelSet'; duelId: string }
+  | { type: 'pendingDuelClear' }
+  | { type: 'duelStateReceived'; duel: DuelState; duelPokemonState: DuelPokemonState[] }
+  | { type: 'duelTurnResolved'; duel: DuelState; duelPokemonState: DuelPokemonState[] }
+  | { type: 'duelFinished'; duelId: string; winnerId: string; endReason: DuelState['endReason'] }
+  | { type: 'duelLeadSelection'; ownerId: number; pokemonId: number }
+  | { type: 'duelActionRejected'; moveIndex: number; reason: string }
+  | { type: 'duelOpponentDisconnected' }
+  | { type: 'tournamentBracket'; bracket: Partial<Record<TournamentSlot, BracketPairing | null>> }
+  | { type: 'roomFinalRanking'; ranking: RankingEntry[] }
   | { type: 'resetSession' }
-
-const MOVE_PP = [4, 4, 4] as const
-
-function makeDuelPokemon(
-  duelId: string,
-  ownerId: string,
-  pokemonId: string,
-  seed: Pokemon | null,
-  isActive: boolean,
-  hp = 100,
-): DuelPokemonState {
-  return {
-    duelId,
-    ownerId,
-    pokemonId,
-    name: seed?.name ?? pokemonId,
-    type: seed?.type ?? 'normal',
-    spriteUrl: seed?.sprite_url ?? '',
-    backSpriteUrl: seed?.back_sprite_url ?? '',
-    currentHp: hp,
-    ppMove1: MOVE_PP[0],
-    ppMove2: MOVE_PP[1],
-    ppMove3: MOVE_PP[2],
-    isActive,
-    fainted: false,
-  }
-}
-
-// The rival's fixed team, keyed by the catalog's numeric backend ids (sourced
-// from a real GET /api/pokemons response during implementation — see
-// apply-decisions for the id→name mapping). Kept to catalog entries so the
-// duel resolves real sprites for both sides.
-const BOT_ROSTER = [6, 23, 14, 17, 33, 15]
-
-function makeDuel(duelId: string, slot: DuelSlot): DuelState {
-  return {
-    duelId,
-    slot,
-    phase: 'awaiting_actions',
-    turnNumber: 1,
-    winnerId: null,
-    endReason: null,
-  }
-}
-
-function makeTournament(): TournamentState {
-  return {
-    bracket: {},
-    queue: ['semiA', 'semiB'],
-    activeSlot: 'semiA',
-    results: {},
-  }
-}
-
-function enterDuel(state: MockState, slot: DuelSlot): MockState {
-  const { teamSelection, player } = state
-  const roster = teamSelection.starterId && teamSelection.rosterIds.length === 5
-  if (!roster || !state.room) return state
-
-  const duelId = `${slot}-${Date.now()}`
-  const humanIds = [teamSelection.starterId!, ...teamSelection.rosterIds]
-  const catalog = getCachedCatalog()
-  // Duel-level identity stays a string (DuelPokemonState.pokemonId: string is
-  // #10's contract) — numeric ids are stringified at this boundary.
-  const toDuelPokemon = (id: number, ownerId: string, isActive: boolean) =>
-    makeDuelPokemon(duelId, ownerId, String(id), pokemonById(catalog, id) ?? null, isActive)
-
-  const duelPokemonState: DuelPokemonState[] = [
-    ...humanIds.map((id, i) => toDuelPokemon(id, player.nickname, i === 0)),
-    ...BOT_ROSTER.map((id, i) => toDuelPokemon(id, 'bot', i === 0)),
-  ]
-
-  return {
-    ...state,
-    duelPokemonState,
-    duel: makeDuel(duelId, slot),
-  }
-}
-
-function mergeTurnResult(state: MockState, result: TurnResult): MockState {
-  return { ...state, duelPokemonState: result.duelPokemonState, duel: result.duel }
-}
-
-function recordResultAndAdvance(state: MockState): MockState {
-  const { tournament, duel } = state
-  if (!tournament || !duel || duel.phase !== 'finished' || !duel.winnerId) {
-    return state
-  }
-  const slot = duel.slot as TournamentSlot
-  const loser = slotLoserId(state)
-  if (!loser) return state
-
-  const results = { ...tournament.results, [slot]: { winner: duel.winnerId, loser } }
-  const next = advanceQueue({ ...tournament, results })
-  return { ...state, tournament: next }
-}
 
 export function reduceMockState(state: MockState, action: MockStateAction): MockState {
   switch (action.type) {
@@ -205,9 +234,10 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
 
     case 'roomShellReceived': {
       // REST create/join returns a room shell (code/maxPlayers/status) with an
-      // empty roster — the live roster arrives later via WS room:state. A
-      // 4-player shell seeds the tournament queue so the existing wait-room /
-      // duel/tournament mock flow keeps working (reducer surface untouched).
+      // empty roster — the live roster arrives later via WS room:state. The
+      // shell opens a NEW room, so all room-scoped state (tournament, duel,
+      // pending pointer, ranking) is reset; the bracket arrives from the
+      // server via tournament:bracket when it bootstraps.
       const room: RoomState = {
         code: action.code,
         maxPlayers: action.maxPlayers,
@@ -217,7 +247,11 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
       return {
         ...state,
         room,
-        tournament: action.maxPlayers === 4 ? makeTournament() : null,
+        tournament: null,
+        duel: null,
+        duelPokemonState: [],
+        pendingDuelId: null,
+        finalRanking: null,
       }
     }
 
@@ -237,29 +271,68 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
         teamSelection: { ...state.teamSelection, ...action.selection },
       }
 
-    case 'enterDuel':
-      return enterDuel(state, action.slot)
+    // duel:start { duelId } — the server announced a duel the player can join.
+    // The pointer is cleared once duel:state resolves into state.duel.
+    case 'pendingDuelSet':
+      return { ...state, pendingDuelId: action.duelId }
 
-    case 'applyPlayerAttack': {
+    case 'pendingDuelClear':
+      return { ...state, pendingDuelId: null }
+
+    // duel:state — full snapshot after duel:join (incl. mid-duel resync).
+    case 'duelStateReceived':
+      return {
+        ...state,
+        duel: {
+          ...action.duel,
+          slot: deriveDuelSlot(action.duel.duelId, state.tournament),
+        },
+        duelPokemonState: action.duelPokemonState,
+        pendingDuelId: null,
+      }
+
+    // duel:turn_resolved — server-authoritative round outcome. A fresh
+    // snapshot also clears the opponent-disconnect banner and the last
+    // rejection (the opponent is back and the round moved on).
+    case 'duelTurnResolved':
+      return {
+        ...state,
+        duel: {
+          ...action.duel,
+          slot: deriveDuelSlot(action.duel.duelId, state.tournament),
+        },
+        duelPokemonState: action.duelPokemonState,
+      }
+
+    // duel:finished { duelId, winnerId, endReason } — the server finalizes the
+    // duel; the client only marks the outcome (no local winner computation).
+    case 'duelFinished': {
       const duel = state.duel
-      if (!duel || duel.phase !== 'awaiting_actions') return state
-      return mergeTurnResult(state, resolveTurn(action.moveIndex, state))
+      if (!duel || duel.duelId !== action.duelId) return state
+      return {
+        ...state,
+        duel: {
+          ...duel,
+          phase: 'finished',
+          winnerId: action.winnerId,
+          endReason: action.endReason,
+          opponentDisconnected: false,
+          lastRejection: null,
+        },
+      }
     }
 
-    case 'confirmSwap': {
-      const { duel, duelPokemonState, player } = state
-      // Allowed from awaiting_actions (voluntary swap) and awaiting_switch
-      // (forced swap after KO); blocked once the duel is finished.
-      if (!duel || duel.phase === 'finished') return state
-      const target = duelPokemonState.find(
-        (p) => p.ownerId === player.nickname && p.pokemonId === action.pokemonId,
+    // Optimistic echo of the player's own duel:select_lead emit: activate the
+    // picked lead and leave lead_selection so the picker closes. The server
+    // re-validates the pick; the next snapshot owns the authoritative actives.
+    case 'duelLeadSelection': {
+      const { duel, duelPokemonState } = state
+      if (!duel || duel.phase !== 'lead_selection') return state
+      const updated = duelPokemonState.map((p) =>
+        p.ownerId === action.ownerId && p.pokemonId === action.pokemonId
+          ? { ...p, isActive: true }
+          : p,
       )
-      if (!target) return state
-      const updated = duelPokemonState.map((p) => {
-        if (p.ownerId !== player.nickname) return p
-        const isTarget = p.pokemonId === action.pokemonId
-        return { ...p, isActive: isTarget, fainted: isTarget ? false : p.fainted }
-      })
       return {
         ...state,
         duelPokemonState: updated,
@@ -267,26 +340,43 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
       }
     }
 
-    case 'surrender': {
-      const { duel, duelPokemonState, player } = state
-      if (!duel || duel.phase === 'finished') return state
-      const opponent = duelPokemonState.find((p) => p.ownerId !== player.nickname)
+    // duel:action_rejected — surface the rejection WITHOUT advancing the turn
+    // or resetting the timer (insufficient_pp must not consume the round).
+    case 'duelActionRejected': {
+      const duel = state.duel
+      if (!duel) return state
       return {
         ...state,
-        duel: {
-          ...duel,
-          phase: 'finished',
-          winnerId: opponent?.ownerId ?? 'bot',
-          endReason: 'surrender',
-        },
+        duel: { ...duel, lastRejection: { moveIndex: action.moveIndex, reason: action.reason } },
       }
     }
 
-    case 'advanceTournament':
-      return recordResultAndAdvance(state)
+    // duel:opponent_disconnected — non-blocking notice; cleared by the next
+    // snapshot (duelTurnResolved / duelFinished carry fresh duel state).
+    case 'duelOpponentDisconnected': {
+      const duel = state.duel
+      if (!duel) return state
+      return { ...state, duel: { ...duel, opponentDisconnected: true } }
+    }
 
-    // "Play again": wipe the whole session (room, team, tournament, duel) but
-    // keep the player's nickname (design: PlayAgainButton on the ranking screen).
+    // tournament:bracket — merge the broadcast's slots into the local bracket
+    // projection (semis arrive first, then final + third place).
+    case 'tournamentBracket': {
+      const current = state.tournament?.bracket ?? {}
+      return {
+        ...state,
+        tournament: { bracket: { ...current, ...action.bracket } },
+      }
+    }
+
+    // room:final_ranking — the authoritative podium; replaces any provisional
+    // ranking the client may have shown.
+    case 'roomFinalRanking':
+      return { ...state, finalRanking: action.ranking }
+
+    // "Play again": wipe the whole session (room, team, tournament, duel,
+    // pending duel, ranking) but keep the player's nickname (design:
+    // PlayAgainButton on the ranking screen).
     case 'resetSession':
       return { ...createInitialState(), player: state.player }
 
