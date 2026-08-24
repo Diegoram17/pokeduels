@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  frontend:
+    name: Frontend (build, test, lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run lint
+
+  backend:
+    name: Backend (test, lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+
+      # 162 of the backend's tests are DB-gated (skipped without DATABASE_URL).
+      # An ephemeral Neon branch gives this run a real, isolated Postgres so
+      # the full suite runs in CI instead of just the 266 non-gated tests.
+      # Requires NEON_PROJECT_ID + NEON_API_KEY as repo secrets — set once
+      # during EXECUTE, when the Neon project (already used as production) is
+      # connected to this repo. Until then this job fails at this step, which
+      # is expected and does not block anything else in the workflow.
+      - name: Create ephemeral Neon branch for this run
+        id: neon_branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: ci-${{ github.run_id }}
+
+      - name: Run migrations against the ephemeral branch
+        env:
+          DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
+        run: node ./node_modules/node-pg-migrate/bin/node-pg-migrate.js up
+
+      - name: Seed catalog data
+        env:
+          DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
+        run: node seed/index.js
+
+      - name: Run backend test suite (DB-gated tests included)
+        env:
+          DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
+        run: npm test
+
+      - name: Delete ephemeral Neon branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ci-${{ github.run_id }}

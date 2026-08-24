@@ -1,0 +1,211 @@
+# Deploy Plan — Pokeduels
+
+Fecha: 2026-08-24
+Estado: GENERADO
+
+## Resumen del proyecto
+
+Monorepo con `/frontend` (React 19 + Vite + Tailwind v4 + React Router + TS) y `/backend` (Node
+ESM + Express 5 + Socket.IO 4 + `pg` + `node-pg-migrate`), ambos reales y con test suites verdes.
+A diferencia de la versión anterior de este plan (2026-08-22, escrita cuando `/backend` no existía
+todavía), hoy el backend está completo: REST + WebSocket + motor de duelo server-side + torneo de
+bracket + resiliencia operativa (`/health` + reconciliación de arranque). Sigue sin existir remoto
+de GitHub, CI/CD, Dockerfile, `vercel.json`/`render.yaml`, ni conexión real a Vercel/Render.
+
+**Cambio de estado desde la versión anterior de este plan (2026-08-24):**
+
+- `master` estaba 80 commits atrás de todo el trabajo de backend — se consolidó hoy (ver Registro
+  de ejecución). `master` ahora tiene los 9 ítems del backlog completos, incluido `/health`, que
+  vivía en una rama (`operational-resilience`) nunca mergeada.
+- El backend aceptaba requests de cualquier origen (`cors()` sin restricción) y no soportaba
+  `CORS_ORIGIN`. Se agregó soporte real (TDD) — ver Config & Secrets.
+- El proyecto Neon ya sembrado con datos reales (ítem #1 del backlog) fue confirmado por el usuario
+  como la base de **producción** — no se crea una Neon separada.
+
+## Sistema de deployment propuesto
+
+### Build
+
+- **Frontend:** `tsc -b && vite build` → `frontend/dist/`. Sin cambios respecto al plan anterior,
+  ahora confirmado real (`frontend/package.json`).
+- **Backend:** sin build step — ESM plano (`"type": "module"`), se corre directo con
+  `node server.js`. No hay nada que compilar.
+- **Migraciones:** `node-pg-migrate`, 3 archivos en `backend/migrations/`, scripts `migrate:up`/
+  `migrate:down` ya probados (incluye el fix `f4437be` — revierte la cadena completa en
+  `migrate:down`).
+- `poke-duel-engine/` (paquete legacy roto) sigue en el repo pero confirmado sin uso real en
+  ningún lado — no participa del build. Limpieza pendiente, no bloquea deploy.
+
+### Artifact
+
+- **Frontend:** bundle estático (`dist/`), versionado por Vercel al commit SHA de cada deploy.
+- **Backend:** Render construye directo del commit de `master` (buildpack Node nativo, sin
+  Docker — mismo criterio del plan anterior: un solo dev, tier gratuito, sin necesidad de paridad
+  de entorno entre plataformas).
+- **DB:** las migraciones SQL versionadas en el repo son el artifact de schema — ya reales, no
+  especulativas.
+
+### Config & Secrets
+
+- **Frontend (Vercel env vars):** `VITE_API_URL`, `VITE_WS_URL` — confirmados exactos en
+  `frontend/src/lib/api.ts:14` y `frontend/src/lib/socket.ts:8`.
+- **Backend (Render env vars):**
+  - `DATABASE_URL` (secreto) — connection string de la Neon **ya existente**, confirmada como la
+    de producción.
+  - `PORT` — inyectada por Render automáticamente (`backend/server.js:8` ya la lee con fallback
+    `?? 3000`).
+  - `CORS_ORIGIN` — **implementado hoy** (`backend/app.js`, `backend/server.js`, TDD, 3 tests
+    nuevos en `backend/test/cors.test.js`). Sin configurar, el backend sigue permisivo (`*`) para
+    no romper dev/tests; en Render se setea a la URL de Vercel una vez que exista.
+  - `NODE_ENV` — **no se lee en ningún lado del código actual**. No se configura por convención
+    sin uso real; si en el futuro se agrega lógica que dependa de él, se documenta en ese momento.
+- `.env.example` de backend actualizado con `CORS_ORIGIN` documentado. Ningún secreto en el repo.
+
+### Infraestructura
+
+- **Vercel** para `/frontend`.
+- **Render**, Web Service único, instancia gratuita, para `/backend` — instancia única, sin HA,
+  riesgo ya aceptado en ADR-0001.
+- **Neon existente** (ya seedeada) como base de **producción** — decisión explícita del usuario
+  (2026-08-24), no una Neon nueva separada.
+  - **Riesgo a documentar:** al no haber separación dev/prod, cualquier prueba futura contra esa
+    misma base afecta datos "de producción" directamente. Aceptado explícitamente, mismo patrón
+    que el riesgo ya aceptado del token de sesión sin expiración (`SECURITY-REPORT.md`).
+- **PokeAPI**, sin cambios — consumido directo desde el frontend, sin infraestructura propia.
+- **Cron externo gratuito** (cron-job.org o UptimeRobot) contra `GET /health` — ahora sí es
+  ejecutable: `/health` existe de verdad en `master` (antes no, ver Registro de ejecución).
+
+### Entornos
+
+- **Frontend:** Preview deployments automáticos de Vercel por cada push/PR, Production en `main`.
+- **Backend:** un único entorno production (Render free tier no da preview sin costo); cambios se
+  prueban localmente antes de mergear.
+- **DB:** Neon ofrece branching gratuito, pero no se usa por ahora — la base actual ES la de
+  producción, no hay un flujo dev/prod separado que branchear.
+
+### Estrategia de release
+
+- **Frontend:** deploy atómico nativo de Vercel, rollback a cualquier deploy anterior.
+- **Backend: release directo** (Render reemplaza la instancia en cada deploy). Reafirmado por
+  ADR-0001 (instancia única, sin HA) + ADR-0005 (estado de duelo en memoria) + ADR-0008
+  (reconciliación de arranque, **ya real y confirmada en `master`**): todo redeploy tiene el mismo
+  efecto que un crash, y el mecanismo de reconciliación ya probado deja duelos/rooms huérfanos en
+  `aborted`/`finished(server_restart)` al reiniciar.
+
+### Data & Migrations
+
+- Ya reales, no especulativas: `node-pg-migrate`, 3 migraciones (`0001_initial-schema`,
+  `0002_add-back-sprite`, `0003_add-walkover-end-reason`), corridas y probadas con tests.
+- Rollback de código ≠ rollback de datos — cada migración necesita su `down`; migrar antes de
+  deployar el código que la requiere, nunca al revés.
+
+### Deploy gates
+
+- **Frontend:** `tsc -b` (vía `npm run build`) + `vitest run` (198/198) + `oxlint` — corren en
+  `.github/workflows/ci.yml` (generado hoy) en cada PR y push a `master`.
+- **Backend:** `oxlint` (agregado hoy, `npm run lint`, 0 errores) + `vitest run`. **Decidido:** el
+  CI le da al job de backend una Neon branch efímera real (`neondatabase/create-branch-action`),
+  corre migraciones + seed contra ella, y ejecuta la suite completa (266 no-gated + 162 DB-gated)
+  — no solo el subconjunto no-gated. La branch se borra al final del job (`if: always()`).
+  Requiere `NEON_PROJECT_ID` y `NEON_API_KEY` como secrets del repo — se configuran en EXECUTE,
+  cuando el proyecto Neon (ya usado como producción) se conecte al repo. Hasta entonces este paso
+  del workflow falla al ejecutarse — esperado, no bloquea nada más.
+
+### Verify & Observe
+
+- **Backend:** `GET /health` — confirmado real en `master` hoy, responde 200 sin tocar la DB
+  (antes de la consolidación de ramas de hoy, no existía en la rama activa). Post-deploy: pegarle
+  y confirmar 200 — mismo endpoint que usa el cron de cold-start.
+- **Frontend:** Vercel sirve el bundle, navegar rutas (`/`, `/lobby`, etc.) sin errores de consola.
+- **DB:** verificar conexión del backend a Neon post-deploy (falla rápido si `DATABASE_URL` está
+  mal configurada).
+- **Observabilidad:** sin herramienta dedicada (RNF-4, un solo dev, tier gratuito) — logs nativos
+  de Render/Vercel alcanzan para v1.
+
+### Recovery
+
+- **Frontend:** rollback nativo de Vercel a cualquier deploy previo.
+- **Backend:** redeploy del commit anterior en Render.
+- **Datos:** la reconciliación de arranque (ADR-0008, ya confirmada real en código) actúa como
+  recovery automático ante cualquier reinicio/crash, incluido uno causado por un deploy fallido.
+  Para revertir un schema, correr el `down` de la migración antes de revertir el código.
+- **Incidente en Neon:** point-in-time restore / branching nativo del servicio.
+
+## Autorizaciones pendientes
+
+Ya hechos hoy (local, reversible, sin tocar ningún remoto ni cuenta externa):
+
+1. ~~Consolidar el trabajo disperso en ramas hacia `master`~~ — **✅ HECHO** (fast-forward,
+   `de8e417..58723b1`, ver Registro de ejecución).
+2. ~~Fix `CORS_ORIGIN`~~ — **✅ HECHO** (TDD, commit `d7f6226`).
+3. ~~Agregar lint al backend (`oxlint`)~~ — **✅ HECHO** (commit `b13de76`).
+4. ~~Generar el workflow de CI~~ — **✅ HECHO** (`.github/workflows/ci.yml`, sin commitear
+   todavía — ver nota abajo).
+
+Quedan para EXECUTE — ninguna se ejecuta sin autorización explícita paso a paso, y a partir de acá
+las va a correr **otra sesión/agente**, no esta:
+
+5. Commitear `.github/workflows/ci.yml` (generado, no commiteado en esta sesión).
+6. Crear el repositorio remoto en GitHub y pushear `master` — paso obligatorio, hoy no hay
+   remoto. Todas las cuentas (GitHub, Vercel, Render, cron) hay que crearlas desde cero.
+7. Conectar el repo a Vercel y disparar el primer deploy del frontend. Configurar `VITE_API_URL`
+   y `VITE_WS_URL` como env vars de Vercel (todavía apuntando a nada real hasta el paso 9).
+8. Activar el workflow de CI — requiere los secrets `NEON_PROJECT_ID` y `NEON_API_KEY` del
+   proyecto Neon ya existente (confirmado como producción) para que el job de backend corra.
+9. Crear el servicio en Render, conectar el repo, configurar env vars (`DATABASE_URL` de la Neon
+   existente, `CORS_ORIGIN` = URL de Vercel del paso 7, `PORT` la inyecta Render).
+10. Volver a Vercel y actualizar `VITE_API_URL`/`VITE_WS_URL` con la URL real de Render (dependencia
+    circular normal: Vercel y Render necesitan la URL del otro).
+11. Configurar el cron externo de health-check (cron-job.org/UptimeRobot) contra `/health`.
+
+**Nota para quien ejecute esto:** el ítem #10 del backlog de producto (integración real de
+duelo/torneo en el frontend — `WaitRoomScreen`/`DuelBoardScreen`/`SwapScreen`/`RankingScreen`)
+sigue **pendiente**, sin relación con este plan de deploy. Quedó pausado en la fase `explore` del
+ciclo SDD (`sdd/frontend-duel-tournament-integration/explore` en Engram, next recomendado:
+`sdd-propose`). No es un prerequisito de deploy, pero el proyecto no está funcionalmente completo
+hasta que se implemente.
+
+## Registro de ejecución y verificación
+
+### 2026-08-24 — Consolidación de ramas
+
+- **Ejecutado:** `git checkout master && git merge --ff-only operational-resilience`.
+- **Por qué era seguro:** `operational-resilience` había branchado exactamente desde la punta de
+  `tournament-bracket-ranking/pr3-bracket` (que ya contenía los ítems #1-#7 y #9) y solo agregó 4
+  commits propios — cero archivos tocados en ambos lados a la vez, fast-forward puro, conflicto
+  imposible. Confirmado antes de ejecutar (`git merge-base`, diff de archivos por rama).
+- **Resultado:** fast-forward limpio `de8e417..58723b1`, 148 archivos, sin conflictos.
+- **Verificación:** backend 263/263 pass / 0 fail / 162 skip (DB-gated); frontend 198/198 pass.
+- **Incidente:** el disco C: se llenó a 0 bytes libres durante la verificación posterior (ENOSPC en
+  `npm`, y luego `git status` fallando al escribir `.git/index.lock`). El commit de merge ya
+  estaba escrito en disco antes del fallo — sin pérdida de datos. El usuario liberó espacio
+  (614 MB libres al retomar) y se confirmó la integridad del repo antes de seguir.
+
+### 2026-08-24 — Fix `CORS_ORIGIN` (TDD)
+
+- Test rojo (`backend/test/cors.test.js`, 2/3 fallando) → implementación en `backend/app.js`
+  (`cors({ origin: process.env.CORS_ORIGIN || '*' })`) y `backend/server.js`
+  (`createSocketServer(httpServer, { corsOrigin: process.env.CORS_ORIGIN })` — el parámetro ya
+  existía en `backend/ws/index.js`, solo faltaba conectarlo) → verde.
+- Un test tuvo que corregirse en el camino: `cors` con un string estático siempre refleja ese
+  valor tal cual (no compara contra el `Origin` real del request) — la validación real la hace el
+  browser, no el server. El test se ajustó para probar lo correcto: que el header nunca vuelve a
+  ser `*` una vez configurado `CORS_ORIGIN`.
+- `backend/.env.example` actualizado documentando la variable.
+- Suite completa: 266/266 pass, 0 fail, 162 skip (mismo baseline DB-gated de antes).
+- Commit `d7f6226`.
+
+### 2026-08-24 — Lint de backend + CI (GENERATE)
+
+- `oxlint` agregado a `backend/` (mismo criterio que el frontend, plugin `oxc` únicamente — sin
+  `react`/`typescript`, el backend es JS ESM plano). `npm run lint` corre limpio hoy (solo
+  warnings preexistentes de variables sin usar en tests, ningún error). Commit `b13de76`.
+- Generado `.github/workflows/ci.yml`: job `frontend` (build + test + lint) y job `backend`
+  (lint + Neon branch efímera vía `neondatabase/create-branch-action@v6` + migraciones + seed +
+  suite completa + borrado de la branch al final). Nombres/inputs de las actions de Neon
+  verificados contra su documentación (no asumidos). Sin commitear todavía — queda como parte de
+  EXECUTE, junto con la configuración de los secrets `NEON_PROJECT_ID`/`NEON_API_KEY` que el
+  workflow necesita para poder correr de verdad.
+- **A partir de acá, esta sesión no ejecuta nada más** — el resto de "Autorizaciones pendientes"
+  (crear remoto, conectar Vercel/Render, activar CI, cron) lo ejecuta otra sesión/agente, paso a
+  paso, con autorización explícita en cada uno.
