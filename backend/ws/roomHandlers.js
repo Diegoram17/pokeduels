@@ -1,7 +1,7 @@
 import {
   joinOrResumeRoom,
   setPlayerReady,
-  leaveRoom,
+  leaveOrCloseRoom,
   markPlayerConnected,
   markPlayerDisconnected,
 } from '../db/rooms.js';
@@ -12,6 +12,24 @@ import { bootstrapDuelIfReady } from '../ws/duelBootstrap.js';
 import { createDuelLifecycle } from '../ws/duelLifecycle.js';
 
 const MAX_NICKNAME_LENGTH = 30;
+
+/**
+ * Runs the room-leave/abandonment close-and-rank path (item #7, PR 2). Calls
+ * leaveOrCloseRoom under its FOR UPDATE lock; when the room was closed-and-
+ * ranked (closed:true) it broadcasts the room:final_ranking payload to the
+ * whole room channel exactly once. For waiting/already-closed rooms it is a
+ * pure pass-through (leaveOrCloseRoom delegates to the existing leaveRoom or
+ * no-ops), so the pre-tournament and double-leave behaviors are unchanged.
+ */
+async function handleLeaveOrClose(io, roomId, playerId) {
+  const result = await leaveOrCloseRoom(roomId, playerId);
+  if (result.closed) {
+    io.to(`room:${roomId}`).emit('room:final_ranking', {
+      roomId: result.roomId,
+      ranking: result.ranking,
+    });
+  }
+}
 
 /**
  * Registers the lobby event handlers for one connected socket. Every handler
@@ -67,7 +85,7 @@ export function registerRoomHandlers(io, socket, reconnectTimers, turnTimers) {
       if (!roomId) return;
       const playerId = socket.data.player.id;
       reconnectTimers.cancel(roomId, playerId);
-      await leaveRoom(roomId, playerId);
+      await handleLeaveOrClose(io, roomId, playerId);
       socket.data.roomId = undefined;
       await broadcastRoomState(io, roomId);
       socket.leave(`room:${roomId}`);
@@ -98,7 +116,7 @@ export function registerRoomHandlers(io, socket, reconnectTimers, turnTimers) {
       if (!roomId) return;
       await markPlayerDisconnected(roomId, playerId);
       reconnectTimers.start(roomId, playerId, async () => {
-        await leaveRoom(roomId, playerId);
+        await handleLeaveOrClose(io, roomId, playerId);
         await broadcastRoomState(io, roomId);
       });
     }),

@@ -198,4 +198,36 @@ describe.skipIf(!hasDatabase)('room lobby over WS (requires DATABASE_URL)', () =
     const seat = await getRoomPlayerSeat(room.id, creator.id);
     expect(seat.ready).toBe(true);
   });
+
+  it('closes a 1v1 room with finished duels on room:leave and emits room:final_ranking', async () => {
+    const harness = await startHarness();
+    const creator = await createPlayer('WsRank1Creator');
+    const joiner = await createPlayer('WsRank1Joiner');
+    const room = await createRoomWithCreator(2, creator.id);
+    roomIds.push(room.id);
+    const { client: creatorClient } = await joinRoomViaWs(harness, creator, room.code);
+    const staleP = waitForEvent(creatorClient, 'room:state');
+    const { client: joinerClient } = await joinRoomViaWs(harness, joiner, room.code);
+    await staleP;
+
+    // Mark the room in_progress and give it a finished duel (creator won).
+    await pool.query("UPDATE rooms SET status = 'in_progress' WHERE id = $1", [room.id]);
+    await pool.query(
+      `INSERT INTO duels (room_id, player1_id, player2_id, round, status, winner_id, end_reason)
+       VALUES ($1, $2, $3, 'unica', 'finished', $2, 'ko')`,
+      [room.id, creator.id, joiner.id],
+    );
+
+    const rankingP = waitForEvent(joinerClient, 'room:final_ranking');
+    joinerClient.emit('room:leave');
+    const ranking = await rankingP;
+
+    expect(ranking.roomId).toBe(room.id);
+    const rank = (id) => ranking.ranking.find((r) => r.playerId === id);
+    expect(rank(creator.id)).toMatchObject({ playerId: creator.id, finalRank: 1 });
+    expect(rank(joiner.id)).toMatchObject({ playerId: joiner.id, finalRank: 2 });
+
+    const { rows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
+    expect(rows[0].status).toBe('finished');
+  });
 });

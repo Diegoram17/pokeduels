@@ -4,7 +4,7 @@ import { HttpError } from '../lib/httpError.js';
 import {
   joinOrResumeRoom,
   setPlayerReady,
-  leaveRoom,
+  leaveOrCloseRoom,
   markPlayerConnected,
   markPlayerDisconnected,
 } from '../db/rooms.js';
@@ -20,7 +20,7 @@ import { registerRoomHandlers } from '../ws/roomHandlers.js';
 vi.mock('../db/rooms.js', () => ({
   joinOrResumeRoom: vi.fn(),
   setPlayerReady: vi.fn(),
-  leaveRoom: vi.fn(),
+  leaveOrCloseRoom: vi.fn(),
   markPlayerConnected: vi.fn(),
   markPlayerDisconnected: vi.fn(),
 }));
@@ -64,7 +64,7 @@ describe('registerRoomHandlers', () => {
 
     joinOrResumeRoom.mockResolvedValue(room);
     setPlayerReady.mockResolvedValue({ id: 1, ready: true });
-    leaveRoom.mockResolvedValue(undefined);
+    leaveOrCloseRoom.mockResolvedValue({ closed: false });
     markPlayerConnected.mockResolvedValue(undefined);
     markPlayerDisconnected.mockResolvedValue(undefined);
     broadcastRoomState.mockResolvedValue(undefined);
@@ -138,20 +138,46 @@ describe('registerRoomHandlers', () => {
   });
 
   describe('room:leave', () => {
-    it('cancels any pending timer, removes the seat, clears roomId, and broadcasts', async () => {
+    it('cancels any pending timer, runs close-and-rank, clears roomId, and broadcasts', async () => {
       socket.data.roomId = 7;
       socket.emit('room:leave');
-      await vi.waitFor(() => expect(leaveRoom).toHaveBeenCalled());
+      await vi.waitFor(() => expect(broadcastRoomState).toHaveBeenCalled());
 
       expect(reconnectTimers.cancel).toHaveBeenCalledWith(7, 5);
-      expect(leaveRoom).toHaveBeenCalledWith(7, 5);
+      expect(leaveOrCloseRoom).toHaveBeenCalledWith(7, 5);
       expect(socket.data.roomId).toBeUndefined();
       expect(broadcastRoomState).toHaveBeenCalledWith(io, 7);
+    });
+
+    it('emits room:final_ranking once when close-and-rank actually closes the room', async () => {
+      socket.data.roomId = 7;
+      const emit = vi.fn();
+      io.to.mockReturnValue({ emit });
+      leaveOrCloseRoom.mockResolvedValueOnce({
+        closed: true,
+        roomId: 7,
+        ranking: [
+          { playerId: 5, nickname: 'AshDb', finalRank: 1 },
+          { playerId: 9, nickname: 'Other', finalRank: 2 },
+        ],
+      });
+
+      socket.emit('room:leave');
+      await vi.waitFor(() => expect(emit).toHaveBeenCalled());
+
+      expect(io.to).toHaveBeenCalledWith('room:7');
+      expect(emit).toHaveBeenCalledWith('room:final_ranking', {
+        roomId: 7,
+        ranking: [
+          { playerId: 5, nickname: 'AshDb', finalRank: 1 },
+          { playerId: 9, nickname: 'Other', finalRank: 2 },
+        ],
+      });
     });
   });
 
   describe('native disconnect', () => {
-    it('marks the player disconnected and arms the grace timer that removes the seat on expiry', async () => {
+    it('marks the player disconnected and arms the grace timer that closes the room on expiry', async () => {
       socket.data.roomId = 7;
       socket.emit('disconnect');
       await vi.waitFor(() => expect(reconnectTimers.start).toHaveBeenCalled());
@@ -161,7 +187,7 @@ describe('registerRoomHandlers', () => {
 
       const onExpire = reconnectTimers.start.mock.calls[0][2];
       await onExpire();
-      expect(leaveRoom).toHaveBeenCalledWith(7, 5);
+      expect(leaveOrCloseRoom).toHaveBeenCalledWith(7, 5);
       expect(broadcastRoomState).toHaveBeenCalledWith(io, 7);
     });
 

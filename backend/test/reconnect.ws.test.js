@@ -158,4 +158,39 @@ describe.skipIf(!hasDatabase)('reconnect over WS (requires DATABASE_URL)', () =>
     expect(rows[0].n).toBe(1);
     reconnected.close();
   });
+
+  it('closes a 1v1 room with finished duels and emits room:final_ranking when the lobby grace elapses', async () => {
+    const harness = await startHarness();
+    const creator = await createPlayer('WsGraceRankCreator');
+    const joiner = await createPlayer('WsGraceRankJoiner');
+    const room = await createRoomWithCreator(2, creator.id);
+    roomIds.push(room.id);
+    const { client: creatorClient } = await joinRoomViaWs(harness, creator, room.code);
+    const staleP = waitForEvent(creatorClient, 'room:state');
+    const { client: joinerClient } = await joinRoomViaWs(harness, joiner, room.code);
+    await staleP;
+
+    // A 1v1 room with one finished duel (creator won) and the joiner absent.
+    await pool.query("UPDATE rooms SET status = 'in_progress' WHERE id = $1", [room.id]);
+    await pool.query(
+      `INSERT INTO duels (room_id, player1_id, player2_id, round, status, winner_id, end_reason)
+       VALUES ($1, $2, $3, 'unica', 'finished', $2, 'ko')`,
+      [room.id, creator.id, joiner.id],
+    );
+
+    // Disconnect the joiner; the lobby grace fires and the remaining creator
+    // receives the close-and-rank event.
+    const rankingP = waitForEvent(creatorClient, 'room:final_ranking');
+    joinerClient.disconnect();
+    const ranking = await rankingP;
+
+    expect(ranking.roomId).toBe(room.id);
+    const rank = (id) => ranking.ranking.find((r) => r.playerId === id);
+    expect(rank(creator.id).finalRank).toBe(1);
+    expect(rank(joiner.id).finalRank).toBe(2);
+
+    const { rows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
+    expect(rows[0].status).toBe('finished');
+    joinerClient.close();
+  });
 });
