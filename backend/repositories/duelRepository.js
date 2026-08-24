@@ -253,9 +253,18 @@ export async function createDuelFromRoom(roomId, player1Id, player2Id, round = '
     // commits, then its existing-duel check below sees the committed row.
     await client.query('SELECT id FROM rooms WHERE id = $1 FOR UPDATE', [roomId]);
 
+    // Existing-duel check scoped by room + round + player pair + ACTIVE status
+    // (item #7, PR 1 rematch): a repeat call for the same pair/round returns
+    // the in-flight duel (idempotency), but a FINISHED duel no longer matches,
+    // so a rematch creates a second duel row in the same room. Scoping by the
+    // exact player pair (order-agnostic) also lets two different pairs share a
+    // room+round — the 4-player bracket's two semifinals — without colliding.
     const { rows: existing } = await client.query(
-      'SELECT id, status FROM duels WHERE room_id = $1',
-      [roomId],
+      `SELECT id, status FROM duels
+       WHERE room_id = $1 AND round = $4 AND status IN ('pending','in_progress')
+         AND ((player1_id = $2 AND player2_id = $3)
+           OR (player1_id = $3 AND player2_id = $2))`,
+      [roomId, player1Id, player2Id, round],
     );
     if (existing[0]) {
       await client.query('COMMIT');

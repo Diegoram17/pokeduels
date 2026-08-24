@@ -583,6 +583,102 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
     expect(rows[0].n).toBe(1);
   });
 
+  // ---------- createDuelFromRoom pair+round scoping (item #7, PR 1 rematch) ----------
+
+  /**
+   * Creates a bare room with `nPlayers` players and NO team_selections — the
+   * minimal input to prove createDuelFromRoom's duel-row scoping (the
+   * duel_pokemon_state seed is an empty INSERT SELECT when no teams exist,
+   * which is irrelevant to the duel-row-count assertions here).
+   */
+  async function createBareRoom(maxPlayers, nPlayers) {
+    const players = [];
+    for (let i = 0; i < nPlayers; i += 1) {
+      const { rows } = await pool.query(
+        `INSERT INTO players (nickname) VALUES ('ScopingP${Date.now()}_${i}') RETURNING id`,
+      );
+      players.push(rows[0].id);
+    }
+    const code = `S${Math.random().toString(36).slice(2, 8)}`;
+    const { rows } = await pool.query(
+      `INSERT INTO rooms (code, max_players, status) VALUES ($1, $2, 'waiting') RETURNING id`,
+      [code, maxPlayers],
+    );
+    const roomId = rows[0].id;
+    createdRoomIds.push(roomId);
+    return { roomId, players };
+  }
+
+  it('createDuelFromRoom creates a SECOND duel in the same room once the first is finished (rematch)', async () => {
+    const { roomId, player1Id, player2Id } = await createRoomWithTeams();
+
+    const first = await createDuelFromRoom(roomId, player1Id, player2Id);
+    createdDuelIds.push(first.id);
+    // The first duel resolves (finished). A finished duel must NOT block a
+    // second duel for the same pair — that is the rematch enabler (PR 1).
+    await pool.query(
+      "UPDATE duels SET status = 'finished', winner_id = $2, end_reason = 'ko' WHERE id = $1",
+      [first.id, player2Id],
+    );
+
+    const second = await createDuelFromRoom(roomId, player1Id, player2Id);
+    createdDuelIds.push(second.id);
+
+    expect(second.id).not.toBe(first.id);
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM duels WHERE room_id = $1',
+      [roomId],
+    );
+    expect(rows[0].n).toBe(2);
+
+    // The second duel is a fresh pending duel with its own seeded state.
+    const state = await getDuelState(second.id);
+    expect(state.duel.status).toBe('pending');
+    expect(state.pokemonStates).toHaveLength(12);
+    expect(state.pokemonStates.every((p) => p.current_hp === 100 && !p.fainted)).toBe(true);
+  });
+
+  it('createDuelFromRoom scopes by round + player pair: a different pair in the same room gets its own duel', async () => {
+    const { roomId, players } = await createBareRoom(4, 4);
+    const [p1, p2, p3, p4] = players;
+
+    const semiA = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+    createdDuelIds.push(semiA.id);
+    // Same room + same round but a DIFFERENT pair must create semiB, not return
+    // semiA (the naive (room_id, round) filter would collide).
+    const semiB = await createDuelFromRoom(roomId, p3, p4, 'semifinal');
+    createdDuelIds.push(semiB.id);
+
+    expect(semiB.id).not.toBe(semiA.id);
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM duels WHERE room_id = $1 AND round = \'semifinal\'',
+      [roomId],
+    );
+    expect(rows[0].n).toBe(2);
+  });
+
+  it('createDuelFromRoom returns the existing ACTIVE duel for the same pair in a different round only when the round matches', async () => {
+    const { roomId, players } = await createBareRoom(4, 4);
+    const [p1, p2] = players;
+
+    const semi = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+    createdDuelIds.push(semi.id);
+    // The same pair requesting the SAME round returns the existing active duel.
+    const semiAgain = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+    expect(semiAgain.id).toBe(semi.id);
+
+    // But a FINAL (different round) for the same pair creates a new duel.
+    const final = await createDuelFromRoom(roomId, p1, p2, 'final');
+    createdDuelIds.push(final.id);
+    expect(final.id).not.toBe(semi.id);
+
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM duels WHERE room_id = $1',
+      [roomId],
+    );
+    expect(rows[0].n).toBe(2);
+  });
+
   // ---------- activateLead (first-activation persistence) ----------
 
   it('activateLead activates an owned, alive pokemon as the first active', async () => {
