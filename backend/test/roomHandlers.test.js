@@ -123,6 +123,27 @@ describe('registerRoomHandlers', () => {
       expect(joinOrResumeRoom).toHaveBeenCalledWith('ABC123', 5, 'AshDb');
     });
 
+    it('emits room:aborted instead of room:state when the joined room is aborted (post-reconciliation)', async () => {
+      // Boot reconciliation (ADR-0008) aborts the room; a seated player
+      // reconnecting must be told the room is dead — not get a room:state.
+      joinOrResumeRoom.mockResolvedValueOnce({ ...room, status: 'aborted' });
+      const emit = vi.fn();
+      io.to.mockReturnValue({ emit });
+
+      socket.emit('room:join', { code: 'ABC123', nickname: 'Ash' });
+      await vi.waitFor(() => expect(emit).toHaveBeenCalled());
+
+      // socket.join must still run FIRST so the channel broadcast reaches the
+      // reconnecting socket (design ordering constraint).
+      expect(socket.join).toHaveBeenCalledWith('room:7');
+      expect(io.to).toHaveBeenCalledWith('room:7');
+      expect(emit).toHaveBeenCalledWith('room:aborted', {
+        roomId: 7,
+        reason: 'server_restart',
+      });
+      expect(broadcastRoomState).not.toHaveBeenCalled();
+    });
+
     it('swallows DB HttpErrors (e.g. unknown code) without crashing the socket', async () => {
       joinOrResumeRoom.mockRejectedValueOnce(new HttpError(404, 'room not found'));
 

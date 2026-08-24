@@ -87,7 +87,19 @@ export function registerRoomHandlers(
       // walkover window (spec: "Reconnect within grace cancels the walkover").
       bracketWalkoverTimers.cancel(room.id, playerId);
       await markPlayerConnected(room.id, playerId);
-      await broadcastRoomState(io, room.id);
+
+      // socket.join above has ALREADY run unconditionally, so the channel
+      // broadcast forms below are guaranteed to reach this socket. When the
+      // room was aborted by boot reconciliation (ADR-0008), tell the player
+      // the room is dead instead of broadcasting a normal room:state.
+      if (room.status === 'aborted') {
+        io.to(`room:${room.id}`).emit('room:aborted', {
+          roomId: room.id,
+          reason: 'server_restart',
+        });
+      } else {
+        await broadcastRoomState(io, room.id);
+      }
     }),
   );
 

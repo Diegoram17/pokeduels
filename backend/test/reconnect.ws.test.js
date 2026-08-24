@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { pool } from '../db/pool.js';
 import { createPlayer } from '../db/players.js';
 import { createRoomWithCreator, getRoomPlayerSeat } from '../db/rooms.js';
+import { reconcileOrphanedDuels } from '../db/reconciliation.js';
 import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
 import { startWsHarness, waitForEvent, waitUntil, joinRoomViaWs } from './wsHelpers.js';
 
@@ -192,5 +193,40 @@ describe.skipIf(!hasDatabase)('reconnect over WS (requires DATABASE_URL)', () =>
     const { rows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
     expect(rows[0].status).toBe('finished');
     joinerClient.close();
+  });
+
+  it('emits room:aborted (not room:state) when reconnecting to a room aborted by boot reconciliation', async () => {
+    const harness = await startHarness();
+    const creator = await createPlayer('WsAbortedCreator');
+    const joiner = await createPlayer('WsAbortedJoiner');
+    const room = await createRoomWithCreator(2, creator.id);
+    roomIds.push(room.id);
+
+    // Seed an in-progress duel + room, then reconcile through the REAL
+    // boot-time production path (ADR-0008) — the room becomes aborted.
+    await pool.query("UPDATE rooms SET status = 'in_progress' WHERE id = $1", [room.id]);
+    await pool.query(
+      `INSERT INTO duels (room_id, player1_id, player2_id, round, status, winner_id, end_reason)
+       VALUES ($1, $2, $3, 'unica', 'in_progress', NULL, NULL)`,
+      [room.id, creator.id, joiner.id],
+    );
+    await reconcileOrphanedDuels();
+
+    // Reconnect the still-seated creator with a manual room:join —
+    // joinRoomViaWs is NOT usable here because it waits on room:state, which
+    // must never arrive for an aborted room.
+    const client = await harness.connect(creator.sessionToken);
+    let stateArrived = false;
+    client.on('room:state', () => {
+      stateArrived = true;
+    });
+    const abortedP = waitForEvent(client, 'room:aborted');
+    client.emit('room:join', { code: room.code, nickname: creator.nickname });
+    const aborted = await abortedP;
+
+    expect(aborted.roomId).toBe(room.id);
+    expect(aborted.reason).toBe('server_restart');
+    expect(stateArrived).toBe(false);
+    client.close();
   });
 });
