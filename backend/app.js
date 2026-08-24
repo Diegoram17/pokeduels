@@ -26,6 +26,13 @@ export function createApp() {
   // factory keeps limiter state per app instance.
   app.use('/api/rooms', createRoomsRouter());
 
+  // Liveness probe (ADR-0006): bare 200, empty body, zero DB access — so an
+  // external cron can keep the free-tier instance warm. Mounted BEFORE the
+  // 404 catch-all.
+  app.get('/health', (req, res) => {
+    res.status(200).end();
+  });
+
   // Unknown routes → 404 JSON.
   app.use((req, res) => {
     res.status(404).json({ error: 'Not Found' });
