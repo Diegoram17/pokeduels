@@ -229,4 +229,59 @@ describe.skipIf(!hasDatabase)('reconnect over WS (requires DATABASE_URL)', () =>
     expect(stateArrived).toBe(false);
     client.close();
   });
+
+  it('gives the already-finished semifinal winner no differentiated treatment when reconnecting to the aborted room', async () => {
+    // Spec: "No compensation for a player who already won their semifinal" —
+    // a 4-player bracket where one semifinal already finished (winner
+    // decided) and its sibling semifinal was still in_progress when boot
+    // reconciliation aborted the room. The WINNING player reconnects here
+    // (not a generic seated player, as in the test above) and must receive
+    // the exact same bare room:aborted payload — no extra fields, no
+    // preserved-advancement flag, no differentiated messaging tied to
+    // having already won their duel.
+    const harness = await startHarness();
+    const winner = await createPlayer('WsBracketWinner');
+    const loser = await createPlayer('WsBracketLoser');
+    const p3 = await createPlayer('WsBracketP3');
+    const room = await createRoomWithCreator(4, winner.id);
+    roomIds.push(room.id);
+
+    await pool.query("UPDATE rooms SET status = 'in_progress' WHERE id = $1", [room.id]);
+    await pool.query(
+      `INSERT INTO duels (room_id, player1_id, player2_id, round, status, winner_id, end_reason)
+       VALUES ($1, $2, $3, 'semifinal', 'finished', $2, 'ko')`,
+      [room.id, winner.id, loser.id],
+    );
+    await pool.query(
+      `INSERT INTO duels (room_id, player1_id, player2_id, round, status, winner_id, end_reason)
+       VALUES ($1, $2, $3, 'semifinal', 'in_progress', NULL, NULL)`,
+      [room.id, p3.id, loser.id],
+    );
+    await reconcileOrphanedDuels();
+
+    const client = await harness.connect(winner.sessionToken);
+    let stateArrived = false;
+    client.on('room:state', () => {
+      stateArrived = true;
+    });
+    const abortedP = waitForEvent(client, 'room:aborted');
+    client.emit('room:join', { code: room.code, nickname: winner.nickname });
+    const aborted = await abortedP;
+
+    // Exact-shape equality (not just field-by-field toBe) proves no extra
+    // compensation/preservation field was ever attached for this player.
+    expect(aborted).toEqual({ roomId: room.id, reason: 'server_restart' });
+    expect(stateArrived).toBe(false);
+
+    // The already-decided semifinal result itself is left untouched — the
+    // reconciliation sweep (already proven room-scoped in reconciliation.test.js)
+    // is re-confirmed here at the WS-reconnect boundary too.
+    const { rows } = await pool.query(
+      'SELECT status, end_reason, winner_id FROM duels WHERE room_id = $1 AND player1_id = $2',
+      [room.id, winner.id],
+    );
+    expect(rows[0]).toEqual({ status: 'finished', end_reason: 'ko', winner_id: winner.id });
+
+    client.close();
+  });
 });
