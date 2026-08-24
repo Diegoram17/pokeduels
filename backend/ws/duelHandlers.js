@@ -12,6 +12,7 @@ import { getPhaseStore } from '../engine/duelPhaseStore.js';
 import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
 import { withWsHandler } from './wsFaultIsolation.js';
 import { createDuelLifecycle } from './duelLifecycle.js';
+import { advanceTournamentOrRematch } from './tournamentLifecycle.js';
 
 /**
  * Registers the duel event handlers for one connected socket (item #5). Every
@@ -28,9 +29,12 @@ import { createDuelLifecycle } from './duelLifecycle.js';
  *
  * @param {import('socket.io').Server} io
  * @param {import('socket.io').Socket} socket
- * @param {{ turnTimers?: object, turnCycle?: object }} [deps] - injected
- *        per-duel turn timer registry (composition root, injectable
- *        timeoutMs) and the shared turn cycle (factory singleton)
+ * @param {{ turnTimers?: object, turnCycle?: object, bracketWalkoverTimers?: object }} [deps]
+ *        - injected per-duel turn timer registry (composition root,
+ *          injectable timeoutMs), the shared turn cycle (factory singleton),
+ *          and the bracket-walkover timer registry (PR 3) — the surrender
+ *          path re-advances the tournament after a finish so a 4p bracket
+ *          progresses.
  */
 
 /**
@@ -56,7 +60,7 @@ function toRejectionWsError(event, err, extra = {}) {
   throw err;
 }
 
-export function registerDuelHandlers(io, socket, { turnTimers, turnCycle } = {}) {
+export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracketWalkoverTimers } = {}) {
   // Item #6 centralized finish path, bound to THIS server's turn-timer
   // registry (composition root) so the correct pending 10s window is cancelled
   // on surrender/disconnect (PR 2 note: never the default singleton for
@@ -207,6 +211,9 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle } = {})
       const { player1_id, player2_id } = state.duel;
       const opponentId = playerId === player1_id ? player2_id : player1_id;
       await lifecycle.finishDuel(io, duelId, opponentId, 'surrender');
+      // Item #7: re-advance the tournament after the surrender finish so a
+      // 4p bracket progresses (e.g. a semifinal surrender -> finals creation).
+      await advanceTournamentOrRematch(io, state.duel.room_id, duelId, { bracketWalkoverTimers });
     }),
   );
 }

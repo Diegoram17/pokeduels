@@ -40,7 +40,7 @@ export function createDuelLifecycle({
    * @param {import('socket.io').Server} io
    * @param {number} duelId
    * @param {number} winnerId
-   * @param {'ko'|'surrender'|'disconnect'} endReason
+   * @param {'ko'|'surrender'|'disconnect'|'walkover'} endReason
    */
   async function finalizeDuelSideEffects(io, duelId, winnerId, endReason) {
     turnTimers.cancel(duelId);
@@ -59,7 +59,7 @@ export function createDuelLifecycle({
    * @param {import('socket.io').Server} io
    * @param {number} duelId
    * @param {number} winnerId
-   * @param {'ko'|'surrender'|'disconnect'} endReason
+   * @param {'ko'|'surrender'|'disconnect'|'walkover'} endReason
    * @returns {Promise<{ applied: boolean }>}
    */
   async function finishDuel(io, duelId, winnerId, endReason) {

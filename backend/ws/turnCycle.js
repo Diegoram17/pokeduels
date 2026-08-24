@@ -6,6 +6,7 @@ import { resolverRonda } from '../engine/roundResolver.js';
 import { withDuelFaultIsolation } from '../engine/faultIsolation.js';
 import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
 import { finalizeDuelSideEffects } from './duelLifecycle.js';
+import { advanceTournamentOrRematch } from './tournamentLifecycle.js';
 
 /**
  * Per-duel action buffer + shared turn-resolution trigger (item #5, design:
@@ -22,7 +23,7 @@ import { finalizeDuelSideEffects } from './duelLifecycle.js';
  *
  * Factory + singleton shape (mirrors duelPhaseStore.js / duelRoundState.js).
  */
-export function createTurnCycle() {
+export function createTurnCycle({ bracketWalkoverTimers } = {}) {
   const buffers = new Map();
 
   return {
@@ -106,13 +107,17 @@ export function createTurnCycle() {
         // Team wipe — the round resolution already persisted the finish
         // (applyRoundResult's guarded transactional write). Route the post-write
         // cleanup + broadcast through the centralized lifecycle (item #6) so
-        // KO shares one finalize path with surrender/disconnect.
+        // KO shares one finalize path with surrender/disconnect, then
+        // re-advance the tournament (item #7) so a 4p bracket progresses.
         await finalizeDuelSideEffects(
           io,
           duelId,
           fresh.duel.winner_id ?? null,
           'ko',
         );
+        await advanceTournamentOrRematch(io, fresh.duel.room_id, duelId, {
+          bracketWalkoverTimers,
+        });
         return true;
       }
 
@@ -154,12 +159,15 @@ export function createTurnCycle() {
 let singletonTurnCycle = null;
 
 /**
- * Returns the shared process-wide turn cycle, creating it on first use.
+ * Returns the shared process-wide turn cycle, creating it on first use. The
+ * bracket-walkover registry is threaded into the singleton so the KO path can
+ * re-advance a 4p bracket and arm walkovers when it creates the finals.
+ * @param {{ bracketWalkoverTimers?: object }} [opts]
  * @returns {ReturnType<typeof createTurnCycle>}
  */
-export function getTurnCycle() {
+export function getTurnCycle({ bracketWalkoverTimers } = {}) {
   if (!singletonTurnCycle) {
-    singletonTurnCycle = createTurnCycle();
+    singletonTurnCycle = createTurnCycle({ bracketWalkoverTimers });
   }
   return singletonTurnCycle;
 }

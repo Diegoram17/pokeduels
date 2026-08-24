@@ -7,10 +7,12 @@ import {
   leaveOrCloseRoom,
   markPlayerConnected,
   markPlayerDisconnected,
+  getRoomState,
 } from '../db/rooms.js';
-import { findActiveDuelForPlayer } from '../repositories/duelRepository.js';
+import { findActiveDuelForPlayer, findPendingBracketDuelForPlayer } from '../repositories/duelRepository.js';
 import { broadcastRoomState } from '../ws/roomState.js';
-import { bootstrapDuelIfReady } from '../ws/duelBootstrap.js';
+import { bootstrapDuelIfReady, bootstrapBracketIfReady } from '../ws/duelBootstrap.js';
+import { advanceTournamentOrRematch, walkoverPendingDuel } from '../ws/tournamentLifecycle.js';
 import { registerRoomHandlers } from '../ws/roomHandlers.js';
 
 // Handler-glue tests: the DB functions and the broadcast helper are mocked
@@ -23,15 +25,23 @@ vi.mock('../db/rooms.js', () => ({
   leaveOrCloseRoom: vi.fn(),
   markPlayerConnected: vi.fn(),
   markPlayerDisconnected: vi.fn(),
+  getRoomState: vi.fn(),
 }));
 vi.mock('../ws/roomState.js', () => ({
   broadcastRoomState: vi.fn(),
 }));
 vi.mock('../ws/duelBootstrap.js', () => ({
   bootstrapDuelIfReady: vi.fn(),
+  bootstrapBracketIfReady: vi.fn(),
 }));
 vi.mock('../repositories/duelRepository.js', () => ({
   findActiveDuelForPlayer: vi.fn(),
+  findPendingBracketDuelForPlayer: vi.fn(),
+  finishDuelByWalkover: vi.fn(),
+}));
+vi.mock('../ws/tournamentLifecycle.js', () => ({
+  advanceTournamentOrRematch: vi.fn(),
+  walkoverPendingDuel: vi.fn(),
 }));
 
 const mockLifecycle = { finishDuel: vi.fn(), finalizeDuelSideEffects: vi.fn() };
@@ -43,6 +53,7 @@ describe('registerRoomHandlers', () => {
   let io;
   let socket;
   let reconnectTimers;
+  let bracketWalkoverTimers;
   let errorSpy;
 
   const room = { id: 7, code: 'ABC123', status: 'waiting', player_count: 2, resumed: false };
@@ -55,8 +66,15 @@ describe('registerRoomHandlers', () => {
     socket = new EventEmitter();
     socket.data = { player: { id: 5, nickname: 'AshDb' } };
     socket.join = vi.fn();
+    socket.leave = vi.fn();
     reconnectTimers = {
       start: vi.fn(),
+      cancel: vi.fn(() => false),
+      has: vi.fn(() => false),
+      clear: vi.fn(),
+    };
+    bracketWalkoverTimers = {
+      arm: vi.fn(),
       cancel: vi.fn(() => false),
       has: vi.fn(() => false),
       clear: vi.fn(),
@@ -67,13 +85,18 @@ describe('registerRoomHandlers', () => {
     leaveOrCloseRoom.mockResolvedValue({ closed: false });
     markPlayerConnected.mockResolvedValue(undefined);
     markPlayerDisconnected.mockResolvedValue(undefined);
+    getRoomState.mockResolvedValue(undefined);
     broadcastRoomState.mockResolvedValue(undefined);
     bootstrapDuelIfReady.mockResolvedValue(undefined);
+    bootstrapBracketIfReady.mockResolvedValue(undefined);
+    findPendingBracketDuelForPlayer.mockResolvedValue(null);
+    advanceTournamentOrRematch.mockResolvedValue(undefined);
+    walkoverPendingDuel.mockResolvedValue({ applied: false });
     // No live duel by default: the disconnect listener falls through to the
     // lobby grace path (the pre-change behavior).
     findActiveDuelForPlayer.mockResolvedValue(null);
 
-    registerRoomHandlers(io, socket, reconnectTimers);
+    registerRoomHandlers(io, socket, reconnectTimers, undefined, bracketWalkoverTimers);
   });
 
   afterEach(() => {
@@ -88,6 +111,7 @@ describe('registerRoomHandlers', () => {
       expect(joinOrResumeRoom).toHaveBeenCalledWith('ABC123', 5, 'Ash');
       expect(socket.join).toHaveBeenCalledWith('room:7');
       expect(reconnectTimers.cancel).toHaveBeenCalledWith(7, 5);
+      expect(bracketWalkoverTimers.cancel).toHaveBeenCalledWith(7, 5);
       expect(markPlayerConnected).toHaveBeenCalledWith(7, 5);
       expect(socket.data.roomId).toBe(7);
     });
@@ -126,6 +150,14 @@ describe('registerRoomHandlers', () => {
 
       expect(broadcastRoomState).toHaveBeenCalledWith(io, 7);
       expect(bootstrapDuelIfReady).toHaveBeenCalledWith(io, 7);
+    });
+
+    it('also runs the bracket bootstrap so a full ready 4-player room opens its bracket', async () => {
+      socket.data.roomId = 7;
+      socket.emit('room:ready', { ready: true });
+      await vi.waitFor(() => expect(bootstrapBracketIfReady).toHaveBeenCalled());
+
+      expect(bootstrapBracketIfReady).toHaveBeenCalledWith(io, 7);
     });
 
     it('persists ready=false when the client un-readies', async () => {
@@ -174,6 +206,35 @@ describe('registerRoomHandlers', () => {
         ],
       });
     });
+
+    it('walks a 4-player bracket player over immediately on explicit leave between rounds (no 60s wait)', async () => {
+      // A 4p in_progress room: an explicit room:leave between rounds is an
+      // immediate walkover of the player's pending duel, not the close-and-rank
+      // path (which would remove the seat and break the bracket).
+      getRoomState.mockResolvedValue({
+        roomId: 7,
+        maxPlayers: 4,
+        status: 'in_progress',
+        players: [],
+        startersTaken: [],
+      });
+      findPendingBracketDuelForPlayer.mockResolvedValueOnce({
+        id: 40,
+        round: 'semifinal',
+        status: 'pending',
+        player1_id: 5,
+        player2_id: 99,
+      });
+      socket.data.roomId = 7;
+      socket.emit('room:leave');
+      await vi.waitFor(() => expect(walkoverPendingDuel).toHaveBeenCalled());
+
+      expect(walkoverPendingDuel).toHaveBeenCalledWith(io, 7, 5, { bracketWalkoverTimers });
+      expect(leaveOrCloseRoom).not.toHaveBeenCalled();
+      // The walkover timer (if any) is cancelled for the leaving player.
+      expect(bracketWalkoverTimers.cancel).toHaveBeenCalledWith(7, 5);
+      expect(socket.data.roomId).toBeUndefined();
+    });
   });
 
   describe('native disconnect', () => {
@@ -198,10 +259,11 @@ describe('registerRoomHandlers', () => {
       expect(reconnectTimers.start).not.toHaveBeenCalled();
     });
 
-    it('forfeits a mid-duel disconnect via finishDuel + duel:opponent_disconnected, skipping the lobby grace', async () => {
-      // P1 (id 5) is mid-duel against P2 (id 99) in duel 9, still in_progress.
+    it('forfeits a mid-duel disconnect via finishDuel + duel:opponent_disconnected, then re-advances the tournament', async () => {
+      // P1 (id 5) is mid-duel against P2 (id 99) in duel 9 (room 7), in_progress.
       findActiveDuelForPlayer.mockResolvedValueOnce({
         id: 9,
+        room_id: 7,
         player1_id: 5,
         player2_id: 99,
         status: 'in_progress',
@@ -214,8 +276,41 @@ describe('registerRoomHandlers', () => {
       expect(findActiveDuelForPlayer).toHaveBeenCalledWith(5);
       expect(lifecycle.finishDuel).toHaveBeenCalledWith(io, 9, 99, 'disconnect');
       expect(io.to).toHaveBeenCalledWith('duel:9');
+      // The tournament lifecycle re-runs so a 4p bracket advances on a
+      // disconnect-forfeited semifinal/final.
+      expect(advanceTournamentOrRematch).toHaveBeenCalledWith(io, 7, 9, {
+        bracketWalkoverTimers,
+      });
       // The lobby grace path is NOT taken for a mid-duel forfeit.
       expect(markPlayerDisconnected).not.toHaveBeenCalled();
+      expect(reconnectTimers.start).not.toHaveBeenCalled();
+    });
+
+    it('arms a bracket-walkover timer for a 4-player between-round disconnect with a pending duel', async () => {
+      // P1 (id 5) is between bracket rounds in a 4p in_progress room: no live
+      // duel, but a pending semifinal awaits them. The walkover timer (not the
+      // lobby reconnect timer) is armed so a silent absence times out.
+      getRoomState.mockResolvedValue({
+        roomId: 7,
+        maxPlayers: 4,
+        status: 'in_progress',
+        players: [],
+        startersTaken: [],
+      });
+      findPendingBracketDuelForPlayer.mockResolvedValueOnce({
+        id: 30,
+        round: 'semifinal',
+        status: 'pending',
+        player1_id: 5,
+        player2_id: 99,
+      });
+      socket.data.roomId = 7;
+      socket.emit('disconnect');
+      await vi.waitFor(() => expect(bracketWalkoverTimers.arm).toHaveBeenCalled());
+
+      expect(markPlayerDisconnected).toHaveBeenCalledWith(7, 5);
+      expect(bracketWalkoverTimers.arm).toHaveBeenCalledWith(7, 5, expect.any(Function));
+      // The lobby reconnect timer is skipped for a 4p bracket between-round case.
       expect(reconnectTimers.start).not.toHaveBeenCalled();
     });
   });

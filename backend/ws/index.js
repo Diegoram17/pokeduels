@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { touchSession } from '../db/players.js';
 import { createReconnectTimerRegistry } from './reconnectTimers.js';
 import { createTurnTimerRegistry, DEFAULT_TURN_TIMEOUT_MS } from './turnTimers.js';
+import { createBracketWalkoverTimerRegistry } from './bracketWalkoverTimers.js';
 import { getTurnCycle } from './turnCycle.js';
 import { registerRoomHandlers } from './roomHandlers.js';
 import { registerTeamHandlers } from './teamHandlers.js';
@@ -16,8 +17,9 @@ import { registerDuelHandlers } from './duelHandlers.js';
  *
  * @param {import('node:http').Server} httpServer - shared listener
  * @param {{ reconnectGraceMs?: number, turnTimeoutMs?: number, corsOrigin?: string }} [options]
- * @returns {{ io: Server, reconnectTimers: object, turnTimers: object }} — all
- *   exposed for test teardown/assertions (design interface contract)
+ * @returns {{ io: Server, reconnectTimers: object, turnTimers: object,
+ *             bracketWalkoverTimers: object }} — all exposed for test
+ *   teardown/assertions (design interface contract)
  */
 export function createSocketServer(
   httpServer,
@@ -26,6 +28,7 @@ export function createSocketServer(
   const io = new Server(httpServer, { cors: { origin: corsOrigin } });
   const reconnectTimers = createReconnectTimerRegistry({ graceMs: reconnectGraceMs });
   const turnTimers = createTurnTimerRegistry({ timeoutMs: turnTimeoutMs });
+  const bracketWalkoverTimers = createBracketWalkoverTimerRegistry();
 
   // Auth: one touchSession() per connection (not per event). The resolved
   // player becomes socket.data.player; unknown tokens and DB faults reject
@@ -43,10 +46,14 @@ export function createSocketServer(
   });
 
   io.on('connection', (socket) => {
-    registerRoomHandlers(io, socket, reconnectTimers, turnTimers);
+    registerRoomHandlers(io, socket, reconnectTimers, turnTimers, bracketWalkoverTimers);
     registerTeamHandlers(io, socket);
-    registerDuelHandlers(io, socket, { turnTimers, turnCycle: getTurnCycle() });
+    registerDuelHandlers(io, socket, {
+      turnTimers,
+      turnCycle: getTurnCycle({ bracketWalkoverTimers }),
+      bracketWalkoverTimers,
+    });
   });
 
-  return { io, reconnectTimers, turnTimers };
+  return { io, reconnectTimers, turnTimers, bracketWalkoverTimers };
 }
