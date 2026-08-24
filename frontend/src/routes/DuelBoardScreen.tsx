@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import type { DuelPokemonState } from '../state/schema'
@@ -8,16 +8,18 @@ import {
   BASIC_ATTACK_INDEX,
   MAX_HP,
   MOVE_SLOTS,
-  TIMEOUT_NOTICE,
   TURN_TIMEOUT_SECONDS,
   isBasicAttack,
   moveDamageLabel,
 } from '../lib/duelBoard'
 
 /**
- * Screen 5: Duel Board. Renders the HUD for both sides, the 4-move attack
- * grid, and a per-turn countdown that auto-resolves as a basic attack on
- * timeout (RF-6.1).
+ * Screen 5: Duel Board (#10 PR 2). Server-authoritative gameplay: lead
+ * selection submits via WS, moves/switch/surrender emit WS actions, and every
+ * outcome renders from server-pushed state. The countdown is cosmetic only
+ * (never auto-submits), and finish routing follows the design data flow:
+ * 1v1 -> wait-room rematch, bracket+finalRanking -> ranking,
+ * bracket+noFinalRanking -> wait/go-now choice.
  */
 
 function HpBar({ hp }: { hp: number }) {
@@ -103,24 +105,24 @@ function HudCard({ pokemon, side }: { pokemon: DuelPokemonState; side: 'human' |
   )
 }
 
+/**
+ * Presentation-only countdown (#10): it ticks and resets per turn but NEVER
+ * submits an action on expiry — the server owns turn resolution.
+ */
 function TimerRing({
   seconds,
   active,
   turnKey,
-  onTimeout,
 }: {
   seconds: number
   active: boolean
   turnKey: number
-  onTimeout: () => void
 }) {
   const [remaining, setRemaining] = useState(seconds)
-  const firedRef = useRef(false)
 
   // Reset the countdown whenever a new turn starts.
   useEffect(() => {
     setRemaining(seconds)
-    firedRef.current = false
   }, [seconds, turnKey])
 
   // One 1-second tick per remaining unit while the timer is armed.
@@ -129,13 +131,6 @@ function TimerRing({
     const id = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000)
     return () => clearInterval(id)
   }, [active, turnKey, seconds])
-
-  // Fire the timeout exactly once when the countdown reaches zero.
-  useEffect(() => {
-    if (remaining > 0 || !active || firedRef.current) return
-    firedRef.current = true
-    onTimeout()
-  }, [remaining, active, onTimeout])
 
   return (
     <div
@@ -168,10 +163,12 @@ function TimerRing({
 function MoveButton({
   index,
   disabled,
+  pp,
   onAttack,
 }: {
   index: MoveIndex
   disabled: boolean
+  pp: number
   onAttack: (index: MoveIndex) => void
 }) {
   const slot = MOVE_SLOTS[index]
@@ -203,7 +200,7 @@ function MoveButton({
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <span className="pd-badge" style={{ background: 'rgba(120,180,255,.14)', color: 'var(--pd-text-meta)' }}>
-          {basic ? 'PP ∞' : 'PP 4/4'}
+          {basic ? 'PP ∞' : `PP ${pp}/4`}
         </span>
       </div>
     </button>
@@ -212,23 +209,113 @@ function MoveButton({
 
 function MoveButtonGrid({
   disabled,
+  active,
   onAttack,
 }: {
   disabled: boolean
+  active: DuelPokemonState | undefined
   onAttack: (index: MoveIndex) => void
 }) {
+  // Insufficient-PP prevention: a move with 0 remaining PP is shown disabled
+  // and non-selectable (basic attack has infinite PP).
+  const ppOf = (index: MoveIndex): number => {
+    if (index === BASIC_ATTACK_INDEX) return Infinity
+    if (!active) return 0
+    if (index === 0) return active.ppMove1
+    if (index === 1) return active.ppMove2
+    return active.ppMove3
+  }
   return (
     <div className="move-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
       {MOVE_SLOTS.map((_, i) => (
-        <MoveButton key={i} index={i as MoveIndex} disabled={disabled} onAttack={onAttack} />
+        <MoveButton
+          key={i}
+          index={i as MoveIndex}
+          disabled={disabled || ppOf(i as MoveIndex) <= 0}
+          pp={ppOf(i as MoveIndex)}
+          onAttack={onAttack}
+        />
       ))}
+    </div>
+  )
+}
+
+function LeadPicker({
+  roster,
+  onPick,
+}: {
+  roster: DuelPokemonState[]
+  onPick: (pokemonId: number) => void
+}) {
+  return (
+    <div className="lead-picker" data-testid="lead-picker">
+      <h2 className="pd-title" style={{ margin: 0 }}>
+        ELIGE TU PRIMER POKÉMON
+      </h2>
+      <p className="pd-body" style={{ margin: '8px 0 16px' }}>
+        Selecciona el Pokémon que abrirá el combate.
+      </p>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {roster.map((p) => (
+          <button
+            key={p.pokemonId}
+            type="button"
+            className="pd-btn pd-btn--primary"
+            aria-label={p.name}
+            onClick={() => onPick(p.pokemonId)}
+          >
+            <span className="pd-stat">{p.name.toUpperCase()}</span>
+            <span className="pd-meta">ELEGIR</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Wait-vs-go-now choice shown after a bracket duel while the room is still open. */
+function PostDuelChoice({
+  waiting,
+  onWait,
+  onGoNow,
+}: {
+  waiting: boolean
+  onWait: () => void
+  onGoNow: () => void
+}) {
+  if (waiting) {
+    return (
+      <div data-testid="post-duel-choice">
+        <p role="status" className="pd-label" style={{ color: 'var(--pd-yellow)', margin: 0 }}>
+          ESPERANDO RESULTADOS FINALES…
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div data-testid="post-duel-choice">
+      <h2 className="pd-title" style={{ margin: 0 }}>
+        ¿ESPERAR O VER RESULTADOS?
+      </h2>
+      <p className="pd-body" style={{ margin: '8px 0 16px' }}>
+        Tu duelo terminó y la sala sigue abierta. Puedes esperar el resultado
+        final o ver una clasificación provisional ahora.
+      </p>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <button type="button" className="pd-btn pd-btn--secondary" onClick={onWait}>
+          ESPERAR
+        </button>
+        <button type="button" className="pd-btn pd-btn--primary" onClick={onGoNow}>
+          IR YA
+        </button>
+      </div>
     </div>
   )
 }
 
 /**
  * Custom surrender confirmation (RF-7.7): a Tailwind/design-system modal
- * instead of the native window.confirm. Confirming ends the duel as a loss,
+ * instead of the native window.confirm. Confirming emits duel:surrender,
  * canceling resumes it.
  */
 function SurrenderConfirmModal({
@@ -294,17 +381,16 @@ function SurrenderButton({ onClick }: { onClick: () => void }) {
 
 function DuelBoardScreen() {
   const [state, actions] = useMockState()
-  const [timeoutNotice, setTimeoutNotice] = useState(false)
   const [showSurrender, setShowSurrender] = useState(false)
+  const [waitingForFinal, setWaitingForFinal] = useState(false)
   const { duel } = state
   const navigate = useNavigate()
   const handledDuelId = useRef<string | null>(null)
 
-  // KO detection: the engine flips the duel to awaiting_switch when the human
-  // active faints with bench remaining — send the player to the forced swap.
-  // Hooks must run unconditionally on every render (Rules of Hooks), so the
-  // `duel` null-check lives inside the effect body instead of gating the
-  // hook call itself.
+  // KO detection: the server snapshot flips the duel to awaiting_switch when
+  // the human active faints with bench remaining — send the player to the
+  // forced swap. Hooks must run unconditionally (Rules of Hooks), so the
+  // `duel` null-check lives inside the effect body.
   useEffect(() => {
     if (!duel) return
     if (duel.phase === 'awaiting_switch') {
@@ -312,22 +398,19 @@ function DuelBoardScreen() {
     }
   }, [duel, navigate])
 
-  // Duel finish: record the result in the tournament (when applicable), then
-  // route back to the wait room if slots remain, or to the ranking screen.
+  // Duel finish routing (server-driven): 1v1 -> wait-room rematch panel;
+  // bracket + final ranking -> ranking screen; bracket + no final ranking ->
+  // stay and render the wait/go-now choice (the effect re-runs and navigates
+  // once room:final_ranking lands — the handledDuelId guard is only set when a
+  // navigation actually happens).
   useEffect(() => {
-    if (!duel) return
-    if (duel.phase !== 'finished') return
+    if (!duel || duel.phase !== 'finished') return
     if (handledDuelId.current === duel.duelId) return
-    handledDuelId.current = duel.duelId
-    if (state.tournament) actions.advanceTournament()
     const route = computePostDuelRoute(state)
-    if (route) navigate(route.path, { replace: true })
-  }, [duel, state.tournament, state, actions, navigate])
-
-  const handleTimeout = useCallback(() => {
-    setTimeoutNotice(true)
-    actions.applyPlayerAttack(BASIC_ATTACK_INDEX)
-  }, [actions])
+    if (!route) return
+    handledDuelId.current = duel.duelId
+    navigate(route.path, { replace: true })
+  }, [duel, state, navigate])
 
   // The `!duel` redirect happens AFTER every hook above has been declared —
   // moving it earlier would make hook calls conditional (see Rules of Hooks).
@@ -337,12 +420,16 @@ function DuelBoardScreen() {
 
   const humanActive = humanActivePokemon(state)
   const rivalActive = rivalActivePokemon(state)
-  const canAct = duel.phase === 'awaiting_actions' && Boolean(humanActive) && Boolean(rivalActive)
+  // Round-1 gate: the rival lead is not broadcast until the first
+  // duel:turn_resolved, so the move grid must not wait on rivalActive.
+  const canAct = duel.phase === 'awaiting_actions' && Boolean(humanActive)
 
   const handleAttack = (index: MoveIndex) => {
-    setTimeoutNotice(false)
-    actions.applyPlayerAttack(index)
+    actions.submitAction(index)
   }
+
+  const isTournament = state.tournament != null
+  const showPostDuelChoice = duel.phase === 'finished' && isTournament && state.finalRanking == null
 
   return (
     <div className="pd-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -371,7 +458,7 @@ function DuelBoardScreen() {
       {showSurrender && (
         <SurrenderConfirmModal
           onConfirm={() => {
-            actions.surrender()
+            actions.surrenderDuel()
             setShowSurrender(false)
           }}
           onCancel={() => setShowSurrender(false)}
@@ -386,7 +473,6 @@ function DuelBoardScreen() {
           seconds={TURN_TIMEOUT_SECONDS}
           active={duel.phase === 'awaiting_actions' && canAct}
           turnKey={duel.turnNumber}
-          onTimeout={handleTimeout}
         />
 
         <div
@@ -422,27 +508,47 @@ function DuelBoardScreen() {
           overflowY: 'auto',
         }}
       >
-        {timeoutNotice && (
-          <p role="status" className="pd-label" style={{ color: 'var(--pd-yellow)', margin: 0 }}>
-            {TIMEOUT_NOTICE}
+        {duel.opponentDisconnected && (
+          <p role="status" className="pd-label" style={{ color: 'var(--pd-danger)', margin: 0 }}>
+            TU RIVAL SE DESCONECTÓ
           </p>
         )}
-        <div style={{ display: 'flex', gap: 16, flex: 1, flexDirection: 'column' }}>
-          <MoveButtonGrid disabled={!canAct} onAttack={handleAttack} />
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              className="pd-btn pd-btn--secondary"
-              disabled={!canAct}
-              onClick={() => navigate('/swap?mode=voluntary')}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                swap_horiz
-              </span>
-              CAMBIAR POKÉMON
-            </button>
+        {duel.lastRejection && (
+          <p role="status" className="pd-label" style={{ color: 'var(--pd-yellow)', margin: 0 }}>
+            MOVIMIENTO RECHAZADO — {duel.lastRejection.reason}
+          </p>
+        )}
+        {duel.phase === 'lead_selection' ? (
+          <LeadPicker
+            roster={state.duelPokemonState.filter(
+              (p) => p.ownerId === Number(state.player.playerId),
+            )}
+            onPick={(pokemonId) => actions.selectLead(pokemonId)}
+          />
+        ) : showPostDuelChoice ? (
+          <PostDuelChoice
+            waiting={waitingForFinal}
+            onWait={() => setWaitingForFinal(true)}
+            onGoNow={() => navigate('/ranking')}
+          />
+        ) : (
+          <div style={{ display: 'flex', gap: 16, flex: 1, flexDirection: 'column' }}>
+            <MoveButtonGrid disabled={!canAct} active={humanActive} onAttack={handleAttack} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="pd-btn pd-btn--secondary"
+                disabled={!canAct}
+                onClick={() => navigate('/swap?mode=voluntary')}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  swap_horiz
+                </span>
+                CAMBIAR POKÉMON
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

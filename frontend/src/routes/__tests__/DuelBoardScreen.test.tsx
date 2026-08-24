@@ -1,46 +1,114 @@
 // @vitest-environment jsdom
+// #10 PR 2 rewrite: the mock engine is gone, so DuelBoardScreen's presentation
+// behaviors are exercised against server-shaped pre-seeded state — HUD, the
+// surrender dialog (confirming emits duel:surrender via WS), voluntary/forced
+// swap navigation, and Rules-of-Hooks safety when a duel lands via WS.
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { act, render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useSearchParams } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
-import type { MockStateActions } from '../../state/useMockState'
 import { STORAGE_KEY, serializeMockState } from '../../state/store'
 import { setCachedCatalog } from '../../lib/catalog'
 import type { Pokemon } from '../../lib/catalog'
-import type {
-  DuelPokemonState,
-  DuelState,
-  MockState,
-  TournamentSlot,
-  TournamentState,
-} from '../../state/schema'
+import type { DuelPokemonState, DuelState, MockState } from '../../state/schema'
 import DuelBoardScreen from '../DuelBoardScreen'
+import { io } from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
 
-// Catalog resolved by enterDuel at duel start: Pikachu is the human starter
-// and Eevee leads the fixed bot roster, so those two drive the active HUDs.
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(),
+}))
+
+import { disconnectSocket } from '../../lib/socket'
+
 const duelSeedFixture: Pokemon[] = [
   { id: 25, name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'front-pikachu', back_sprite_url: 'back-pikachu', is_starter: true },
   { id: 5, name: 'Snorlax', type: 'normal', pokeapi_id: 143, sprite_url: 'front-snorlax', back_sprite_url: 'back-snorlax', is_starter: false },
-  { id: 6, name: 'Eevee', type: 'normal', pokeapi_id: 133, sprite_url: 'front-eevee', back_sprite_url: 'back-eevee', is_starter: false },
-  { id: 23, name: 'Pidgeot', type: 'flying', pokeapi_id: 18, sprite_url: 'front-pidgeot', back_sprite_url: 'back-pidgeot', is_starter: false },
-  { id: 14, name: 'Sceptile', type: 'grass', pokeapi_id: 254, sprite_url: 'front-sceptile', back_sprite_url: 'back-sceptile', is_starter: false },
-  { id: 17, name: 'Machamp', type: 'fighting', pokeapi_id: 68, sprite_url: 'front-machamp', back_sprite_url: 'back-machamp', is_starter: false },
-  { id: 33, name: 'Onix', type: 'rock', pokeapi_id: 95, sprite_url: 'front-onix', back_sprite_url: 'back-onix', is_starter: false },
-  { id: 15, name: 'Gengar', type: 'ghost', pokeapi_id: 94, sprite_url: 'front-gengar', back_sprite_url: 'back-gengar', is_starter: false },
 ]
 
-function SeedProbe({ seed }: { seed?: (actions: MockStateActions) => void }) {
-  const [, actions] = useMockState()
-  const seeded = useRef(false)
-  if (!seeded.current && seed) {
-    seeded.current = true
-    seed(actions)
+function makeFakeSocket(): Socket & { _fire: (event: string, payload?: unknown) => void } {
+  const handlers = new Map<string, (payload?: unknown) => void>()
+  const fake = {
+    on: vi.fn((event: string, handler: (payload?: unknown) => void) => {
+      handlers.set(event, handler)
+      return fake
+    }),
+    off: vi.fn((event: string) => {
+      handlers.delete(event)
+      return fake
+    }),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+    _fire: (event: string, payload?: unknown) => {
+      handlers.get(event)?.(payload)
+    },
   }
-  return null
+  return fake as unknown as Socket & { _fire: (event: string, payload?: unknown) => void }
+}
+
+let fakeSocket: ReturnType<typeof makeFakeSocket>
+
+function makePokemon(
+  ownerId: number,
+  pokemonId: number,
+  name: string,
+  isActive: boolean,
+  overrides: Partial<DuelPokemonState> = {},
+): DuelPokemonState {
+  return {
+    duelId: '42',
+    ownerId,
+    pokemonId,
+    name,
+    type: 'normal',
+    spriteUrl: `front-${name.toLowerCase()}`,
+    backSpriteUrl: `back-${name.toLowerCase()}`,
+    currentHp: isActive ? 100 : 0,
+    ppMove1: 4,
+    ppMove2: 4,
+    ppMove3: 4,
+    isActive,
+    fainted: !isActive,
+    ...overrides,
+  }
+}
+
+function makeDuel(phase: DuelState['phase']): DuelState {
+  return {
+    duelId: '42',
+    slot: '1v1',
+    phase,
+    turnNumber: 1,
+    winnerId: null,
+    endReason: null,
+    opponentDisconnected: false,
+    lastRejection: null,
+  }
+}
+
+function buildLiveState(overrides: Partial<MockState> = {}): MockState {
+  return {
+    player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+    room: {
+      code: 'AB12',
+      maxPlayers: 2,
+      status: 'in_progress',
+      players: [{ playerId: '10', nickname: 'Ash', ready: false, connected: true }],
+    },
+    teamSelection: { starterId: 25, rosterIds: [] },
+    tournament: null,
+    duelPokemonState: [
+      makePokemon(10, 25, 'Pikachu', true),
+      makePokemon(11, 5, 'Snorlax', true),
+    ],
+    duel: makeDuel('awaiting_actions'),
+    pendingDuelId: null,
+    finalRanking: null,
+    ...overrides,
+  }
 }
 
 function DuelPhaseProbe() {
@@ -59,135 +127,23 @@ function SwapModeProbe() {
   return (
     <span data-testid="swap-probe">
       mode:{params.get('mode') ?? 'none'}
-      |active:{state.duelPokemonState.find((p) => p.isActive)?.pokemonId ?? 'none'}
+      |active:{state.duelPokemonState.find((p) => p.ownerId === Number(state.player.playerId) && p.isActive)?.pokemonId ?? 'none'}
     </span>
   )
 }
 
-// The duel board redirects when no duel exists, and the seed runs during the
-// first render pass — so wait until the seeded duel lands before mounting it.
 function WaitForDuel({ children }: { children: ReactNode }) {
   const [state] = useMockState()
   if (!state.duel) return <div>setting-up-duel</div>
   return <>{children}</>
 }
 
-function TournamentProbe() {
-  const [state] = useMockState()
-  const results = state.tournament?.results ?? {}
-  return (
-    <span data-testid="tournament-probe">
-      activeSlot:{state.tournament?.activeSlot ?? 'none'}|slotsDone:{Object.keys(results).length}
-    </span>
-  )
-}
-
-function renderDuelBoard(seed?: (actions: MockStateActions) => void) {
-  return render(
-    <MockStateProvider>
-      <MemoryRouter initialEntries={['/duel']}>
-        <SeedProbe seed={seed} />
-        <DuelPhaseProbe />
-        <TournamentProbe />
-        <Routes>
-          <Route
-            path="/duel"
-            element={
-              <WaitForDuel>
-                <DuelBoardScreen />
-              </WaitForDuel>
-            }
-          />
-          <Route
-            path="/swap"
-            element={
-              <>
-                <SwapModeProbe />
-                <div>SWAP-LANDED</div>
-              </>
-            }
-          />
-          <Route path="/wait-room" element={<div>WAIT-LANDED</div>} />
-          <Route path="/ranking" element={<div>RANKING-LANDED</div>} />
-        </Routes>
-      </MemoryRouter>
-    </MockStateProvider>,
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Pre-seeded state helpers (the provider hydrates from localStorage on mount)
-// ---------------------------------------------------------------------------
-
-function makePokemon(ownerId: string, pokemonId: string, isActive: boolean): DuelPokemonState {
-  return {
-    duelId: 'duel-slot',
-    ownerId,
-    pokemonId,
-    name: pokemonId,
-    type: 'normal',
-    spriteUrl: '',
-    backSpriteUrl: '',
-    currentHp: isActive ? 100 : 0,
-    ppMove1: 4,
-    ppMove2: 4,
-    ppMove3: 4,
-    isActive,
-    fainted: !isActive,
-  }
-}
-
-const QUEUE_FULL: TournamentSlot[] = ['semiA', 'semiB', 'thirdPlace', 'final']
-
-function makeTournamentState(overrides: Partial<TournamentState> = {}): TournamentState {
-  return {
-    bracket: {},
-    queue: ['semiA', 'semiB'],
-    activeSlot: 'semiA',
-    results: {},
-    ...overrides,
-  }
-}
-
-function buildInProgressDuel(
-  duelSlot: DuelState['slot'],
-  tournament: TournamentState,
-): MockState {
-  return {
-    player: { nickname: 'Ash', playerId: null, sessionToken: null },
-    room: {
-      code: 'AB12',
-      maxPlayers: 4,
-      status: 'in_progress',
-      players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
-    },
-    teamSelection: {
-      starterId: 25,
-      rosterIds: [5, 23, 14, 17, 33],
-    },
-    tournament,
-    duelPokemonState: [
-      makePokemon('Ash', 'Pikachu', true),
-      makePokemon('bot', 'rattata', true),
-    ],
-    duel: {
-      duelId: `duel-${duelSlot}`,
-      slot: duelSlot,
-      phase: 'awaiting_actions',
-      turnNumber: 1,
-      winnerId: null,
-      endReason: null,
-    },
-  }
-}
-
-function renderDuelBoardFromState(state: MockState) {
+function renderBoardFromState(state: MockState) {
   localStorage.setItem(STORAGE_KEY, serializeMockState(state))
   return render(
     <MockStateProvider>
       <MemoryRouter initialEntries={['/duel']}>
         <DuelPhaseProbe />
-        <TournamentProbe />
         <Routes>
           <Route
             path="/duel"
@@ -206,7 +162,7 @@ function renderDuelBoardFromState(state: MockState) {
               </>
             }
           />
-          <Route path="/wait-room" element={<div>WAIT-LANDED</div>} />
+          <Route path="/wait-room" element={<div>WAIT-ROOM-LANDED</div>} />
           <Route path="/ranking" element={<div>RANKING-LANDED</div>} />
         </Routes>
       </MemoryRouter>
@@ -214,45 +170,37 @@ function renderDuelBoardFromState(state: MockState) {
   )
 }
 
-function seed1v1Duel(actions: MockStateActions) {
-  actions.setNickname('Ash')
-  actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
-  actions.updateTeamSelection({
-    starterId: 25,
-    rosterIds: [5, 23, 14, 17, 33],
-  })
-  actions.enterDuel('1v1')
-}
-
-afterEach(() => {
-  vi.restoreAllMocks()
-  vi.useRealTimers()
+beforeEach(() => {
+  fakeSocket = makeFakeSocket()
+  vi.mocked(io).mockReturnValue(fakeSocket as never)
+  setCachedCatalog(duelSeedFixture)
 })
 
-beforeEach(() => {
-  // The store resolves the duel roster through the cached catalog.
-  setCachedCatalog(duelSeedFixture)
+afterEach(() => {
+  vi.clearAllMocks()
+  setCachedCatalog(null)
+  disconnectSocket()
 })
 
 describe('DuelBoardScreen — HUD', () => {
   it('renders the player and rival HUDs with active pokemon names and full HP', () => {
-    renderDuelBoard(seed1v1Duel)
+    renderBoardFromState(buildLiveState())
     const humanHud = screen.getByTestId('hud-human')
     const rivalHud = screen.getByTestId('hud-rival')
     expect(within(humanHud).getByText('PIKACHU')).toBeInTheDocument()
-    expect(within(rivalHud).getByText('EEVEE')).toBeInTheDocument()
+    expect(within(rivalHud).getByText('SNORLAX')).toBeInTheDocument()
     expect(within(humanHud).getByText('100/100')).toBeInTheDocument()
     expect(within(rivalHud).getByText('100/100')).toBeInTheDocument()
   })
 
   it('renders the GB-style sprites: rival seen from the front, own pokemon from the back', () => {
-    renderDuelBoard(seed1v1Duel)
+    renderBoardFromState(buildLiveState())
     const humanHud = screen.getByTestId('hud-human')
     const rivalHud = screen.getByTestId('hud-rival')
 
     const rivalSprite = within(rivalHud).getByRole('img')
-    expect(rivalSprite).toHaveAttribute('src', 'front-eevee')
-    expect(rivalSprite).toHaveAttribute('alt', 'Eevee')
+    expect(rivalSprite).toHaveAttribute('src', 'front-snorlax')
+    expect(rivalSprite).toHaveAttribute('alt', 'Snorlax')
 
     const humanSprite = within(humanHud).getByRole('img')
     expect(humanSprite).toHaveAttribute('src', 'back-pikachu')
@@ -260,7 +208,7 @@ describe('DuelBoardScreen — HUD', () => {
   })
 
   it('shows the HP bars with the live HP value', () => {
-    renderDuelBoard(seed1v1Duel)
+    renderBoardFromState(buildLiveState())
     const bars = screen.getAllByRole('progressbar', { name: /hp/i })
     expect(bars).toHaveLength(2)
     for (const bar of bars) {
@@ -271,75 +219,63 @@ describe('DuelBoardScreen — HUD', () => {
 })
 
 describe('DuelBoardScreen — move grid', () => {
-  it('applies the fixed 25% damage to the rival when the strongest move is used', async () => {
-    const user = userEvent.setup()
-    renderDuelBoard(seed1v1Duel)
-    await user.click(screen.getByRole('button', { name: /golpe fuerte/i }))
-    const rivalHud = screen.getByTestId('hud-rival')
-    expect(within(rivalHud).getByText('75/100')).toBeInTheDocument()
-  })
-
   it('exposes all four moves with their damage labels', () => {
-    renderDuelBoard(seed1v1Duel)
+    renderBoardFromState(buildLiveState())
     expect(screen.getByRole('button', { name: /25% dmg/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /20% dmg/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /15% dmg/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /10% dmg/i })).toBeInTheDocument()
   })
-
-  it('advances the turn number after an attack', async () => {
-    const user = userEvent.setup()
-    renderDuelBoard(seed1v1Duel)
-    await user.click(screen.getByRole('button', { name: /golpe fuerte/i }))
-    expect(screen.getByTestId('duel-probe').textContent).toContain('turn:2')
-  })
 })
 
 describe('DuelBoardScreen — surrender', () => {
-  it('opens a custom confirm dialog when the surrender button is clicked', async () => {
-    const user = userEvent.setup()
-    renderDuelBoard(seed1v1Duel)
-
-    await user.click(screen.getByRole('button', { name: /rendirse/i }))
-
+  it('opens a custom confirm dialog when the surrender button is clicked', () => {
+    renderBoardFromState(buildLiveState())
+    act(() => {
+      screen.getByRole('button', { name: /rendirse/i }).click()
+    })
     const dialog = screen.getByRole('dialog', { name: /rendirse/i })
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /rendirse/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /seguir luchando/i })).toBeInTheDocument()
   })
 
-  it('closes the dialog and keeps the duel running when the player cancels', async () => {
-    const user = userEvent.setup()
-    renderDuelBoard(seed1v1Duel)
-
-    await user.click(screen.getByRole('button', { name: /rendirse/i }))
-    await user.click(screen.getByRole('button', { name: /seguir luchando/i }))
+  it('closes the dialog and keeps the duel running when the player cancels', () => {
+    renderBoardFromState(buildLiveState())
+    act(() => {
+      screen.getByRole('button', { name: /rendirse/i }).click()
+    })
+    act(() => {
+      screen.getByRole('button', { name: /seguir luchando/i }).click()
+    })
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
-    expect(screen.getByTestId('duel-probe').textContent).toContain('winner:none')
   })
 
-  it('ends the duel with the opponent as winner when the player confirms', async () => {
-    const user = userEvent.setup()
-    renderDuelBoard(seed1v1Duel)
-
-    await user.click(screen.getByRole('button', { name: /rendirse/i }))
+  it('emits duel:surrender via WS and closes the dialog when the player confirms', () => {
+    renderBoardFromState(buildLiveState())
+    act(() => {
+      screen.getByRole('button', { name: /rendirse/i }).click()
+    })
     const dialog = screen.getByRole('dialog', { name: /rendirse/i })
-    await user.click(within(dialog).getByRole('button', { name: /rendirse/i }))
+    act(() => {
+      within(dialog).getByRole('button', { name: /rendirse/i }).click()
+    })
 
+    expect(fakeSocket.emit).toHaveBeenCalledWith('duel:surrender', { duelId: 42 })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:finished')
-    expect(screen.getByTestId('duel-probe').textContent).toContain('winner:bot')
+    // The server owns the finish — no local phase flip.
+    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
   })
 })
 
 describe('DuelBoardScreen — swap navigation', () => {
-  it('opens the swap screen in voluntary mode when the player clicks cambiar pokemon', async () => {
-    const user = userEvent.setup()
-    renderDuelBoard(seed1v1Duel)
-
-    await user.click(screen.getByRole('button', { name: /cambiar pokémon/i }))
+  it('opens the swap screen in voluntary mode when the player clicks cambiar pokemon', () => {
+    renderBoardFromState(buildLiveState())
+    act(() => {
+      screen.getByRole('button', { name: /cambiar pokémon/i }).click()
+    })
 
     expect(screen.getByText('SWAP-LANDED')).toBeInTheDocument()
     expect(screen.getByTestId('swap-probe').textContent).toContain('mode:voluntary')
@@ -347,154 +283,54 @@ describe('DuelBoardScreen — swap navigation', () => {
     expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
   })
 
-  it('navigates to the swap screen in forced mode when the active pokemon faints', async () => {
-    // Deterministic bot: move 0 (25% damage) on every response.
-    vi.spyOn(Math, 'random').mockReturnValue(0)
-    const user = userEvent.setup()
-    renderDuelBoard(seed1v1Duel)
-
-    // Four exchanges drop the human active to 0 HP; the KO forces the swap.
-    for (let i = 0; i < 4; i++) {
-      await user.click(screen.getByRole('button', { name: /ataque básico/i }))
-    }
+  it('navigates to the swap screen in forced mode when the server marks awaiting_switch', () => {
+    renderBoardFromState(
+      buildLiveState({
+        duelPokemonState: [
+          makePokemon(10, 25, 'Pikachu', false, { currentHp: 0, fainted: true }),
+          makePokemon(10, 5, 'Snorlax', false),
+          makePokemon(11, 6, 'Eevee', true),
+        ],
+        duel: makeDuel('awaiting_switch'),
+      }),
+    )
 
     expect(screen.getByText('SWAP-LANDED')).toBeInTheDocument()
     expect(screen.getByTestId('swap-probe').textContent).toContain('mode:forced')
-    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_switch')
-  })
-})
-
-describe('DuelBoardScreen — duel finish routing', () => {
-  it('routes a finished 1v1 duel to the ranking screen', async () => {
-    const user = userEvent.setup()
-    renderDuelBoard(seed1v1Duel)
-
-    await user.click(screen.getByRole('button', { name: /rendirse/i }))
-    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
-    await user.click(within(dialog).getByRole('button', { name: /rendirse/i }))
-
-    expect(screen.getByText('RANKING-LANDED')).toBeInTheDocument()
-  })
-
-  it('records the semifinal result and returns to the wait room while slots remain', async () => {
-    const user = userEvent.setup()
-    const state = buildInProgressDuel('semiA', makeTournamentState())
-    renderDuelBoardFromState(state)
-
-    await user.click(screen.getByRole('button', { name: /rendirse/i }))
-    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
-    await user.click(within(dialog).getByRole('button', { name: /rendirse/i }))
-
-    expect(screen.getByText('WAIT-LANDED')).toBeInTheDocument()
-    // The recorded semiA result advances the wait room to the next slot.
-    expect(screen.getByTestId('tournament-probe').textContent).toContain('activeSlot:semiB')
-    expect(screen.getByTestId('tournament-probe').textContent).toContain('slotsDone:1')
-  })
-
-  it('routes to the ranking screen when the final concludes the tournament', async () => {
-    const user = userEvent.setup()
-    const state = buildInProgressDuel(
-      'final',
-      makeTournamentState({
-        queue: QUEUE_FULL,
-        activeSlot: 'final',
-        results: {
-          semiA: { winner: 'Ash', loser: 'bot' },
-          semiB: { winner: 'Ash', loser: 'bot' },
-          thirdPlace: { winner: 'bot', loser: 'Ash' },
-        },
-      }),
-    )
-    renderDuelBoardFromState(state)
-
-    await user.click(screen.getByRole('button', { name: /rendirse/i }))
-    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
-    await user.click(within(dialog).getByRole('button', { name: /rendirse/i }))
-
-    expect(screen.getByText('RANKING-LANDED')).toBeInTheDocument()
-    expect(screen.getByTestId('tournament-probe').textContent).toContain('slotsDone:4')
   })
 })
 
 describe('DuelBoardScreen — Rules of Hooks safety', () => {
-  it('does not crash when duel flips from null to set while the screen stays mounted', async () => {
-    // Seeds only room + teamSelection (no duel yet) so the FIRST render hits
-    // the `!duel` branch. The screen is mounted directly (no Route/Navigate
-    // gate) so the instance survives the null -> set transition in place —
-    // this is exactly the scenario a Rules-of-Hooks violation crashes on.
-    localStorage.setItem(
-      STORAGE_KEY,
-      serializeMockState({
-        player: { nickname: 'Ash', playerId: null, sessionToken: null },
-        room: { code: 'AB12', maxPlayers: 2, status: 'waiting', players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }] },
-        teamSelection: {
-          starterId: 25,
-          rosterIds: [5, 23, 14, 17, 33],
-        },
-        tournament: null,
-        duelPokemonState: [],
-        duel: null,
-      }),
-    )
-
-    function EnterDuelTrigger() {
-      const [, actions] = useMockState()
-      return (
-        <button type="button" onClick={() => actions.enterDuel('1v1')}>
-          start-duel
-        </button>
-      )
-    }
+  it('does not crash when duel flips from null to set via WS while the screen stays mounted', () => {
+    // Seed only room + session (no duel) so the FIRST render hits the `!duel`
+    // branch. The screen is mounted directly (no Route/Navigate gate) so the
+    // instance survives the null -> set transition in place — exactly the
+    // scenario a Rules-of-Hooks violation crashes on.
+    localStorage.setItem(STORAGE_KEY, serializeMockState(buildLiveState({ duel: null, duelPokemonState: [] })))
 
     render(
       <MockStateProvider>
         <MemoryRouter initialEntries={['/duel']}>
-          <EnterDuelTrigger />
           <DuelBoardScreen />
         </MemoryRouter>
       </MockStateProvider>,
     )
 
-    const user = userEvent.setup()
-    // First render: duel is null. Click sets duel on the SAME instance —
-    // a hook-order mismatch throws here on the buggy implementation.
-    await user.click(screen.getByRole('button', { name: 'start-duel' }))
-
-    expect(screen.getByTestId('hud-human')).toBeInTheDocument()
-  })
-})
-
-describe('DuelBoardScreen — turn timer', () => {
-  it('auto-applies the basic attack when the countdown expires without an action', () => {
-    // Deterministic bot: force move 0 (25% damage) on the response.
-    vi.spyOn(Math, 'random').mockReturnValue(0)
-    vi.useFakeTimers()
-    renderDuelBoard(seed1v1Duel)
-
     act(() => {
-      vi.advanceTimersByTime(8000)
+      fakeSocket._fire('duel:start', { duelId: 42 })
+      fakeSocket._fire('duel:state', {
+        duelId: 42,
+        turnNumber: 1,
+        winnerId: null,
+        endReason: null,
+        pokemonStates: [
+          { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+          { duelId: 42, ownerId: 11, pokemonId: 5, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+        ],
+      })
     })
 
-    // Human basic attack (10%) → rival at 90; bot response (25%) → human at 75.
-    const humanHud = screen.getByTestId('hud-human')
-    const rivalHud = screen.getByTestId('hud-rival')
-    expect(within(rivalHud).getByText('90/100')).toBeInTheDocument()
-    expect(within(humanHud).getByText('75/100')).toBeInTheDocument()
-    expect(screen.getByTestId('duel-probe').textContent).toContain('turn:2')
-    // The RF-6.1 notice tells the player the timeout resolved as a basic attack.
-    expect(screen.getByRole('status')).toHaveTextContent('SIN TIEMPO, ATAQUE BÁSICO')
-  })
-
-  it('restarts the countdown when a manual move resolves the turn', async () => {
-    renderDuelBoard(seed1v1Duel)
-    const ring = screen.getByTestId('timer-ring')
-    expect(within(ring).getByText('08')).toBeInTheDocument()
-
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /golpe fuerte/i }))
-
-    // The new turn re-arms the ring at the full timeout.
-    expect(within(ring).getByText('08')).toBeInTheDocument()
-    expect(screen.getByTestId('duel-probe').textContent).toContain('turn:2')
+    expect(screen.getByTestId('hud-human')).toBeInTheDocument()
+    expect(screen.getByTestId('hud-rival')).toBeInTheDocument()
   })
 })
