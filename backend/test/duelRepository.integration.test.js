@@ -10,7 +10,9 @@ import {
   activateLead,
   applySwitchDecision,
   finishDuelWrite,
+  finishDuelByWalkover,
   findActiveDuelForPlayer,
+  findPendingBracketDuelForPlayer,
   markDuelInProgress,
 } from '../repositories/duelRepository.js';
 import { resolverRonda } from '../engine/roundResolver.js';
@@ -404,6 +406,95 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
 
     expect(await markDuelInProgress(duelId)).toEqual({ applied: false });
     expect((await getDuelState(duelId)).duel.status).toBe('finished');
+  });
+
+  // ---------- finishDuelByWalkover (pending/in_progress -> finished, end_reason 'walkover') ----------
+
+  it('finishDuelByWalkover transitions a pending duel to finished with the opponent as winner', async () => {
+    // A between-round walkover targets a duel that was created but never
+    // started (status='pending') — the absent player never picked a lead.
+    const [p1, p2] = await Promise.all([
+      pool.query(`INSERT INTO players (nickname) VALUES ('WalkoverP1') RETURNING id`),
+      pool.query(`INSERT INTO players (nickname) VALUES ('WalkoverP2') RETURNING id`),
+    ]);
+    const { rows } = await pool.query(
+      `INSERT INTO duels (player1_id, player2_id, round, status)
+       VALUES ($1, $2, 'semifinal', 'pending') RETURNING id`,
+      [p1.rows[0].id, p2.rows[0].id],
+    );
+    const duelId = rows[0].id;
+    createdDuelIds.push(duelId);
+
+    const result = await finishDuelByWalkover(duelId, p2.rows[0].id);
+    expect(result).toEqual({ applied: true });
+
+    const after = await getDuelState(duelId);
+    expect(after.duel.status).toBe('finished');
+    expect(after.duel.winner_id).toBe(p2.rows[0].id);
+    expect(after.duel.end_reason).toBe('walkover');
+  });
+
+  it('finishDuelByWalkover also transitions an in_progress duel', async () => {
+    const { duelId, player2Id } = await createDuel();
+
+    const result = await finishDuelByWalkover(duelId, player2Id);
+    expect(result).toEqual({ applied: true });
+
+    const after = await getDuelState(duelId);
+    expect(after.duel.status).toBe('finished');
+    expect(after.duel.winner_id).toBe(player2Id);
+    expect(after.duel.end_reason).toBe('walkover');
+  });
+
+  it('finishDuelByWalkover is a no-op (applied:false) on an already-finished duel', async () => {
+    const { duelId, player1Id } = await createDuel();
+    await finishDuelWrite(duelId, player1Id, 'surrender');
+
+    const result = await finishDuelByWalkover(duelId, player1Id);
+    expect(result).toEqual({ applied: false });
+
+    // The original finish values are untouched — a walkover never overwrites.
+    const after = await getDuelState(duelId);
+    expect(after.duel.end_reason).toBe('surrender');
+  });
+
+  // ---------- findPendingBracketDuelForPlayer (walkover lookup) ----------
+
+  it('findPendingBracketDuelForPlayer returns the pending bracket duel for a participating player', async () => {
+    const { roomId, players } = await createBareRoom(4, 2);
+    const [p1, p2] = players;
+    const semi = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+    createdDuelIds.push(semi.id);
+
+    const found = await findPendingBracketDuelForPlayer(roomId, p1);
+    expect(found).toMatchObject({ id: semi.id, round: 'semifinal', status: 'pending' });
+    // Both participants can locate the same pending duel.
+    expect((await findPendingBracketDuelForPlayer(roomId, p2)).id).toBe(semi.id);
+  });
+
+  it('findPendingBracketDuelForPlayer returns null when the duel is not pending', async () => {
+    const { roomId, players } = await createBareRoom(4, 2);
+    const [p1, p2] = players;
+    const semi = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+    createdDuelIds.push(semi.id);
+    await pool.query(
+      "UPDATE duels SET status = 'in_progress' WHERE id = $1",
+      [semi.id],
+    );
+
+    expect(await findPendingBracketDuelForPlayer(roomId, p1)).toBeNull();
+  });
+
+  it('findPendingBracketDuelForPlayer returns null when the player has no pending duel in the room', async () => {
+    const { roomId, players } = await createBareRoom(4, 2);
+    const [p1, p2] = players;
+    const semi = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+    createdDuelIds.push(semi.id);
+
+    const [outsider] = (await pool.query(
+      `INSERT INTO players (nickname) VALUES ('WalkoverOutsider') RETURNING id`,
+    )).rows;
+    expect(await findPendingBracketDuelForPlayer(roomId, outsider.id)).toBeNull();
   });
 
   // ---------- resolverRonda (I/O orchestrator) ----------

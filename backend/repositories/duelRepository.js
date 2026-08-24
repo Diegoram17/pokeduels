@@ -147,6 +147,55 @@ export async function findActiveDuelForPlayer(playerId) {
 }
 
 /**
+ * Finishes a duel by walkover (item #7, bracket-walkover): the absent player
+ * between bracket rounds is defaulted to a loss, crediting the opponent. This
+ * is a SEPARATE write from finishDuelWrite because a between-round walkover
+ * often targets a 'pending' duel (created but never started), while
+ * finishDuelWrite is guarded to 'in_progress' only. The UPDATE affects rows in
+ * EITHER 'pending' or 'in_progress', so the same conditional-tie-break applies:
+ * a repeat walkover or a walkover racing another finish is a silent no-op
+ * (0 rows changed -> applied:false).
+ *
+ * @param {number} duelId
+ * @param {number} winnerId - the opponent credited with the walkover win
+ * @returns {Promise<{ applied: boolean }>} applied=false when 0 rows changed
+ *          (already finished, or no such duel)
+ */
+export async function finishDuelByWalkover(duelId, winnerId) {
+  const { rowCount } = await pool.query(
+    `UPDATE duels SET status = 'finished', winner_id = $2, end_reason = 'walkover'
+     WHERE id = $1 AND status IN ('pending','in_progress')`,
+    [duelId, winnerId],
+  );
+  return { applied: rowCount > 0 };
+}
+
+/**
+ * Finds a player's still-pending bracket duel in a room, or null (item #7,
+ * walkover lookup). A between-round walkover arms a timer only when the player
+ * has a 'pending' duel (created but never started) awaiting them; a duel that
+ * already went 'in_progress' is a mid-duel case handled by the item-#6
+ * disconnect forfeit, not a walkover. Scoped by room so a player in multiple
+ * rooms never targets the wrong bracket.
+ *
+ * @param {number} roomId
+ * @param {number} playerId
+ * @returns {Promise<{ id: number, round: string, status: string } | null>}
+ */
+export async function findPendingBracketDuelForPlayer(roomId, playerId) {
+  const { rows } = await pool.query(
+    `SELECT id, round, status
+     FROM duels
+     WHERE room_id = $1 AND status = 'pending'
+       AND (player1_id = $2 OR player2_id = $2)
+     ORDER BY id
+     LIMIT 1`,
+    [roomId, playerId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
  * Atomically commits one resolved round: UPDATE duels (status/winner/end_reason),
  * UPDATE every duel_pokemon_state row, INSERT every moveRow — all in ONE
  * transaction. Any failure rolls everything back (no partial rounds).
