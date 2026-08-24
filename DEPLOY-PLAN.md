@@ -1,7 +1,7 @@
 # Deploy Plan — Pokeduels
 
 Fecha: 2026-08-24
-Estado: EJECUTADO (parcial — falta cron de health-check)
+Estado: EJECUTADO (completo)
 
 ## Resumen del proyecto
 
@@ -157,8 +157,9 @@ Ejecutados en sesión de deploy (2026-08-24):
    `rootDir=backend`, env vars `DATABASE_URL` y `CORS_ORIGIN` configuradas).
 10. ~~Volver a Vercel y actualizar `VITE_API_URL`/`VITE_WS_URL` con la URL real de Render~~ —
     **✅ HECHO** (frontend redeployado con URLs reales).
-11. Configurar el cron externo de health-check (cron-job.org/UptimeRobot) contra `/health` —
-    **⏳ PENDIENTE** — requiere cuenta en cron-job.org o UptimeRobot.
+11. ~~Configurar el cron externo de health-check (cron-job.org/UptimeRobot) contra `/health`~~ —
+    **✅ HECHO** — Monitor creado en UptimeRobot (ID: 803822718), intervalo 5 minutos,
+    status: activo. Verificado: backend responde 200 OK en `/health`.
 
 **Nota para quien ejecute esto:** el ítem #10 del backlog de producto (integración real de
 duelo/torneo en el frontend — `WaitRoomScreen`/`DuelBoardScreen`/`SwapScreen`/`RankingScreen`)
@@ -242,4 +243,11 @@ hasta que se implemente.
 
 **Pendiente:**
 - CI secrets (`NEON_PROJECT_ID`, `NEON_API_KEY`) — configurar en GitHub repo settings.
-- Cron de health-check — requiere cuenta en cron-job.org o UptimeRobot.
+
+**UptimeRobot (health-check):**
+- Monitor creado: `pokeduels-backend-health` (ID: 803822718).
+- URL: `https://pokeduels-backend.onrender.com/health`.
+- Intervalo: 300 segundos (5 minutos).
+- Status: activo (status code 1).
+- Verificación: `GET /health` → 200 OK.
+- Propósito: mantener el backend de Render despierto (evitar cold start del free tier).
