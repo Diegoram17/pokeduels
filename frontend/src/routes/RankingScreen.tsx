@@ -1,13 +1,14 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
-import { buildRanking, type RankingEntry } from '../lib/ranking'
+import { buildProvisionalRanking, type RankingEntry } from '../lib/ranking'
 
 /**
- * Screen 7: Final Ranking. Shows the podium for the current session — 2 rows
- * for a 1v1 (winner/loser), 4 rows for a tournament (final winner, final
- * loser, 3rd-place winner, 3rd-place loser). "Jugar de nuevo" clears the
- * room/duel/tournament while keeping the nickname (ADR-0002: no persistent
- * cross-session ranking).
+ * Screen 7: Final Ranking (#10 PR 2). Server-driven podium: the authoritative
+ * rows arrive via room:final_ranking and render verbatim; while a bracket room
+ * is still open (finalRanking null), a provisional podium from the bracket +
+ * finished duel renders instead — visually identical, so the swap to the
+ * authoritative data on room:final_ranking is silent. "Jugar de nuevo" clears
+ * the room/duel/tournament while keeping the nickname (ADR-0002).
  */
 
 function PodiumRow({ entry }: { entry: RankingEntry }) {
@@ -148,7 +149,7 @@ function RankingScreen() {
     return <Navigate to="/lobby" replace />
   }
 
-  const entries = buildRanking(state)
+  const entries = state.finalRanking ?? buildProvisionalRanking(state)
 
   return (
     <div className="pd-page">

@@ -20,7 +20,7 @@ function BenchPokemonCard({
 }: {
   pokemon: DuelPokemonState
   selected: boolean
-  onSelect: (pokemonId: string) => void
+  onSelect: (pokemonId: number) => void
 }) {
   const isActive = pokemon.isActive
   const isKo = pokemon.fainted || pokemon.currentHp === 0
@@ -107,8 +107,8 @@ function BenchList({
   onSelect,
 }: {
   pokemon: DuelPokemonState[]
-  selectedId: string | null
-  onSelect: (pokemonId: string) => void
+  selectedId: number | null
+  onSelect: (pokemonId: number) => void
 }) {
   return (
     <div
@@ -155,7 +155,7 @@ function SwapScreen() {
   const [state, actions] = useMockState()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
   const { duel, duelPokemonState, player } = state
 
   if (!duel) {
@@ -163,14 +163,16 @@ function SwapScreen() {
   }
 
   const mode: SwapMode = searchParams.get('mode') === 'forced' ? 'forced' : 'voluntary'
-  const myPokemon = duelPokemonState.filter((p) => p.ownerId === player.nickname)
+  // Numeric server-issued identity: the player side matches Number(playerId).
+  const myPokemon = duelPokemonState.filter((p) => p.ownerId === Number(player.playerId))
 
-  const handleSelect = (pokemonId: string) => {
+  const handleSelect = (pokemonId: number) => {
     setSelectedId((current) => (current === pokemonId ? null : pokemonId))
   }
 
   const handleConfirm = () => {
-    if (!selectedId) return
+    if (selectedId == null) return
+    // Submits duel:switch_decision via WS — the server owns the new active.
     actions.confirmSwap(selectedId)
     navigate('/duel')
   }

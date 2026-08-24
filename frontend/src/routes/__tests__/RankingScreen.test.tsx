@@ -1,13 +1,47 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+// #10 PR 2: RankingScreen is server-driven — it renders state.finalRanking
+// verbatim, falls back to buildProvisionalRanking while the room is open, and
+// silently swaps when room:final_ranking arrives (no badge/animation).
+// "JUGAR DE NUEVO" stays a local reset + /lobby navigation.
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
 import { STORAGE_KEY, serializeMockState } from '../../state/store'
 import type { DuelPokemonState, DuelState, MockState, TournamentState } from '../../state/schema'
 import RankingScreen from '../RankingScreen'
+import { io } from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
+
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(),
+}))
+
+import { disconnectSocket } from '../../lib/socket'
+
+function makeFakeSocket(): Socket & { _fire: (event: string, payload?: unknown) => void } {
+  const handlers = new Map<string, (payload?: unknown) => void>()
+  const fake = {
+    on: vi.fn((event: string, handler: (payload?: unknown) => void) => {
+      handlers.set(event, handler)
+      return fake
+    }),
+    off: vi.fn((event: string) => {
+      handlers.delete(event)
+      return fake
+    }),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+    _fire: (event: string, payload?: unknown) => {
+      handlers.get(event)?.(payload)
+    },
+  }
+  return fake as unknown as Socket & { _fire: (event: string, payload?: unknown) => void }
+}
+
+let fakeSocket: ReturnType<typeof makeFakeSocket>
 
 function SessionProbe() {
   const [state] = useMockState()
@@ -16,6 +50,70 @@ function SessionProbe() {
       room:{state.room ? 'present' : 'cleared'}|nickname:{state.player.nickname}
     </span>
   )
+}
+
+function makePokemon(ownerId: number, isActive: boolean): DuelPokemonState {
+  return {
+    duelId: '42',
+    ownerId,
+    pokemonId: ownerId * 10 + 1,
+    name: `mon-${ownerId}`,
+    type: 'normal',
+    spriteUrl: '',
+    backSpriteUrl: '',
+    currentHp: isActive ? 100 : 0,
+    ppMove1: 4,
+    ppMove2: 4,
+    ppMove3: 4,
+    isActive,
+    fainted: !isActive,
+  }
+}
+
+function makeFinishedDuel(winnerId: string): DuelState {
+  return {
+    duelId: '42',
+    slot: 'semiA',
+    phase: 'finished',
+    turnNumber: 3,
+    winnerId,
+    endReason: 'ko',
+    opponentDisconnected: false,
+    lastRejection: null,
+  }
+}
+
+function makeTournamentState(): TournamentState {
+  return {
+    bracket: {
+      semiA: { duelId: '42', playerA: '10', playerB: '11' },
+      semiB: { duelId: '43', playerA: '12', playerB: '13' },
+    },
+  }
+}
+
+function makeRankingState(overrides: Partial<MockState> = {}): MockState {
+  return {
+    player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+    room: {
+      code: 'AB12',
+      maxPlayers: 4,
+      status: 'in_progress',
+      players: [
+        { playerId: '10', nickname: 'Ash', ready: true, connected: true },
+        { playerId: '11', nickname: 'Misty', ready: true, connected: true },
+        { playerId: '12', nickname: 'Brock', ready: true, connected: true },
+        { playerId: '13', nickname: 'Gary', ready: true, connected: true },
+      ],
+    },
+    teamSelection: { starterId: 25, rosterIds: [] },
+    tournament: makeTournamentState(),
+    duelPokemonState: [makePokemon(10, true), makePokemon(11, true)],
+    duel: makeFinishedDuel('10'),
+    pendingDuelId: null,
+    finalRanking: null,
+    ...overrides,
+  }
 }
 
 function renderRanking(state: MockState) {
@@ -33,121 +131,87 @@ function renderRanking(state: MockState) {
   )
 }
 
-function makePokemon(ownerId: string, isActive: boolean): DuelPokemonState {
-  return {
-    duelId: 'duel-1',
-    ownerId,
-    pokemonId: `${ownerId}-1`,
-    name: `${ownerId}-1`,
-    type: 'normal',
-    spriteUrl: '',
-    backSpriteUrl: '',
-    currentHp: isActive ? 100 : 0,
-    ppMove1: 4,
-    ppMove2: 4,
-    ppMove3: 4,
-    isActive,
-    fainted: !isActive,
-  }
-}
-
-function makeFinishedDuel(winnerId: string): DuelState {
-  return {
-    duelId: 'duel-1',
-    slot: '1v1',
-    phase: 'finished',
-    turnNumber: 3,
-    winnerId,
-    endReason: 'ko',
-  }
-}
-
-function make1v1FinishedState(): MockState {
-  return {
-    player: { nickname: 'Ash', playerId: null, sessionToken: null },
-    room: { code: 'AB12', maxPlayers: 2, status: 'finished', players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }] },
-    teamSelection: { starterId: 25, rosterIds: [] },
-    tournament: null,
-    duelPokemonState: [makePokemon('Ash', true), makePokemon('bot', true)],
-    duel: makeFinishedDuel('Ash'),
-  }
-}
-
-function makeTournamentFinishedState(): MockState {
-  const results = {
-    semiA: { winner: 'VORTEX_99', loser: 'CYBER_RONIN' },
-    semiB: { winner: 'Ash', loser: 'STEALTH_OP' },
-    thirdPlace: { winner: 'CYBER_RONIN', loser: 'STEALTH_OP' },
-    final: { winner: 'Ash', loser: 'VORTEX_99' },
-  }
-  const tournament: TournamentState = {
-    bracket: {},
-    queue: ['semiA', 'semiB', 'thirdPlace', 'final'],
-    activeSlot: 'final',
-    results,
-  }
-  return {
-    player: { nickname: 'Ash', playerId: null, sessionToken: null },
-    room: {
-      code: 'AB12',
-      maxPlayers: 4,
-      status: 'finished',
-      players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
-    },
-    teamSelection: { starterId: 25, rosterIds: [] },
-    tournament,
-    duelPokemonState: [makePokemon('Ash', true), makePokemon('bot', true)],
-    duel: makeFinishedDuel('Ash'),
-  }
-}
-
-describe('RankingScreen — 1v1 podium', () => {
-  it('shows exactly two rows with the real winner first and a champion badge', () => {
-    renderRanking(make1v1FinishedState())
-
-    const rows = screen.getAllByTestId('podium-row')
-    expect(rows).toHaveLength(2)
-    expect(rows[0]).toHaveTextContent('#1')
-    expect(rows[0]).toHaveTextContent('ASH')
-    expect(rows[0]).toHaveTextContent('CAMPEÓN')
-    expect(rows[1]).toHaveTextContent('#2')
-    expect(rows[1]).not.toHaveTextContent('CAMPEÓN')
-  })
-
-  it('does not show a 4th row for a 1v1 result', () => {
-    renderRanking(make1v1FinishedState())
-    expect(screen.queryByText('#4')).not.toBeInTheDocument()
-  })
+beforeEach(() => {
+  fakeSocket = makeFakeSocket()
+  vi.mocked(io).mockReturnValue(fakeSocket as never)
 })
 
-describe('RankingScreen — tournament podium', () => {
-  it('shows four rows ordered final winner, final loser, 3rd winner, 3rd loser', () => {
-    renderRanking(makeTournamentFinishedState())
+afterEach(() => {
+  vi.clearAllMocks()
+  disconnectSocket()
+})
+
+const FINAL_RANKING = [
+  { rank: 1, name: 'Ash', champion: true },
+  { rank: 2, name: 'Misty', champion: false },
+  { rank: 3, name: 'Brock', champion: false },
+  { rank: 4, name: 'Gary', champion: false },
+]
+
+describe('RankingScreen — authoritative ranking', () => {
+  it('renders the podium from state.finalRanking verbatim', () => {
+    renderRanking(makeRankingState({ finalRanking: FINAL_RANKING }))
 
     const rows = screen.getAllByTestId('podium-row')
     expect(rows).toHaveLength(4)
     expect(rows[0]).toHaveTextContent('#1')
     expect(rows[0]).toHaveTextContent('ASH')
-    expect(rows[1]).toHaveTextContent('#2')
-    expect(rows[1]).toHaveTextContent('VORTEX_99')
-    expect(rows[2]).toHaveTextContent('#3')
-    expect(rows[2]).toHaveTextContent('CYBER_RONIN')
+    expect(rows[0]).toHaveTextContent('CAMPEÓN')
     expect(rows[3]).toHaveTextContent('#4')
-    expect(rows[3]).toHaveTextContent('STEALTH_OP')
+    expect(rows[3]).toHaveTextContent('GARY')
+  })
+})
+
+describe('RankingScreen — provisional ranking (wait/go-now path)', () => {
+  it('falls back to a provisional podium when finalRanking is still null', () => {
+    renderRanking(makeRankingState())
+
+    const rows = screen.getAllByTestId('podium-row')
+    expect(rows).toHaveLength(4)
+    expect(rows[0]).toHaveTextContent('#1')
+    expect(rows[0]).toHaveTextContent('ASH')
+    expect(rows[0]).toHaveTextContent('CAMPEÓN')
+    expect(rows[1]).toHaveTextContent('MISTY')
+    expect(rows[2]).toHaveTextContent('BROCK')
+    expect(rows[3]).toHaveTextContent('GARY')
   })
 
-  it('shows the 4th-place row only for tournaments', () => {
-    renderRanking(makeTournamentFinishedState())
-    expect(screen.getByText('#4')).toBeInTheDocument()
+  it('silently swaps to the authoritative ranking when room:final_ranking arrives — no badge or message', () => {
+    renderRanking(makeRankingState())
+
+    expect(screen.getAllByTestId('podium-row')[0]).toHaveTextContent('ASH')
+    // The provisional view carries no distinguishing marker.
+    expect(screen.queryByText(/provisional/i)).not.toBeInTheDocument()
+
+    act(() => {
+      fakeSocket._fire('room:final_ranking', {
+        roomId: 1,
+        ranking: [
+          { playerId: 11, nickname: 'Misty', finalRank: 1 },
+          { playerId: 10, nickname: 'Ash', finalRank: 2 },
+          { playerId: 12, nickname: 'Brock', finalRank: 3 },
+          { playerId: 13, nickname: 'Gary', finalRank: 4 },
+        ],
+      })
+    })
+
+    const rows = screen.getAllByTestId('podium-row')
+    expect(rows[0]).toHaveTextContent('MISTY')
+    expect(rows[0]).toHaveTextContent('CAMPEÓN')
+    expect(rows[1]).toHaveTextContent('ASH')
+    // Silent swap: still no badge, animation or message.
+    expect(screen.queryByText(/provisional/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/actualizado/i)).not.toBeInTheDocument()
   })
 })
 
 describe('RankingScreen — play again', () => {
   it('clears the room, duel and tournament while keeping the nickname', async () => {
-    const user = userEvent.setup()
-    renderRanking(makeTournamentFinishedState())
+    renderRanking(makeRankingState({ finalRanking: FINAL_RANKING }))
 
-    await user.click(screen.getByRole('button', { name: /jugar de nuevo/i }))
+    act(() => {
+      screen.getByRole('button', { name: /jugar de nuevo/i }).click()
+    })
 
     expect(screen.getByText('LOBBY-LANDED')).toBeInTheDocument()
     expect(screen.getByTestId('session-probe').textContent).toContain('room:cleared')

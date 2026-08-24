@@ -69,6 +69,8 @@ function renderLobby(session?: boolean) {
       tournament: null,
       duelPokemonState: [],
       duel: null,
+      pendingDuelId: null,
+      finalRanking: null,
     }
     localStorage.setItem(STORAGE_KEY, serializeMockState(seeded))
   }
