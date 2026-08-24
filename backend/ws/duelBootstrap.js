@@ -37,7 +37,16 @@ export async function bootstrapDuelIfReady(io, roomId) {
     maxPlayers === 2 &&
     players.length === maxPlayers &&
     players.every((p) => p.ready);
-  if (!full1v1Ready || status !== 'waiting') return undefined;
+
+  // Readiness gate (item #7, PR 1 rematch): the first duel starts from a
+  // `waiting` room; a rematch starts from an `in_progress` 1v1 room whose
+  // previous duel finished (ready flags were reset, so both re-readying opens
+  // this gate again). Any other status — `finished` (room closed) or
+  // `aborted` — must never open a new duel. Double-firing mid-duel is safe:
+  // createDuelFromRoom's scoped existing-check returns the in-flight duel
+  // instead of duplicating it.
+  const canBootstrap = status === 'waiting' || status === 'in_progress';
+  if (!full1v1Ready || !canBootstrap) return undefined;
 
   const [player1, player2] = players;
   const duel = await createDuelFromRoom(roomId, player1.playerId, player2.playerId);
