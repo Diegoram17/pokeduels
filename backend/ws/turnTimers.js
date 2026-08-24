@@ -64,3 +64,29 @@ export function createTurnTimerRegistry({ timeoutMs = DEFAULT_TURN_TIMEOUT_MS } 
     },
   };
 }
+
+let singletonTurnTimerRegistry = null;
+
+/**
+ * Returns the shared process-wide turn timer registry, creating it on first
+ * use. Mirrors `getTurnCycle()` / `getRoundStateStore()` so the centralized
+ * duel-finish lifecycle (`duelLifecycle.js`) can reach the default registry
+ * without threading a dependency through every caller. Per-server callers that
+ * need a custom timeout still use `createTurnTimerRegistry({ timeoutMs })`
+ * directly (composition root pattern).
+ * @returns {ReturnType<typeof createTurnTimerRegistry>}
+ */
+export function getTurnTimerRegistry() {
+  if (!singletonTurnTimerRegistry) {
+    singletonTurnTimerRegistry = createTurnTimerRegistry();
+  }
+  return singletonTurnTimerRegistry;
+}
+
+/**
+ * Test escape hatch: drops the shared singleton. Factory-created registries are
+ * unaffected (they own their own Maps).
+ */
+export function resetTurnTimerRegistry() {
+  singletonTurnTimerRegistry = null;
+}

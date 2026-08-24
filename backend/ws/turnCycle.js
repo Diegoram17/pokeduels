@@ -5,6 +5,7 @@ import {
 import { resolverRonda } from '../engine/roundResolver.js';
 import { withDuelFaultIsolation } from '../engine/faultIsolation.js';
 import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
+import { finalizeDuelSideEffects } from './duelLifecycle.js';
 
 /**
  * Per-duel action buffer + shared turn-resolution trigger (item #5, design:
@@ -102,12 +103,16 @@ export function createTurnCycle() {
       io.to(`duel:${duelId}`).emit('duel:turn_resolved', mapDuelStateToCamelCase(fresh));
 
       if (fresh.duel.status === 'finished') {
-        roundState.delete(duelId);
-        io.to(`duel:${duelId}`).emit('duel:finished', {
+        // Team wipe — the round resolution already persisted the finish
+        // (applyRoundResult's guarded transactional write). Route the post-write
+        // cleanup + broadcast through the centralized lifecycle (item #6) so
+        // KO shares one finalize path with surrender/disconnect.
+        await finalizeDuelSideEffects(
+          io,
           duelId,
-          winnerId: fresh.duel.winner_id ?? null,
-          endReason: fresh.duel.end_reason ?? null,
-        });
+          fresh.duel.winner_id ?? null,
+          'ko',
+        );
         return true;
       }
 
