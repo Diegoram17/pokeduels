@@ -29,6 +29,12 @@ export function createSocketServer(
   const reconnectTimers = createReconnectTimerRegistry({ graceMs: reconnectGraceMs });
   const turnTimers = createTurnTimerRegistry({ timeoutMs: turnTimeoutMs });
   const bracketWalkoverTimers = createBracketWalkoverTimerRegistry();
+  // Initialize the shared turn-cycle singleton with the walkover registry
+  // BEFORE any handler registers (registerRoomHandlers' createDuelLifecycle
+  // calls getTurnCycle() with no args and would otherwise cache a registry-less
+  // singleton). The KO path's advanceTournamentOrRematch needs the registry to
+  // arm walkovers when it creates the bracket finals.
+  const turnCycle = getTurnCycle({ bracketWalkoverTimers });
 
   // Auth: one touchSession() per connection (not per event). The resolved
   // player becomes socket.data.player; unknown tokens and DB faults reject
@@ -50,7 +56,7 @@ export function createSocketServer(
     registerTeamHandlers(io, socket);
     registerDuelHandlers(io, socket, {
       turnTimers,
-      turnCycle: getTurnCycle({ bracketWalkoverTimers }),
+      turnCycle,
       bracketWalkoverTimers,
     });
   });
