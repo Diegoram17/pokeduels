@@ -64,6 +64,22 @@ describe.skipIf(!hasDatabase)('room lobby over WS (requires DATABASE_URL)', () =
     return { creatorClient, joinerClient };
   }
 
+  /**
+   * Resolves the next `room:state` on `emitter` whose payload satisfies
+   * `predicate`, skipping any stale intermediate broadcasts (e.g. a "waiting"
+   * state from a prior leave still in flight before the closing "aborted"
+   * one). The closing broadcast is guaranteed to arrive, so this drains past
+   * non-matching states instead of asserting on whichever one lands first.
+   */
+  async function waitForRoomState(emitter, predicate, timeoutMs = 15000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const state = await waitForEvent(emitter, 'room:state', timeoutMs - (Date.now() - start));
+      if (predicate(state)) return state;
+    }
+    throw new Error(`no matching room:state within ${timeoutMs}ms`);
+  }
+
   it('broadcasts room:state when a player joins an open room', async () => {
     const harness = await startHarness();
     const { creator, joiner, room } = await createSeatedRoom();
@@ -168,7 +184,11 @@ describe.skipIf(!hasDatabase)('room lobby over WS (requires DATABASE_URL)', () =
     // Both leave: first leaves a waiting room at 1 player, second closes it.
     joinerClient.emit('room:leave');
     await waitForEvent(joinerClient, 'room:state');
-    const stateP = waitForEvent(creatorClient, 'room:state');
+    // Wait for the CLOSING broadcast specifically: the creator may still have
+    // the joiner's-leave "waiting" room:state in flight, and a plain
+    // waitForEvent would intermittently capture that stale state instead of
+    // the "aborted" one. waitForRoomState drains past non-matching states.
+    const stateP = waitForRoomState(creatorClient, (s) => s.status === 'aborted');
     creatorClient.emit('room:leave');
     const state = await stateP;
 

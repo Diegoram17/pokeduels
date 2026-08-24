@@ -245,7 +245,11 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
   });
 
   it('reverts every table on migrate down', () => {
-    run(`${MIGRATE} down`);
+    // node-pg-migrate v7's bare `down` defaults its count to 1 (see
+    // getMigrationsToRun: `const { count: count2 = 1 } = options`), so it only
+    // reverts the LAST applied migration and leaves 0001's 10 tables standing.
+    // Passing an explicit count of `0` reverts the full chain to empty.
+    run(`${MIGRATE} down 0`);
 
     return pool
       .query(

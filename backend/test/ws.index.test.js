@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import { io as ioClient } from 'socket.io-client';
 import { createSocketServer } from '../ws/index.js';
 import { pool } from '../db/pool.js';
-import { hasDatabase } from './helpers.js';
+import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
 
 // Composition-root tests for createSocketServer: it must attach a real
 // Socket.IO Server to the shared http.Server, expose { io, reconnectTimers },
@@ -76,12 +76,16 @@ describe('createSocketServer', () => {
 
 describe.skipIf(!hasDatabase)('auth middleware (requires DATABASE_URL)', () => {
   beforeAll(async () => {
-    // Warm the Neon connection: the first pool.query of a fresh worker pays a
-    // serverless cold-start that can take seconds, blowing the connect_error
-    // timeout below. (Observed: touchSession(undefined) hung ~3s+ on first
-    // query, then returned instantly once the connection was warm.)
+    // touchSession validates tokens against the players table, so the schema
+    // must be present. integration.test.js ends with `migrate down 0` which
+    // empties the DB, so self-provision here (matching every other DB test
+    // file) instead of assuming a prior file left the schema in place.
+    await ensureSchemaAndSeed(pool);
+    // Warm the connection: the first pool.query of a fresh worker pays a
+    // cold-start that can take seconds, blowing the connect_error timeout
+    // below. (Observed: touchSession(undefined) hung ~3s+ on first query.)
     await pool.query('SELECT 1');
-  });
+  }, SEED_TIMEOUT);
 
   it('rejects a connection with no session token', async () => {
     const { httpServer, io, port } = await startHarness();
