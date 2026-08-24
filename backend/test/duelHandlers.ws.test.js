@@ -8,7 +8,7 @@ import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
 import { startWsHarness, waitForEvent, waitUntil, joinRoomViaWs } from './wsHelpers.js';
 import { resetPhaseStore, getPhaseStore } from '../engine/duelPhaseStore.js';
 import { resetRoundStateStore, getRoundStateStore } from '../ws/duelRoundState.js';
-import { resetTurnCycle } from '../ws/turnCycle.js';
+import { resetTurnCycle, getTurnCycle } from '../ws/turnCycle.js';
 
 /**
  * End-to-end duel cycle over a real Socket.IO connection (item #5): room:ready
@@ -513,4 +513,128 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
 
     expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
   }, 60000);
+
+  /**
+   * Counts server-side broadcasts of `event` across the harness Socket.IO
+   * server (used to prove exactly-one semantics on simultaneous finishes).
+   * Wraps io.to().emit() — the exact path finalizeDuelSideEffects uses.
+   */
+  function countBroadcasts(io, event) {
+    const origTo = io.to.bind(io);
+    let count = 0;
+    io.to = (room) => {
+      const operator = origTo(room);
+      const origEmit = operator.emit.bind(operator);
+      operator.emit = (name, ...args) => {
+        if (name === event) count += 1;
+        return origEmit(name, ...args);
+      };
+      return operator;
+    };
+    return () => count;
+  }
+
+  describe('duel:surrender (item #6, RF-5.5)', () => {
+    it('ends an in_progress duel with surrender: opponent wins and duel:finished reaches both players', async () => {
+      const harness = await startHarness({ turnTimeoutMs: 60000 });
+      const { c1, c2, duelId, p1, p2 } = await createActingDuel(harness);
+
+      const fin1P = waitForEvent(c1, 'duel:finished', 30000);
+      const fin2P = waitForEvent(c2, 'duel:finished', 30000);
+      c1.emit('duel:surrender', { duelId });
+      const fin1 = await fin1P;
+      const fin2 = await fin2P;
+
+      expect(fin1).toMatchObject({ duelId, winnerId: p2.id, endReason: 'surrender' });
+      expect(fin2).toMatchObject({ duelId, winnerId: p2.id, endReason: 'surrender' });
+
+      const { rows } = await pool.query(
+        'SELECT status, winner_id, end_reason FROM duels WHERE id = $1',
+        [duelId],
+      );
+      expect(rows[0]).toMatchObject({ status: 'finished', winner_id: p2.id, end_reason: 'surrender' });
+      expect(getRoundStateStore().get(duelId)).toBeUndefined();
+    }, 120000);
+
+    it('rejects a surrender from a non-participant with no state change', async () => {
+      const harness = await startHarness({ turnTimeoutMs: 60000 });
+      const { c1, duelId } = await createActingDuel(harness);
+
+      // A player who is NOT part of this duel tries to surrender it.
+      const outsider = await createPlayer('SurrenderOutsider');
+      const c3 = await harness.connect(outsider.sessionToken);
+
+      const rejP = waitForEvent(c3, 'duel:surrender_rejected', 30000);
+      c3.emit('duel:surrender', { duelId });
+      const rej = await rejP;
+      expect(rej).toMatchObject({ reason: 'not_participant' });
+
+      // No state change: the duel is still live with no winner.
+      const { rows } = await pool.query(
+        'SELECT status, winner_id FROM duels WHERE id = $1',
+        [duelId],
+      );
+      expect(rows[0].status).toBe('in_progress');
+      expect(rows[0].winner_id).toBeNull();
+    }, 120000);
+
+    it('rejects a surrender before the duel is in_progress (pending) with no state change', async () => {
+      const harness = await startHarness({ turnTimeoutMs: 60000 });
+      const ctx = await createSeatedAndTeamedRoom(harness);
+      const { duelId } = await readyBoth(ctx); // duel created 'pending'; no leads picked
+
+      const rejP = waitForEvent(ctx.c1, 'duel:surrender_rejected', 30000);
+      ctx.c1.emit('duel:surrender', { duelId });
+      const rej = await rejP;
+      expect(rej).toMatchObject({ reason: 'not_in_progress' });
+
+      const { rows } = await pool.query(
+        'SELECT status, winner_id, end_reason FROM duels WHERE id = $1',
+        [duelId],
+      );
+      expect(rows[0].status).toBe('pending');
+      expect(rows[0].winner_id).toBeNull();
+      expect(rows[0].end_reason).toBeNull();
+    }, 120000);
+  });
+
+  describe('stray turn-timer regression (item #6)', () => {
+    it('is a no-op after surrender: no re-broadcast of duel:finished, no winner/end_reason overwrite', async () => {
+      const harness = await startHarness({ turnTimeoutMs: 60000 });
+      const { c1, c2, duelId, p1, p2 } = await createActingDuel(harness);
+
+      // A real 10s turn window is pending: P1 acted, P2 has not.
+      c1.emit('duel:select_action', { duelId, moveIndex: 4 });
+      await waitUntil(() => harness.turnTimers.has(duelId), 20000);
+      expect(harness.turnTimers.has(duelId)).toBe(true);
+
+      // P1 surrenders: the duel finishes and the pending timer is cancelled.
+      const finishedP = waitForEvent(c2, 'duel:finished', 30000);
+      c1.emit('duel:surrender', { duelId });
+      await finishedP;
+      expect(harness.turnTimers.has(duelId)).toBe(false);
+
+      // Reproduce the stray timer firing after the finish: the exact resolution
+      // the turn-timer callback runs (bufferTimeoutAction + attemptResolveTurn).
+      const turnCycle = getTurnCycle();
+      const countFinished = countBroadcasts(harness.io, 'duel:finished');
+      const before = (
+        await pool.query('SELECT status, winner_id, end_reason FROM duels WHERE id = $1', [duelId])
+      ).rows[0];
+      await turnCycle.bufferTimeoutAction(duelId);
+      const fired = await turnCycle.attemptResolveTurn(harness.io, duelId);
+
+      // No re-broadcast of duel:finished from the stray callback...
+      expect(fired).toBe(false);
+      expect(countFinished()).toBe(0);
+      // ...and no winner_id/end_reason overwrite (the guarded write holds).
+      const after = (
+        await pool.query('SELECT status, winner_id, end_reason FROM duels WHERE id = $1', [duelId])
+      ).rows[0];
+      expect(after).toEqual(before);
+      expect(after).toMatchObject({ status: 'finished', winner_id: p2.id, end_reason: 'surrender' });
+      // The finish cleanup also ran: WS round sub-state is gone.
+      expect(getRoundStateStore().get(duelId)).toBeUndefined();
+    }, 120000);
+  });
 });

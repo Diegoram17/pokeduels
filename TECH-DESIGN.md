@@ -465,7 +465,7 @@ esperás, decímelo y lo ajusto.
 - [ ] `duel:select_action` con `moveIndex` fuera de 1-4, o sobre un movimiento sin PP, se rechaza o se fuerza al movimiento 4 según corresponda (RF-4.2, RF-4.3).
 - [ ] <!-- interpretación: "verificable" se toma como test estadístico sobre N rondas, no determinístico --> El orden de resolución dentro de una ronda es aleatorio, verificado con un test estadístico sobre múltiples rondas (RF-4.7).
 - [ ] Un pokémon con `fainted=true` no ejecuta su acción aunque la haya enviado antes de caer en la misma ronda (RF-4.8).
-- [ ] `duel:surrender` en un duelo `in_progress` lo termina con `end_reason='surrender'` y `winner_id` = rival (RF-5.5).
+- [x] `duel:surrender` en un duelo `in_progress` lo termina con `end_reason='surrender'` y `winner_id` = rival (RF-5.5).
 - [ ] Ningún payload cliente→servidor de combate lleva daño o HP — solo `moveIndex`/`switchTo` (RNF-3, RF-4.12).
 - [ ] Un par de tipos sin entrada en `type_effectiveness` hace que `calcularDaño` lance un error explícito, nunca que devuelva `NaN` o daño silenciosamente incorrecto.
 - [ ] Los dos duelos concurrentes de un torneo de 4 no se cruzan: un cliente en el `duelId` A nunca recibe eventos `duel:*` del `duelId` B (ADR-0004, rooms de Socket.IO por duelo).
@@ -480,7 +480,7 @@ esperás, decímelo y lo ajusto.
 ### Tiempo real y resiliencia
 
 - [ ] Sin acción en 10s, el servidor aplica auto-ataque con `moveIndex=4` y `was_timeout=true` (RF-6.1).
-- [ ] La desconexión del socket durante un duelo `in_progress` dispara `duel:opponent_disconnected` + victoria automática del rival (RF-6.2).
+- [x] La desconexión del socket durante un duelo `in_progress` dispara `duel:opponent_disconnected` + victoria automática del rival (RF-6.2).
 - [ ] `/health` responde 200 sin tocar la base de datos; el cron externo lo llama en el intervalo configurado (ADR-0006).
 - [ ] Al arrancar, el backend anula todo `duel`/`room` que haya quedado en `in_progress`, sin excepción, antes de aceptar conexiones nuevas (ADR-0008).
 - [ ] Un cliente que reconecta a una sala `aborted` recibe `room:aborted` y no `room:state`, y el frontend lo redirige a P2 sin permitir reintentar el mismo duelo.

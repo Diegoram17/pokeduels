@@ -8,6 +8,7 @@ import {
   markPlayerConnected,
   markPlayerDisconnected,
 } from '../db/rooms.js';
+import { findActiveDuelForPlayer } from '../repositories/duelRepository.js';
 import { broadcastRoomState } from '../ws/roomState.js';
 import { bootstrapDuelIfReady } from '../ws/duelBootstrap.js';
 import { registerRoomHandlers } from '../ws/roomHandlers.js';
@@ -28,6 +29,14 @@ vi.mock('../ws/roomState.js', () => ({
 }));
 vi.mock('../ws/duelBootstrap.js', () => ({
   bootstrapDuelIfReady: vi.fn(),
+}));
+vi.mock('../repositories/duelRepository.js', () => ({
+  findActiveDuelForPlayer: vi.fn(),
+}));
+
+const mockLifecycle = { finishDuel: vi.fn(), finalizeDuelSideEffects: vi.fn() };
+vi.mock('../ws/duelLifecycle.js', () => ({
+  createDuelLifecycle: vi.fn(() => mockLifecycle),
 }));
 
 describe('registerRoomHandlers', () => {
@@ -60,6 +69,9 @@ describe('registerRoomHandlers', () => {
     markPlayerDisconnected.mockResolvedValue(undefined);
     broadcastRoomState.mockResolvedValue(undefined);
     bootstrapDuelIfReady.mockResolvedValue(undefined);
+    // No live duel by default: the disconnect listener falls through to the
+    // lobby grace path (the pre-change behavior).
+    findActiveDuelForPlayer.mockResolvedValue(null);
 
     registerRoomHandlers(io, socket, reconnectTimers);
   });
@@ -156,6 +168,27 @@ describe('registerRoomHandlers', () => {
     it('is a no-op when the socket was never in a room', async () => {
       socket.emit('disconnect');
       await new Promise((r) => setTimeout(r, 20));
+      expect(markPlayerDisconnected).not.toHaveBeenCalled();
+      expect(reconnectTimers.start).not.toHaveBeenCalled();
+    });
+
+    it('forfeits a mid-duel disconnect via finishDuel + duel:opponent_disconnected, skipping the lobby grace', async () => {
+      // P1 (id 5) is mid-duel against P2 (id 99) in duel 9, still in_progress.
+      findActiveDuelForPlayer.mockResolvedValueOnce({
+        id: 9,
+        player1_id: 5,
+        player2_id: 99,
+        status: 'in_progress',
+      });
+      const lifecycle = mockLifecycle;
+      socket.data.roomId = 7;
+      socket.emit('disconnect');
+      await vi.waitFor(() => expect(lifecycle.finishDuel).toHaveBeenCalled());
+
+      expect(findActiveDuelForPlayer).toHaveBeenCalledWith(5);
+      expect(lifecycle.finishDuel).toHaveBeenCalledWith(io, 9, 99, 'disconnect');
+      expect(io.to).toHaveBeenCalledWith('duel:9');
+      // The lobby grace path is NOT taken for a mid-duel forfeit.
       expect(markPlayerDisconnected).not.toHaveBeenCalled();
       expect(reconnectTimers.start).not.toHaveBeenCalled();
     });

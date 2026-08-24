@@ -11,6 +11,7 @@ import { PHASES, EVENTS, transition } from '../engine/stateMachine.js';
 import { getPhaseStore } from '../engine/duelPhaseStore.js';
 import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
 import { withWsHandler } from './wsFaultIsolation.js';
+import { createDuelLifecycle } from './duelLifecycle.js';
 
 /**
  * Registers the duel event handlers for one connected socket (item #5). Every
@@ -56,6 +57,12 @@ function toRejectionWsError(event, err, extra = {}) {
 }
 
 export function registerDuelHandlers(io, socket, { turnTimers, turnCycle } = {}) {
+  // Item #6 centralized finish path, bound to THIS server's turn-timer
+  // registry (composition root) so the correct pending 10s window is cancelled
+  // on surrender/disconnect (PR 2 note: never the default singleton for
+  // handlers that own a per-server registry).
+  const lifecycle = createDuelLifecycle({ turnTimers });
+
   socket.on('duel:join', (payload) =>
     withWsHandler(socket, async () => {
       const duelId = payload?.duelId;
@@ -181,6 +188,28 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle } = {})
         turnTimers.cancel(duelId);
         await turnCycle.attemptResolveTurn(io, duelId);
       }
+    }),
+  );
+
+  socket.on('duel:surrender', (payload) =>
+    withWsHandler(socket, async () => {
+      const duelId = payload?.duelId;
+      const playerId = socket.data.player.id;
+
+      // Server-side re-validation (RF-5.5): the client-side confirmation
+      // dialog is never trusted (ENG-04). The surrender is accepted ONLY for
+      // a participant of a duel whose coarse status is still in_progress.
+      const state = await fetchDuelForParticipant(duelId, playerId);
+      if (!state) {
+        throw new WsError('duel:surrender_rejected', { duelId, reason: 'not_participant' });
+      }
+      if (state.duel.status !== 'in_progress') {
+        throw new WsError('duel:surrender_rejected', { duelId, reason: 'not_in_progress' });
+      }
+
+      const { player1_id, player2_id } = state.duel;
+      const opponentId = playerId === player1_id ? player2_id : player1_id;
+      await lifecycle.finishDuel(io, duelId, opponentId, 'surrender');
     }),
   );
 }

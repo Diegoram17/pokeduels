@@ -43,7 +43,7 @@ export function createSocketServer(
   });
 
   io.on('connection', (socket) => {
-    registerRoomHandlers(io, socket, reconnectTimers);
+    registerRoomHandlers(io, socket, reconnectTimers, turnTimers);
     registerTeamHandlers(io, socket);
     registerDuelHandlers(io, socket, { turnTimers, turnCycle: getTurnCycle() });
   });

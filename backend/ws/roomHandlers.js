@@ -5,9 +5,11 @@ import {
   markPlayerConnected,
   markPlayerDisconnected,
 } from '../db/rooms.js';
+import { findActiveDuelForPlayer } from '../repositories/duelRepository.js';
 import { broadcastRoomState } from '../ws/roomState.js';
 import { withWsHandler } from '../ws/wsFaultIsolation.js';
 import { bootstrapDuelIfReady } from '../ws/duelBootstrap.js';
+import { createDuelLifecycle } from '../ws/duelLifecycle.js';
 
 const MAX_NICKNAME_LENGTH = 30;
 
@@ -20,8 +22,13 @@ const MAX_NICKNAME_LENGTH = 30;
  *
  * Identity comes from the auth middleware (socket.data.player); the room id
  * the socket is seated in is tracked in socket.data.roomId.
+ *
+ * `turnTimers` is the per-server turn-timer registry (composition root); the
+ * disconnect listener needs it so a mid-duel forfeit cancels the correct
+ * pending 10s turn window.
  */
-export function registerRoomHandlers(io, socket, reconnectTimers) {
+export function registerRoomHandlers(io, socket, reconnectTimers, turnTimers) {
+  const lifecycle = createDuelLifecycle({ turnTimers });
   socket.on('room:join', (payload) =>
     withWsHandler(socket, async () => {
       const { code } = payload ?? {};
@@ -69,9 +76,26 @@ export function registerRoomHandlers(io, socket, reconnectTimers) {
 
   socket.on('disconnect', () =>
     withWsHandler(socket, async () => {
+      const playerId = socket.data.player.id;
+
+      // Duel-membership branch FIRST (item #6, RF-6.2): a socket disconnecting
+      // while its player's duel is `in_progress` forfeits that duel
+      // immediately — no debounce, no 60s lobby grace. The DB query is
+      // necessary because no `socket.data.duelId` field exists anywhere in the
+      // WS layer (only room membership via socket.join).
+      const activeDuel = await findActiveDuelForPlayer(playerId);
+      if (activeDuel) {
+        const { id: duelId, player1_id, player2_id } = activeDuel;
+        const opponentId = playerId === player1_id ? player2_id : player1_id;
+        await lifecycle.finishDuel(io, duelId, opponentId, 'disconnect');
+        io.to(`duel:${duelId}`).emit('duel:opponent_disconnected', { duelId });
+        return;
+      }
+
+      // Lobby/draft grace (RF-2.7): unchanged. Only reached when the player
+      // has no live duel (no active duel, or duel still pending/finished).
       const roomId = socket.data.roomId;
       if (!roomId) return;
-      const playerId = socket.data.player.id;
       await markPlayerDisconnected(roomId, playerId);
       reconnectTimers.start(roomId, playerId, async () => {
         await leaveRoom(roomId, playerId);
