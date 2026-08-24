@@ -1,18 +1,16 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
-import type { DuelSlot } from '../state/schema'
-import {
-  buildPlayerList,
-  semifinalPairings,
-  slotLabel,
-} from '../lib/waitRoom'
-import { roomMode } from '../lib/rooms'
+import type { DuelSlot, RoomState, TournamentSlot, TournamentState } from '../state/schema'
+import { deriveDuelSlot } from '../state/store'
+import { buildPlayerList, slotLabel } from '../lib/waitRoom'
+import { roomMode, roomModeLabel } from '../lib/rooms'
 
 /**
- * Screen 4: Wait Room. Reused for every duel slot of a tournament (semifinal
- * A/B, 3rd-place, final) and for 1v1. Renders the player list with bot
- * fillers, the current slot label, a semifinal mini bracket for tournaments,
- * and enter/leave navigation.
+ * Screen 4: Wait Room (#10 PR 2). Renders the player list, a real bracket
+ * projection from tournament:bracket broadcasts, the pending-duel entry button
+ * (keyed on pendingDuelId), and the 1v1 PostDuelRematchPanel when a 1v1 duel
+ * finished without the room closing (both seats reset to not-ready; each
+ * player re-readies via the existing room:ready pipeline or leaves).
  */
 
 function SlotLabel({ slot }: { slot: DuelSlot }) {
@@ -55,78 +53,71 @@ function PlayerList({ players }: { players: ReturnType<typeof buildPlayerList> }
   )
 }
 
-function BracketMini({ players }: { players: string[] }) {
-  const [semiA, semiB] = semifinalPairings(players)
-  const semifinal = (
-    first: [string, string],
-    slotName: string,
-  ) => (
-    <div className="semis">
-      <div className="pd-card pd-card--tight bracket-slot" style={{ borderLeft: '4px solid var(--pd-yellow)' }}>
-        <span className="pid" style={{ background: 'rgba(255,203,5,.16)', color: 'var(--pd-yellow)' }}>
-          {slotName}
-        </span>
-        <span className="pd-stat">{first[0]}</span>
-      </div>
-      <div className="pd-card pd-card--tight bracket-slot" style={{ opacity: 0.6 }}>
-        <span className="pid" style={{ background: 'rgba(120,180,255,.1)', color: 'var(--pd-text-meta)' }}>
-          {slotName === 'P1' ? 'P2' : 'P4'}
-        </span>
-        <span className="pd-stat" style={{ color: 'var(--pd-text-meta)' }}>
-          {first[1]}
-        </span>
-      </div>
-    </div>
-  )
+const SLOT_ORDER: TournamentSlot[] = ['semiA', 'semiB', 'thirdPlace', 'final']
+
+/**
+ * Real bracket mini (#10): rendered exclusively from the server-pushed
+ * tournament:bracket projection. The bracket carries numeric player ids, so
+ * names resolve through the room roster (falling back to the raw id).
+ */
+function BracketMini({
+  bracket,
+  room,
+}: {
+  bracket: TournamentState['bracket']
+  room: RoomState
+}) {
+  const nameOf = (id: string): string =>
+    room.players.find((p) => p.playerId === id)?.nickname ?? id
   return (
     <section className="pd-card bracket-section" aria-label="CUADRO / LLAVES">
       <div className="bracket-head">
         <h2 className="pd-title" style={{ color: 'var(--pd-blue-light)' }}>
           CUADRO / LLAVES
         </h2>
-        <span className="pd-badge pd-badge--outline" style={{ color: 'var(--pd-text-meta)', borderColor: 'var(--pd-border-blue)' }}>
+        <span
+          className="pd-badge pd-badge--outline"
+          style={{ color: 'var(--pd-text-meta)', borderColor: 'var(--pd-border-blue)' }}
+        >
           RONDA DE 4
         </span>
       </div>
-      <div className="bracket-wrap">
-        <div className="bracket-row">
-          {semifinal(semiA, 'P1')}
-          {semifinal(semiB, 'P3')}
-          <div className="connections">
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-              <path d="M 0 15 L 50 15 L 50 50 L 100 50" fill="none" stroke="#ffcb05" strokeWidth="2" />
-              <path d="M 0 85 L 50 85 L 50 50" fill="none" stroke="rgba(120,180,255,.35)" strokeWidth="2" />
-            </svg>
-          </div>
-          <div className="final-slot">
-            <div className="pd-card" style={{ borderColor: 'var(--pd-yellow)' }}>
-              <span className="pd-label" style={{ display: 'block', marginBottom: 'var(--pd-space-2)' }}>
-                Gran Final
+      <div className="bracket-wrap" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {SLOT_ORDER.map((slot) => {
+          const pairing = bracket[slot]
+          return (
+            <div key={slot} className="pd-card pd-card--tight bracket-slot">
+              <span className="pid" style={{ color: 'var(--pd-yellow)' }}>
+                {slotLabel(slot)}
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--pd-space-3)' }}>
-                <span className="pd-stat">GANADOR A</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span className="pd-stat">{pairing ? nameOf(pairing.playerA) : 'TBD'}</span>
                 <span className="pd-meta">VS</span>
-                <span className="pd-stat" style={{ color: 'var(--pd-text-meta)' }}>
-                  GANADOR B
-                </span>
+                <span className="pd-stat">{pairing ? nameOf(pairing.playerB) : 'TBD'}</span>
               </div>
             </div>
-          </div>
-        </div>
+          )
+        })}
       </div>
     </section>
   )
 }
 
-function EnterDuelButton({ slot }: { slot: DuelSlot }) {
-  const [, actions] = useMockState()
+/**
+ * Enter button for a server-announced duel: renders whenever pendingDuelId is
+ * non-null and joins it via duel:join (design decision: explicit-click gate).
+ */
+function EnterDuelButton() {
+  const [state, actions] = useMockState()
   const navigate = useNavigate()
+  const pendingDuelId = state.pendingDuelId
+  if (pendingDuelId == null) return null
   return (
     <button
       type="button"
       className="pd-btn pd-btn--primary"
       onClick={() => {
-        actions.enterDuel(slot)
+        actions.joinDuel(pendingDuelId)
         navigate('/duel')
       }}
     >
@@ -152,8 +143,43 @@ function LeaveRoomButton() {
   )
 }
 
+/**
+ * 1v1 post-duel re-ready (#10): shown when a 1v1 duel finished and the room
+ * stayed in_progress (pendingDuelId null means no rematch has bootstrapped
+ * yet). REVANCHA re-readies through the existing room:ready pipeline; SALIR
+ * leaves the room.
+ */
+function PostDuelRematchPanel({
+  won,
+  onRematch,
+  onLeave,
+}: {
+  won: boolean
+  onRematch: () => void
+  onLeave: () => void
+}) {
+  return (
+    <div className="pd-card" data-testid="rematch-panel" style={{ padding: 24, textAlign: 'center' }}>
+      <h2 className="pd-title" style={{ margin: 0, color: won ? 'var(--pd-yellow)' : 'var(--pd-text-meta)' }}>
+        {won ? '¡GANASTE EL DUELO!' : 'PERDISTE EL DUELO'}
+      </h2>
+      <p className="pd-body" style={{ margin: '8px 0 20px' }}>
+        La sala sigue abierta. ¿Revancha o salir?
+      </p>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+        <button type="button" className="pd-btn pd-btn--primary" onClick={onRematch}>
+          REVANCHA
+        </button>
+        <button type="button" className="pd-btn pd-btn--ghost" onClick={onLeave}>
+          SALIR
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function WaitRoomScreen() {
-  const [state] = useMockState()
+  const [state, actions] = useMockState()
   const navigate = useNavigate()
   const room = state.room
 
@@ -162,11 +188,12 @@ function WaitRoomScreen() {
   }
 
   const isTournament = roomMode(room.maxPlayers) === 'tournament'
-  const slot: DuelSlot = isTournament && state.tournament
-    ? state.tournament.activeSlot
-    : '1v1'
+  const liveSlot = state.duel ? deriveDuelSlot(state.duel.duelId, state.tournament) : null
   const players = buildPlayerList(room)
-  const playerNames = players.map((entry) => entry.name)
+
+  const showRematch =
+    !isTournament && state.duel?.phase === 'finished' && state.pendingDuelId === null
+  const won = state.duel?.winnerId === state.player.playerId
 
   return (
     <div className="pd-page wait-shell">
@@ -176,7 +203,11 @@ function WaitRoomScreen() {
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
         <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
         <span className="pd-meta wifi-status">
-          <span className="material-symbols-outlined pd-icon--fill" aria-hidden="true" style={{ fontSize: 16, color: 'var(--pd-yellow-mid)' }}>
+          <span
+            className="material-symbols-outlined pd-icon--fill"
+            aria-hidden="true"
+            style={{ fontSize: 16, color: 'var(--pd-yellow-mid)' }}
+          >
             wifi
           </span>
           Conectado
@@ -190,8 +221,21 @@ function WaitRoomScreen() {
               SALA DE ESPERA
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--pd-space-2)' }}>
-              <SlotLabel slot={slot} />
-              <span className="pd-stat" style={{ background: 'rgba(6,12,30,.6)', padding: 'var(--pd-space-1) var(--pd-space-2)', borderRadius: 'var(--pd-radius-sm)' }}>
+              {liveSlot ? (
+                <SlotLabel slot={liveSlot} />
+              ) : (
+                <span className="pd-badge pd-badge--outline" data-testid="slot-label">
+                  {roomModeLabel(roomMode(room.maxPlayers))}
+                </span>
+              )}
+              <span
+                className="pd-stat"
+                style={{
+                  background: 'rgba(6,12,30,.6)',
+                  padding: 'var(--pd-space-1) var(--pd-space-2)',
+                  borderRadius: 'var(--pd-radius-sm)',
+                }}
+              >
                 {players.length} / {room.maxPlayers}
               </span>
             </div>
@@ -211,15 +255,35 @@ function WaitRoomScreen() {
           </div>
         </aside>
 
-        {isTournament && <BracketMini players={playerNames} />}
+        {isTournament && state.tournament && (
+          <BracketMini bracket={state.tournament.bracket} room={room} />
+        )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', flex: 'none' }}>
-          <EnterDuelButton slot={slot} />
-        </div>
+        {showRematch ? (
+          <div style={{ display: 'flex', justifyContent: 'center', flex: 'none' }}>
+            <PostDuelRematchPanel
+              won={won}
+              onRematch={() => actions.setReady(true)}
+              onLeave={() => navigate('/lobby')}
+            />
+          </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', flex: 'none' }}>
+            <EnterDuelButton />
+          </div>
+        )}
       </main>
     </div>
   )
 }
 
 export default WaitRoomScreen
-export { SlotLabel, PlayerList, PlayerRow, BracketMini, EnterDuelButton, LeaveRoomButton }
+export {
+  SlotLabel,
+  PlayerList,
+  PlayerRow,
+  BracketMini,
+  EnterDuelButton,
+  LeaveRoomButton,
+  PostDuelRematchPanel,
+}

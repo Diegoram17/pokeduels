@@ -1,4 +1,9 @@
 // @vitest-environment jsdom
+// #10 PR 2 rewrite: non-WS presentation tests for WaitRoomScreen — roster with
+// bot fillers, slot/mode labels, bracket visibility and navigation guards.
+// WS behaviors (rematch panel, pending-duel entry, real bracket) live in
+// WaitRoomScreen.ws.test.tsx.
+
 import { describe, it, expect } from 'vitest'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
@@ -20,21 +25,10 @@ function SeedProbe({ seed }: { seed?: (actions: MockStateActions) => void }) {
   return null
 }
 
-// Mirrors the real flow: the wait room only mounts once a room exists, so the
-// screen's own redirect guard does not fire before the seed settles.
 function WaitForRoom({ children }: { children: ReactNode }) {
   const [state] = useMockState()
   if (!state.room) return <div>setting-up-room</div>
   return <>{children}</>
-}
-
-function DuelProbe() {
-  const [state] = useMockState()
-  return (
-    <span data-testid="duel-slot-probe">
-      {state.duel?.slot ?? 'none'}
-    </span>
-  )
 }
 
 function renderWaitRoom(seed?: (actions: MockStateActions) => void) {
@@ -51,15 +45,7 @@ function renderWaitRoom(seed?: (actions: MockStateActions) => void) {
               </WaitForRoom>
             }
           />
-          <Route
-            path="/duel"
-            element={
-              <>
-                <DuelProbe />
-                <div>DUEL-LANDED</div>
-              </>
-            }
-          />
+          <Route path="/duel" element={<div>DUEL-LANDED</div>} />
           <Route path="/lobby" element={<div>LOBBY-LANDED</div>} />
         </Routes>
       </MemoryRouter>
@@ -67,73 +53,47 @@ function renderWaitRoom(seed?: (actions: MockStateActions) => void) {
   )
 }
 
-function seedTournament(actions: MockStateActions) {
-  actions.setNickname('Ash')
-  actions.receiveRoomShell({ code: 'Z009', maxPlayers: 4, status: 'waiting' })
-  actions.receiveRoomState({
-    code: 'Z009',
-    maxPlayers: 4,
-    status: 'waiting',
-    players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
-  })
-  actions.updateTeamSelection({
-    starterId: 25,
-    rosterIds: [5, 6, 14, 17, 23],
-  })
-}
-
-function seed1v1(actions: MockStateActions) {
-  actions.setNickname('Ash')
-  actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
-  actions.receiveRoomState({
-    code: 'AB12',
-    maxPlayers: 2,
-    status: 'waiting',
-    players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
-  })
-  actions.updateTeamSelection({
-    starterId: 25,
-    rosterIds: [5, 6, 14, 17, 23],
-  })
+function seedRoom(maxPlayers: 2 | 4, players: { playerId: string; nickname: string }[]) {
+  return (actions: MockStateActions) => {
+    actions.setNickname('Ash')
+    actions.receiveRoomShell({ code: 'AB12', maxPlayers, status: 'waiting' })
+    actions.receiveRoomState({
+      code: 'AB12',
+      maxPlayers,
+      status: 'waiting',
+      players: players.map((p) => ({ ...p, ready: false, connected: true })),
+    })
+  }
 }
 
 describe('WaitRoomScreen', () => {
-  it('shows the active tournament slot label and the player list with bot fillers', () => {
-    renderWaitRoom(seedTournament)
-    expect(screen.getByText('SEMIFINAL A')).toBeInTheDocument()
+  it('shows the player list with the real roster and bot fillers for a 1v1 room', () => {
+    renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
+
     const playerList = screen.getByTestId('player-list')
     expect(within(playerList).getByText('Ash')).toBeInTheDocument()
     expect(within(playerList).getByText('VORTEX_99')).toBeInTheDocument()
-    expect(within(playerList).getByText('STEALTH_OP')).toBeInTheDocument()
-    expect(within(playerList).getByText('CYBER_RONIN')).toBeInTheDocument()
-    expect(screen.getByText('4 / 4')).toBeInTheDocument()
+    expect(screen.getByText('2 / 2')).toBeInTheDocument()
   })
 
-  it('shows the semifinal pairings in the bracket for a tournament room', () => {
-    renderWaitRoom(seedTournament)
-    const bracket = screen.getByRole('region', { name: /cuadro/i })
-    expect(within(bracket).getByText('VORTEX_99')).toBeInTheDocument()
-    expect(within(bracket).getByText('STEALTH_OP')).toBeInTheDocument()
-    expect(within(bracket).getByText('CYBER_RONIN')).toBeInTheDocument()
-  })
+  it('labels a 1v1 room DUELO 1V1 and hides the bracket', () => {
+    renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
 
-  it('hides the bracket and labels the slot DUELO 1V1 for a 1v1 room', () => {
-    renderWaitRoom(seed1v1)
-    expect(screen.getByText('DUELO 1V1')).toBeInTheDocument()
+    expect(screen.getByTestId('slot-label')).toHaveTextContent('DUELO 1V1')
     expect(screen.queryByRole('region', { name: /cuadro/i })).not.toBeInTheDocument()
   })
 
-  it('enters the duel and navigates to the duel board', async () => {
-    const user = userEvent.setup()
-    renderWaitRoom(seedTournament)
-    await user.click(screen.getByRole('button', { name: /entrar al combate/i }))
-    expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
-    expect(screen.getByTestId('duel-slot-probe').textContent).toBe('semiA')
+  it('labels a tournament room TORNEO DE 4 and hides the bracket until a broadcast lands', () => {
+    renderWaitRoom(seedRoom(4, [{ playerId: 'p1', nickname: 'Ash' }]))
+
+    expect(screen.getByTestId('slot-label')).toHaveTextContent('TORNEO DE 4')
+    expect(screen.queryByRole('region', { name: /cuadro/i })).not.toBeInTheDocument()
+    expect(screen.getByText('4 / 4')).toBeInTheDocument()
   })
 
   it('leaves the room and returns to the lobby', async () => {
     const user = userEvent.setup()
-    renderWaitRoom(seedTournament)
+    renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
     await user.click(screen.getByRole('button', { name: /salir de la sala/i }))
     expect(screen.getByText('LOBBY-LANDED')).toBeInTheDocument()
   })
