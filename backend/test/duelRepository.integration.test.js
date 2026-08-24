@@ -6,6 +6,9 @@ import {
   applyRoundResult,
   recordMove,
   getPlayerRoster,
+  createDuelFromRoom,
+  activateLead,
+  applySwitchDecision,
 } from '../repositories/duelRepository.js';
 import { resolverRonda } from '../engine/roundResolver.js';
 import { withDuelFaultIsolation } from '../engine/faultIsolation.js';
@@ -34,6 +37,8 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   /** duel ids this file created — afterAll deletes them (cascade cleans moves/dps) */
   const createdDuelIds = [];
+  /** room ids this file created (bootstrap tests) — afterAll deletes them (cascade cleans duels) */
+  const createdRoomIds = [];
 
   /** Fetches 4 seeded pokemon rows (id + type) — robust to seed-name drift. */
   async function pickFourPokemons() {
@@ -44,6 +49,56 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
       throw new Error('seed missing pokemons — run node seed/index.js');
     }
     return rows;
+  }
+
+  /** Fetches 12 seeded pokemon rows — two full 6-pokemon team selections. */
+  async function pickTwelvePokemons() {
+    const { rows } = await pool.query(
+      'SELECT id, type, name FROM pokemons ORDER BY id LIMIT 12',
+    );
+    if (rows.length < 12) {
+      throw new Error('seed missing pokemons — run node seed/index.js');
+    }
+    return rows;
+  }
+
+  /**
+   * Creates a waiting 1v1 room with two players, each with a full 6-pokemon
+   * team_selections (starter + 5 roster) — the input createDuelFromRoom seeds
+   * duel_pokemon_state from. Returns the room, player and team ids.
+   */
+  async function createRoomWithTeams() {
+    const [p1, p2] = await Promise.all([
+      pool.query(`INSERT INTO players (nickname) VALUES ('DuelRoomP1') RETURNING id`),
+      pool.query(`INSERT INTO players (nickname) VALUES ('DuelRoomP2') RETURNING id`),
+    ]);
+    const player1Id = p1.rows[0].id;
+    const player2Id = p2.rows[0].id;
+
+    const code = `R${Math.random().toString(36).slice(2, 8)}`;
+    const room = await pool.query(
+      `INSERT INTO rooms (code, max_players, status, created_by)
+       VALUES ($1, 2, 'waiting', $2) RETURNING id`,
+      [code, player1Id],
+    );
+    const roomId = room.rows[0].id;
+    createdRoomIds.push(roomId);
+
+    const pokemons = await pickTwelvePokemons();
+    const p1Team = pokemons.slice(0, 6).map((p) => p.id);
+    const p2Team = pokemons.slice(6, 12).map((p) => p.id);
+
+    const insertTeam = (playerId, team) =>
+      team.map((pokemonId, i) =>
+        pool.query(
+          `INSERT INTO team_selections (room_id, player_id, pokemon_id, is_starter, slot)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [roomId, playerId, pokemonId, i === 0, i + 1],
+        ),
+      );
+    await Promise.all([...insertTeam(player1Id, p1Team), ...insertTeam(player2Id, p2Team)]);
+
+    return { roomId, player1Id, player2Id, p1Team, p2Team };
   }
 
   /**
@@ -117,6 +172,9 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
   afterAll(async () => {
     if (createdDuelIds.length > 0) {
       await pool.query('DELETE FROM duels WHERE id = ANY($1::int[])', [createdDuelIds]);
+    }
+    if (createdRoomIds.length > 0) {
+      await pool.query('DELETE FROM rooms WHERE id = ANY($1::int[])', [createdRoomIds]);
     }
     resetEffectivenessCache();
     await pool.end();
@@ -352,5 +410,181 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
     await expect(validateSwitchDecision(duelId, player1Id, active1.id)).rejects.toMatchObject({
       reason: 'already_active',
     });
+  });
+
+  // ---------- createDuelFromRoom (item #5 bootstrap) ----------
+
+  it('createDuelFromRoom creates a pending duel, seeds duel_pokemon_state from team_selections, and marks the room in_progress', async () => {
+    const { roomId, player1Id, player2Id, p1Team, p2Team } = await createRoomWithTeams();
+
+    const duel = await createDuelFromRoom(roomId, player1Id, player2Id);
+    createdDuelIds.push(duel.id);
+
+    expect(duel.id).toBeGreaterThan(0);
+    expect(duel.status).toBe('pending');
+
+    const state = await getDuelState(duel.id);
+    expect(state.duel.player1_id).toBe(player1Id);
+    expect(state.duel.player2_id).toBe(player2Id);
+    // 6 pokemon per player -> 12 seeded live-state rows
+    expect(state.pokemonStates).toHaveLength(12);
+    for (const p of state.pokemonStates) {
+      // Full HP/PP, inactive, alive — first activation comes later via activateLead
+      expect(p.current_hp).toBe(100);
+      expect(p.pp_move_1).toBe(4);
+      expect(p.pp_move_2).toBe(4);
+      expect(p.pp_move_3).toBe(4);
+      expect(p.is_active).toBe(false);
+      expect(p.fainted).toBe(false);
+    }
+    // Seeded rows mirror each player's team selections exactly
+    const p1Owned = state.pokemonStates.filter((p) => p.player_id === player1Id);
+    expect(p1Owned.map((p) => p.pokemon_id).sort((a, b) => a - b))
+      .toEqual([...p1Team].sort((a, b) => a - b));
+    const p2Owned = state.pokemonStates.filter((p) => p.player_id === player2Id);
+    expect(p2Owned.map((p) => p.pokemon_id).sort((a, b) => a - b))
+      .toEqual([...p2Team].sort((a, b) => a - b));
+
+    // Room advanced to in_progress
+    const { rows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [roomId]);
+    expect(rows[0].status).toBe('in_progress');
+  });
+
+  it('createDuelFromRoom is idempotent — a repeat call returns the same duel without a second row', async () => {
+    const { roomId, player1Id, player2Id } = await createRoomWithTeams();
+
+    const first = await createDuelFromRoom(roomId, player1Id, player2Id);
+    createdDuelIds.push(first.id);
+
+    const second = await createDuelFromRoom(roomId, player1Id, player2Id);
+    expect(second.id).toBe(first.id);
+
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM duels WHERE room_id = $1',
+      [roomId],
+    );
+    expect(rows[0].n).toBe(1);
+  });
+
+  // ---------- activateLead (first-activation persistence) ----------
+
+  it('activateLead activates an owned, alive pokemon as the first active', async () => {
+    const { roomId, player1Id, player2Id, p1Team } = await createRoomWithTeams();
+    const duel = await createDuelFromRoom(roomId, player1Id, player2Id);
+    createdDuelIds.push(duel.id);
+
+    const row = await activateLead(duel.id, player1Id, p1Team[0]);
+    expect(row.is_active).toBe(true);
+    expect(row.pokemon_id).toBe(p1Team[0]);
+
+    const state = await getDuelState(duel.id);
+    const active = state.pokemonStates.filter((p) => p.is_active);
+    expect(active).toHaveLength(1);
+    expect(active[0].player_id).toBe(player1Id);
+    expect(active[0].pokemon_id).toBe(p1Team[0]);
+  });
+
+  it('activateLead rejects a lead owned by the other player (wrong_owner) without state change', async () => {
+    const { roomId, player1Id, player2Id, p1Team, p2Team } = await createRoomWithTeams();
+    const duel = await createDuelFromRoom(roomId, player1Id, player2Id);
+    createdDuelIds.push(duel.id);
+
+    await expect(activateLead(duel.id, player1Id, p2Team[0])).rejects.toMatchObject({
+      reason: 'wrong_owner',
+    });
+
+    const state = await getDuelState(duel.id);
+    expect(state.pokemonStates.some((p) => p.is_active)).toBe(false);
+  });
+
+  it('activateLead rejects a fainted lead', async () => {
+    const { roomId, player1Id, player2Id, p1Team } = await createRoomWithTeams();
+    const duel = await createDuelFromRoom(roomId, player1Id, player2Id);
+    createdDuelIds.push(duel.id);
+
+    await pool.query(
+      `UPDATE duel_pokemon_state SET fainted = TRUE
+       WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3`,
+      [duel.id, player1Id, p1Team[1]],
+    );
+
+    await expect(activateLead(duel.id, player1Id, p1Team[1])).rejects.toMatchObject({
+      reason: 'fainted',
+    });
+  });
+
+  // ---------- applySwitchDecision (mid-duel switch persistence) ----------
+
+  it('applySwitchDecision toggles is_active and journals a switch move row', async () => {
+    const { duelId, player1Id, active1, bench1 } = await createDuel();
+
+    const activated = await applySwitchDecision(duelId, player1Id, bench1.id);
+    expect(activated.is_active).toBe(true);
+    expect(activated.pokemon_id).toBe(bench1.id);
+
+    const state = await getDuelState(duelId);
+    const p1Rows = state.pokemonStates.filter((p) => p.player_id === player1Id);
+    expect(p1Rows.find((p) => p.pokemon_id === active1.id).is_active).toBe(false);
+    expect(p1Rows.find((p) => p.pokemon_id === bench1.id).is_active).toBe(true);
+
+    const { rows } = await pool.query(
+      `SELECT action_type, move_index, target_pokemon_id, turn_number, was_timeout
+       FROM moves WHERE duel_id = $1`,
+      [duelId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      action_type: 'switch',
+      move_index: null,
+      target_pokemon_id: active1.id, // the previous active is the row's target
+      was_timeout: false,
+    });
+  });
+
+  it('applySwitchDecision rejects a fainted target and leaves is_active unchanged', async () => {
+    const { duelId, player1Id, active1, bench1 } = await createDuel({ p1BenchFainted: true });
+
+    await expect(applySwitchDecision(duelId, player1Id, bench1.id)).rejects.toMatchObject({
+      reason: 'fainted',
+    });
+
+    const state = await getDuelState(duelId);
+    const p1Active = state.pokemonStates.filter((p) => p.player_id === player1Id && p.is_active);
+    expect(p1Active.map((p) => p.pokemon_id)).toEqual([active1.id]);
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM moves WHERE duel_id = $1',
+      [duelId],
+    );
+    expect(rows[0].n).toBe(0);
+  });
+
+  it('applySwitchDecision rejects switching to the already-active pokemon', async () => {
+    const { duelId, player1Id, active1 } = await createDuel();
+
+    await expect(applySwitchDecision(duelId, player1Id, active1.id)).rejects.toMatchObject({
+      reason: 'already_active',
+    });
+  });
+
+  it('applySwitchDecision with no previous active (forced switch after KO) activates the target and journals no move row', async () => {
+    const { duelId, player1Id, bench1 } = await createDuel();
+    // Simulate the post-KO state: the active fainted and was deactivated.
+    await pool.query(
+      `UPDATE duel_pokemon_state SET is_active = FALSE, fainted = TRUE, current_hp = 0
+       WHERE duel_id = $1 AND player_id = $2 AND is_active = TRUE`,
+      [duelId, player1Id],
+    );
+
+    const activated = await applySwitchDecision(duelId, player1Id, bench1.id);
+    expect(activated.is_active).toBe(true);
+
+    const state = await getDuelState(duelId);
+    expect(state.pokemonStates.filter((p) => p.player_id === player1Id && p.is_active))
+      .toHaveLength(1);
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM moves WHERE duel_id = $1',
+      [duelId],
+    );
+    expect(rows[0].n).toBe(0);
   });
 });

@@ -73,3 +73,51 @@ export async function validateSwitchDecision(duelId, playerId, targetPokemonId) 
   const roster = await getPlayerRoster(duelId, playerId);
   return validateSwitchDecisionCore(roster, playerId, targetPokemonId);
 }
+
+/**
+ * Pure core for FIRST-ACTIVATION lead selection (item #5). Deliberately
+ * distinct from `validateSwitchDecisionCore`: a lead pick is the first active
+ * pokemon of the duel, so there is NO `already_active` check (nothing is
+ * active yet — that check would reject every first pick) and the pick is
+ * pre-round setup, never journaled as a `switch` move.
+ *
+ * Checks, in order: ownership -> not fainted.
+ * @param {Array<{player_id: number, pokemon_id: number, fainted: boolean}>} roster
+ *        the submitting player's `duel_pokemon_state` rows
+ * @param {number} playerId
+ * @param {number} pokemonId
+ * @returns {true} when the lead pick is legal
+ * @throws {ValidationError} with reason 'wrong_owner' | 'fainted'
+ */
+export function validateLeadSelectionCore(roster, playerId, pokemonId) {
+  const target = roster.find((p) => p.pokemon_id === pokemonId);
+
+  if (target === undefined || target.player_id !== playerId) {
+    throw new ValidationError(
+      'wrong_owner',
+      `Pokemon ${pokemonId} is not in player ${playerId}'s roster`,
+    );
+  }
+  if (target.fainted) {
+    throw new ValidationError(
+      'fainted',
+      `Pokemon ${pokemonId} is fainted and cannot lead`,
+    );
+  }
+  return true;
+}
+
+/**
+ * I/O wrapper for lead selection (ENG-04 ID-based signature): fetches the
+ * player's roster via the repository and delegates to the pure core.
+ *
+ * @param {number} duelId
+ * @param {number} playerId
+ * @param {number} pokemonId
+ * @returns {Promise<true>}
+ * @throws {ValidationError} with reason 'wrong_owner' | 'fainted'
+ */
+export async function validateLeadSelection(duelId, playerId, pokemonId) {
+  const roster = await getPlayerRoster(duelId, playerId);
+  return validateLeadSelectionCore(roster, playerId, pokemonId);
+}

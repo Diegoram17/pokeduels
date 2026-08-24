@@ -2,6 +2,8 @@ import { createServer } from 'node:http';
 import { io as ioClient } from 'socket.io-client';
 import { createApp } from '../app.js';
 import { createSocketServer } from '../ws/index.js';
+import { pool } from '../db/pool.js';
+import { loadTypeEffectivenessCache } from '../engine/typeEffectiveness.js';
 
 /**
  * WS integration-test harness (design: "backend/test/wsHelpers.js — ephemeral
@@ -66,10 +68,20 @@ export async function waitUntil(predicate, timeoutMs = 5000, intervalMs = 10) {
  * - teardown() — closes every client socket, clears pending grace timers,
  *   then closes the Socket.IO server and the http server.
  */
-export async function startWsHarness({ reconnectGraceMs = DEFAULT_RECONNECT_GRACE_MS, corsOrigin } = {}) {
+export async function startWsHarness({
+  reconnectGraceMs = DEFAULT_RECONNECT_GRACE_MS,
+  turnTimeoutMs,
+  corsOrigin,
+} = {}) {
+  // Mirror server.js boot: the duel engine's type-effectiveness cache must be
+  // loaded before any round can resolve (resolverRonda faults otherwise). The
+  // singleton is reloaded per harness so a prior file's resetEffectivenessCache
+  // teardown never starves this one.
+  await loadTypeEffectivenessCache(pool);
   const httpServer = createServer(createApp());
-  const { io, reconnectTimers } = createSocketServer(httpServer, {
+  const { io, reconnectTimers, turnTimers } = createSocketServer(httpServer, {
     reconnectGraceMs,
+    ...(turnTimeoutMs !== undefined ? { turnTimeoutMs } : {}),
     ...(corsOrigin !== undefined ? { corsOrigin } : {}),
   });
   await new Promise((resolve) => httpServer.listen(0, resolve));
@@ -97,11 +109,12 @@ export async function startWsHarness({ reconnectGraceMs = DEFAULT_RECONNECT_GRAC
     // produce the same caught, cosmetic log line.
     await new Promise((resolve) => setTimeout(resolve, Math.min(DEFAULT_RECONNECT_GRACE_MS, 500) + 150));
     reconnectTimers.clear();
+    turnTimers.clear();
     await new Promise((resolve) => io.close(resolve));
     await new Promise((resolve) => httpServer.close(resolve));
   }
 
-  return { httpServer, io, reconnectTimers, port, url, connect, teardown };
+  return { httpServer, io, reconnectTimers, turnTimers, port, url, connect, teardown };
 }
 
 /**

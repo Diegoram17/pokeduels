@@ -23,9 +23,9 @@ function waitForEvent(emitter, event, timeoutMs = 2000) {
 
 async function startHarness(options) {
   const httpServer = createServer();
-  const { io, reconnectTimers } = createSocketServer(httpServer, options);
+  const { io, reconnectTimers, turnTimers } = createSocketServer(httpServer, options);
   await new Promise((resolve) => httpServer.listen(0, resolve));
-  return { httpServer, io, reconnectTimers, port: httpServer.address().port };
+  return { httpServer, io, reconnectTimers, turnTimers, port: httpServer.address().port };
 }
 
 const harnesses = [];
@@ -38,8 +38,8 @@ afterEach(async () => {
 });
 
 describe('createSocketServer', () => {
-  it('returns a Socket.IO Server and a reconnect timer registry', async () => {
-    const { httpServer, io, reconnectTimers } = await startHarness();
+  it('returns a Socket.IO Server and reconnect + turn timer registries', async () => {
+    const { httpServer, io, reconnectTimers, turnTimers } = await startHarness();
     harnesses.push({ io, httpServer });
 
     expect(io).toBeInstanceOf(Server);
@@ -47,6 +47,10 @@ describe('createSocketServer', () => {
     expect(typeof reconnectTimers.cancel).toBe('function');
     expect(typeof reconnectTimers.has).toBe('function');
     expect(typeof reconnectTimers.clear).toBe('function');
+    expect(typeof turnTimers.start).toBe('function');
+    expect(typeof turnTimers.cancel).toBe('function');
+    expect(typeof turnTimers.has).toBe('function');
+    expect(typeof turnTimers.clear).toBe('function');
   });
 
   it('threads reconnectGraceMs into the timer registry', async () => {
@@ -55,6 +59,16 @@ describe('createSocketServer', () => {
 
     const onExpire = vi.fn();
     reconnectTimers.start('room-1', 'player-1', onExpire);
+    await new Promise((r) => setTimeout(r, 90));
+    expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it('threads turnTimeoutMs into the turn timer registry (item #5)', async () => {
+    const { httpServer, io, turnTimers } = await startHarness({ turnTimeoutMs: 30 });
+    harnesses.push({ io, httpServer });
+
+    const onExpire = vi.fn();
+    turnTimers.start(7, onExpire);
     await new Promise((r) => setTimeout(r, 90));
     expect(onExpire).toHaveBeenCalledTimes(1);
   });
