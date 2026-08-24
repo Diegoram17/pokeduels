@@ -16,7 +16,7 @@ vi.mock('../repositories/duelRepository.js', () => ({
 
 import { getRoomState } from '../db/rooms.js';
 import { createDuelFromRoom } from '../repositories/duelRepository.js';
-import { bootstrapDuelIfReady } from '../ws/duelBootstrap.js';
+import { bootstrapDuelIfReady, bootstrapBracketIfReady } from '../ws/duelBootstrap.js';
 
 /** A room state whose players are all ready — the pre-bootstrap precondition. */
 function ready1v1Room(status) {
@@ -113,6 +113,108 @@ describe('bootstrapDuelIfReady gate (item #7, PR 1 rematch)', () => {
   it('returns undefined for an unknown room (getRoomState null)', async () => {
     getRoomState.mockResolvedValue(undefined);
     expect(await bootstrapDuelIfReady(io, 999)).toBeUndefined();
+    expect(createDuelFromRoom).not.toHaveBeenCalled();
+  });
+});
+
+describe('bootstrapBracketIfReady (item #7, PR 3 — 4-player bracket pairing)', () => {
+  const io = { to: vi.fn(() => ({ emit: vi.fn() })) };
+  // Identity shuffle keeps the pairing deterministic: p1/p2 -> semiA, p3/p4 -> semiB.
+  const identityShuffle = (arr) => [...arr];
+
+  /** A 4-player room state with every seat ready — the bracket precondition. */
+  function ready4Room(status) {
+    return {
+      roomId: 7,
+      status,
+      maxPlayers: 4,
+      players: [
+        { playerId: 1, nickname: 'A', ready: true },
+        { playerId: 2, nickname: 'B', ready: true },
+        { playerId: 3, nickname: 'C', ready: true },
+        { playerId: 4, nickname: 'D', ready: true },
+      ],
+      startersTaken: [],
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('creates two semifinals with the shuffled pairing and broadcasts tournament:bracket + 2x duel:start', async () => {
+    getRoomState.mockResolvedValue(ready4Room('waiting'));
+    createDuelFromRoom
+      .mockResolvedValueOnce({ id: 101, status: 'pending' }) // semiA
+      .mockResolvedValueOnce({ id: 102, status: 'pending' }); // semiB
+
+    const result = await bootstrapBracketIfReady(io, 7, identityShuffle);
+
+    expect(createDuelFromRoom).toHaveBeenNthCalledWith(1, 7, 1, 2, 'semifinal');
+    expect(createDuelFromRoom).toHaveBeenNthCalledWith(2, 7, 3, 4, 'semifinal');
+    expect(result).toEqual({ semiA: { id: 101, status: 'pending' }, semiB: { id: 102, status: 'pending' } });
+
+    // tournament:bracket carries the two semifinal pairings by slot.
+    expect(io.to).toHaveBeenCalledWith('room:7');
+    const emitted = io.to.mock.results.map((r) => r.value.emit);
+    const bracketCall = emitted.find((e) => e.mock.calls.some((c) => c[0] === 'tournament:bracket'));
+    expect(bracketCall).toBeTruthy();
+    expect(bracketCall.mock.calls[0][1]).toEqual({
+      roomId: 7,
+      bracket: {
+        semiA: { duelId: 101, playerA: 1, playerB: 2 },
+        semiB: { duelId: 102, playerA: 3, playerB: 4 },
+      },
+    });
+    // Both semifinal duels are announced with a duel:start broadcast.
+    const startCalls = emitted.flatMap((e) => e.mock.calls.filter((c) => c[0] === 'duel:start'));
+    expect(startCalls).toHaveLength(2);
+  });
+
+  it('does NOT bootstrap when not all 4 seats are ready or the room is not waiting', async () => {
+    // Not every seat ready.
+    getRoomState.mockResolvedValue({
+      roomId: 7,
+      status: 'waiting',
+      maxPlayers: 4,
+      players: [
+        { playerId: 1, nickname: 'A', ready: true },
+        { playerId: 2, nickname: 'B', ready: true },
+        { playerId: 3, nickname: 'C', ready: true },
+        { playerId: 4, nickname: 'D', ready: false },
+      ],
+      startersTaken: [],
+    });
+    expect(await bootstrapBracketIfReady(io, 7, identityShuffle)).toBeUndefined();
+    expect(createDuelFromRoom).not.toHaveBeenCalled();
+    expect(io.to).not.toHaveBeenCalled();
+
+    // All ready but the room already left 'waiting' (duel already created).
+    getRoomState.mockResolvedValue(ready4Room('in_progress'));
+    expect(await bootstrapBracketIfReady(io, 7, identityShuffle)).toBeUndefined();
+    expect(createDuelFromRoom).not.toHaveBeenCalled();
+    expect(io.to).not.toHaveBeenCalled();
+  });
+
+  it('returns undefined for a non-4-player room (1v1 is bootstrapDuelIfReady\'s job)', async () => {
+    getRoomState.mockResolvedValue({
+      roomId: 7,
+      status: 'waiting',
+      maxPlayers: 2,
+      players: [
+        { playerId: 1, nickname: 'A', ready: true },
+        { playerId: 2, nickname: 'B', ready: true },
+      ],
+      startersTaken: [],
+    });
+    expect(await bootstrapBracketIfReady(io, 7, identityShuffle)).toBeUndefined();
+    expect(createDuelFromRoom).not.toHaveBeenCalled();
+    expect(io.to).not.toHaveBeenCalled();
+  });
+
+  it('returns undefined for an unknown room', async () => {
+    getRoomState.mockResolvedValue(undefined);
+    expect(await bootstrapBracketIfReady(io, 999, identityShuffle)).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
   });
 });

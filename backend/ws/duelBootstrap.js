@@ -57,3 +57,72 @@ export async function bootstrapDuelIfReady(io, roomId) {
   io.to(`room:${roomId}`).emit('duel:start', { duelId: duel.id });
   return duel;
 }
+
+/**
+ * Pure Fisher-Yates shuffle (exported for test injection). Returns a NEW array
+ * with the input's elements in a uniformly random order; the input is never
+ * mutated. The bracket pairing uses this so the two semifinals are randomly
+ * paired per spec (RF-5.3).
+ *
+ * @template T
+ * @param {T[]} arr
+ * @returns {T[]}
+ */
+export function fisherYatesShuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * 4-player bracket bootstrap (item #7, PR 3, design decision 3). Sibling of
+ * `bootstrapDuelIfReady`, called from `room:ready` alongside it. Opens the
+ * bracket ONLY when the room is a full 4-player room (maxPlayers === 4, all
+ * four seated, every one ready) still in `waiting` status, then:
+ *
+ *   1. randomly pairs the 4 seats into 2 semifinal duels (Fisher-Yates),
+ *   2. creates both via `createDuelFromRoom(roomId, pA, pB, 'semifinal')` —
+ *      its round+pair-scoped idempotent check makes the two calls safe,
+ *   3. broadcasts `tournament:bracket` (the semifinal pairing by slot) and a
+ *      `duel:start` per semifinal to the whole `room:{roomId}` channel.
+ *
+ * `shuffle` is injectable for deterministic tests (default: fisherYatesShuffle).
+ *
+ * @param {import('socket.io').Server} io
+ * @param {number} roomId
+ * @param {(arr: number[]) => number[]} [shuffle]
+ * @returns {Promise<{ semiA: object, semiB: object } | undefined>}
+ */
+export async function bootstrapBracketIfReady(io, roomId, shuffle = fisherYatesShuffle) {
+  const roomState = await getRoomState(roomId);
+  if (!roomState) return undefined;
+
+  const { maxPlayers, players, status } = roomState;
+  const full4Ready =
+    maxPlayers === 4 &&
+    players.length === maxPlayers &&
+    players.every((p) => p.ready);
+
+  // The bracket starts exactly once from a `waiting` room when all 4 seats are
+  // ready. Any other status (in_progress / finished / aborted) must never
+  // re-pair. 1v1 rooms are bootstrapDuelIfReady's job.
+  if (!full4Ready || status !== 'waiting') return undefined;
+
+  const [p1, p2, p3, p4] = shuffle(players.map((p) => p.playerId));
+  const semiA = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
+  const semiB = await createDuelFromRoom(roomId, p3, p4, 'semifinal');
+
+  io.to(`room:${roomId}`).emit('tournament:bracket', {
+    roomId,
+    bracket: {
+      semiA: { duelId: semiA.id, playerA: p1, playerB: p2 },
+      semiB: { duelId: semiB.id, playerA: p3, playerB: p4 },
+    },
+  });
+  io.to(`room:${roomId}`).emit('duel:start', { duelId: semiA.id });
+  io.to(`room:${roomId}`).emit('duel:start', { duelId: semiB.id });
+  return { semiA, semiB };
+}
