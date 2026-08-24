@@ -222,6 +222,15 @@ export async function resolverRonda(duelId, accionP1, accionP2, { rng = Math.ran
     throw new Error(`Duel ${duelId} not found`);
   }
 
+  // Finished-phase guard (item #6): a stray timer/buffered action must never
+  // re-resolve an already-ended duel. If the canonical status is not
+  // `in_progress`, this is a safe no-op — no duel_pokemon_state mutation, no
+  // moves row, no FSM transition (previously a stray call could silently
+  // overwrite winner_id/end_reason or throw on an illegal transition()).
+  if (state.duel.status !== 'in_progress') {
+    return { applied: false };
+  }
+
   const effectivenessCache = getEffectivenessCache();
   const { events, nextDuelState, moveRows, nextPhase } = resolveRoundLogic(
     state,

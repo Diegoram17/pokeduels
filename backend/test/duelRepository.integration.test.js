@@ -9,6 +9,9 @@ import {
   createDuelFromRoom,
   activateLead,
   applySwitchDecision,
+  finishDuelWrite,
+  findActiveDuelForPlayer,
+  markDuelInProgress,
 } from '../repositories/duelRepository.js';
 import { resolverRonda } from '../engine/roundResolver.js';
 import { withDuelFaultIsolation } from '../engine/faultIsolation.js';
@@ -287,6 +290,120 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
     expect(rows).toHaveLength(1);
     expect(rows[0].move_index).toBe(4);
     expect(rows[0].action_type).toBe('attack');
+  });
+
+  // ---------- finishDuelWrite (conditional finish UPDATE) ----------
+
+  it('finishDuelWrite transitions an in_progress duel to finished with winner_id and end_reason', async () => {
+    const { duelId, player2Id } = await createDuel();
+
+    const result = await finishDuelWrite(duelId, player2Id, 'surrender');
+    expect(result).toEqual({ applied: true });
+
+    const after = await getDuelState(duelId);
+    expect(after.duel.status).toBe('finished');
+    expect(after.duel.winner_id).toBe(player2Id);
+    expect(after.duel.end_reason).toBe('surrender');
+  });
+
+  it('finishDuelWrite is a no-op (applied:false) on an already-finished duel', async () => {
+    const { duelId, player2Id } = await createDuel();
+    await finishDuelWrite(duelId, player2Id, 'surrender');
+
+    const result = await finishDuelWrite(duelId, player2Id, 'ko');
+    expect(result).toEqual({ applied: false });
+
+    // The first finish's values are untouched — the second write did nothing.
+    const after = await getDuelState(duelId);
+    expect(after.duel.status).toBe('finished');
+    expect(after.duel.winner_id).toBe(player2Id);
+    expect(after.duel.end_reason).toBe('surrender');
+  });
+
+  it('finishDuelWrite is idempotent — two consecutive calls, the second is a silent no-op', async () => {
+    const { duelId, player1Id } = await createDuel();
+
+    expect(await finishDuelWrite(duelId, player1Id, 'disconnect')).toEqual({ applied: true });
+    expect(await finishDuelWrite(duelId, player1Id, 'disconnect')).toEqual({ applied: false });
+
+    const after = await getDuelState(duelId);
+    expect(after.duel.end_reason).toBe('disconnect');
+  });
+
+  // ---------- findActiveDuelForPlayer ----------
+
+  it('findActiveDuelForPlayer returns the in_progress duel row for a participating player', async () => {
+    const { duelId, player1Id, player2Id } = await createDuel();
+
+    const found = await findActiveDuelForPlayer(player1Id);
+    expect(found).toMatchObject({
+      id: duelId,
+      player1_id: player1Id,
+      player2_id: player2Id,
+      status: 'in_progress',
+    });
+
+    // Both participants see the same active duel.
+    expect((await findActiveDuelForPlayer(player2Id)).id).toBe(duelId);
+  });
+
+  it('findActiveDuelForPlayer returns null when the player is in no in_progress duel', async () => {
+    const { player1Id, player2Id } = await createDuel();
+    // A non-participant has no active duel.
+    const [outsider] = (await pool.query(
+      `INSERT INTO players (nickname) VALUES ('DuelRepoOutsider') RETURNING id`,
+    )).rows;
+    expect(await findActiveDuelForPlayer(outsider.id)).toBeNull();
+    expect(player1Id).not.toBe(outsider.id);
+    expect(player2Id).not.toBe(outsider.id);
+  });
+
+  it('findActiveDuelForPlayer returns null once the player\'s duel is finished', async () => {
+    const { duelId, player1Id, player2Id } = await createDuel();
+    await finishDuelWrite(duelId, player2Id, 'surrender');
+
+    expect(await findActiveDuelForPlayer(player1Id)).toBeNull();
+    expect(await findActiveDuelForPlayer(player2Id)).toBeNull();
+  });
+
+  // ---------- markDuelInProgress (pending -> in_progress at lead-selection completion) ----------
+
+  it('markDuelInProgress transitions a pending duel to in_progress', async () => {
+    // The real app path: createDuelFromRoom inserts duels with status='pending'
+    // (the WS layer writes in_progress only when both leads are picked). Mirror
+    // that here rather than the createDuel() helper, which inserts in_progress
+    // directly.
+    const [p1, p2] = await Promise.all([
+      pool.query(`INSERT INTO players (nickname) VALUES ('DuelMarkP1') RETURNING id`),
+      pool.query(`INSERT INTO players (nickname) VALUES ('DuelMarkP2') RETURNING id`),
+    ]);
+    const { rows } = await pool.query(
+      `INSERT INTO duels (player1_id, player2_id, round, status)
+       VALUES ($1, $2, 'unica', 'pending') RETURNING id`,
+      [p1.rows[0].id, p2.rows[0].id],
+    );
+    const duelId = rows[0].id;
+    createdDuelIds.push(duelId);
+
+    expect(await markDuelInProgress(duelId)).toEqual({ applied: true });
+
+    const after = await getDuelState(duelId);
+    expect(after.duel.status).toBe('in_progress');
+  });
+
+  it('markDuelInProgress is a no-op on an already-in_progress duel', async () => {
+    const { duelId } = await createDuel(); // helper inserts with in_progress
+
+    expect(await markDuelInProgress(duelId)).toEqual({ applied: false });
+    expect((await getDuelState(duelId)).duel.status).toBe('in_progress');
+  });
+
+  it('markDuelInProgress is a no-op on a finished duel (never re-opens it)', async () => {
+    const { duelId, player2Id } = await createDuel();
+    await finishDuelWrite(duelId, player2Id, 'ko');
+
+    expect(await markDuelInProgress(duelId)).toEqual({ applied: false });
+    expect((await getDuelState(duelId)).duel.status).toBe('finished');
   });
 
   // ---------- resolverRonda (I/O orchestrator) ----------

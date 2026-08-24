@@ -4,6 +4,7 @@ import {
   mapDuelStateToCamelCase,
   activateLead,
   applySwitchDecision,
+  markDuelInProgress,
 } from '../repositories/duelRepository.js';
 import { ValidationError } from '../engine/switchValidation.js';
 import { PHASES, EVENTS, transition } from '../engine/stateMachine.js';
@@ -92,11 +93,17 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle } = {})
       // Lead readiness is tracked in the WS layer; only when BOTH players
       // picked does the coarse engine FSM advance lead_selection ->
       // in_progress (design: stateMachine.js is never widened).
+      // Lead readiness is tracked in the WS layer; only when BOTH players
+      // picked does the coarse engine FSM advance lead_selection ->
+      // in_progress (design: stateMachine.js is never widened). The coarse
+      // duels.status column follows: this is the moment the duel goes LIVE
+      // (item #6's in_progress-guarded repository operations depend on it).
       const roundState = getRoundStateStore();
       roundState.markLeadReady(duelId, playerId);
       if (roundState.bothLeadsReady(duelId) && getPhaseStore().get(duelId) === PHASES.LEAD_SELECTION) {
         getPhaseStore().set(duelId, transition(PHASES.LEAD_SELECTION, EVENTS.SELECT_LEADS));
         roundState.set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
+        await markDuelInProgress(duelId);
       }
     }),
   );

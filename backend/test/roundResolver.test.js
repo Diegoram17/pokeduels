@@ -1,6 +1,20 @@
-import { describe, it, expect, vi } from 'vitest';
-import { resolveRoundLogic } from '../engine/roundResolver.js';
-import { createCache } from '../engine/typeEffectiveness.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { resolveRoundLogic, resolverRonda } from '../engine/roundResolver.js';
+import { createCache, resetEffectivenessCache } from '../engine/typeEffectiveness.js';
+import { resetPhaseStore, getPhaseStore } from '../engine/duelPhaseStore.js';
+
+// resolverRonda (the I/O orchestrator) fetches canonical state via the
+// repository and persists via applyRoundResult. For the finished-duel guard
+// we mock the repository (design-authorized: no DB in a unit test — mirrors
+// the turnCycle unit-test pattern) so we can prove the early return happens
+// BEFORE any resolution/persistence. resolveRoundLogic (pure core) is
+// untouched by this mock — it never touches the repository.
+vi.mock('../repositories/duelRepository.js', () => ({
+  getDuelState: vi.fn(),
+  applyRoundResult: vi.fn(),
+}));
+
+import { getDuelState, applyRoundResult } from '../repositories/duelRepository.js';
 
 // ---------- fixtures ----------
 
@@ -414,5 +428,56 @@ describe('purity', () => {
     const before = JSON.stringify(state);
     resolve(state, { moveIndex: 2 }, { moveIndex: 2 });
     expect(JSON.stringify(state)).toBe(before);
+  });
+});
+
+// ---------- resolverRonda finished-duel guard ----------
+
+describe('resolverRonda finished-duel guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetPhaseStore();
+    resetEffectivenessCache();
+    vi.spyOn(getPhaseStore(), 'set');
+  });
+
+  it('returns {applied:false} without resolving or persisting when the duel status is not in_progress', async () => {
+    // A duel already ended by surrender/disconnect — a stray timer fires again.
+    getDuelState.mockResolvedValue({
+      duel: { id: 7, player1_id: 1, player2_id: 2, status: 'finished', winner_id: 2, end_reason: 'surrender', turn_number: 5 },
+      pokemonStates: [],
+    });
+
+    const result = await resolverRonda(7, { moveIndex: 4 }, { moveIndex: 4 });
+
+    expect(result).toEqual({ applied: false });
+    // The resolution/persistence path was never entered: no round persisted
+    // (no moves row), no duel_pokemon_state mutation, no FSM advance.
+    expect(applyRoundResult).not.toHaveBeenCalled();
+    expect(getPhaseStore().set).not.toHaveBeenCalled();
+  });
+
+  it('does not call resolveRoundLogic on a finished duel (guard fires before resolution)', async () => {
+    // Guard must return before the pure core runs. Because resolverRonda calls
+    // resolveRoundLogic internally (not injectable), we prove the bypass by
+    // ensuring nothing downstream of it ran: getEffectivenessCache would be
+    // reached only if resolveRoundLogic were about to run — so we assert the
+    // repository's applyRoundResult (which resolveRoundLogic's result feeds)
+    // was never reached.
+    getDuelState.mockResolvedValue({
+      duel: { id: 8, player1_id: 1, player2_id: 2, status: 'finished', winner_id: 1, end_reason: 'ko', turn_number: 9 },
+      pokemonStates: [],
+    });
+
+    const result = await resolverRonda(8, { moveIndex: 2 }, { moveIndex: 2 });
+    expect(result).toEqual({ applied: false });
+    expect(applyRoundResult).not.toHaveBeenCalled();
+  });
+
+  it('still throws for a missing duel (guard only short-circuits non-in_progress, not not-found)', async () => {
+    getDuelState.mockResolvedValue(null);
+    await expect(resolverRonda(999, { moveIndex: 4 }, { moveIndex: 4 })).rejects.toThrow(
+      'not found',
+    );
   });
 });

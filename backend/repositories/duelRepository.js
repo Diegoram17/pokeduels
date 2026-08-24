@@ -79,6 +79,74 @@ export async function getDuelState(duelId) {
 }
 
 /**
+ * Conditionally finishes a duel (item #6 centralized finish path). The UPDATE
+ * only affects a row whose status is still `in_progress`, so a repeat finish
+ * (stray timer, simultaneous surrender/disconnect) is a silent no-op — the
+ * atomic conditional is the simultaneous-finish tie-break: whichever write
+ * actually transitions the row wins, the loser affects 0 rows.
+ *
+ * Only `duels.status/winner_id/end_reason` are written — never `rooms.status`
+ * or `room_players` (bracket-advance is item #7's job).
+ *
+ * @param {number} duelId
+ * @param {number} winnerId
+ * @param {'ko'|'surrender'|'disconnect'|'server_restart'} endReason
+ * @returns {Promise<{ applied: boolean }>} applied=false when 0 rows changed
+ *          (already finished or no such duel)
+ */
+export async function finishDuelWrite(duelId, winnerId, endReason) {
+  const { rowCount } = await pool.query(
+    `UPDATE duels
+     SET status = 'finished', winner_id = $2, end_reason = $3
+     WHERE id = $1 AND status = 'in_progress'`,
+    [duelId, winnerId, endReason],
+  );
+  return { applied: rowCount > 0 };
+}
+
+/**
+ * Marks a duel as live (item #6 foundation). `createDuelFromRoom` inserts
+ * duels with status 'pending'; the WS layer advances the in-memory engine FSM
+ * to `in_progress` when both leads are picked. This write keeps the coarse
+ * `duels.status` column in sync with that moment — the status the item-#6
+ * in_progress-guarded operations (finishDuelWrite, findActiveDuelForPlayer,
+ * resolverRonda guard) depend on. Conditional on 'pending' so a live duel is
+ * never re-marked and a finished duel is never re-opened.
+ *
+ * @param {number} duelId
+ * @returns {Promise<{ applied: boolean }>} applied=false when the duel was
+ *          not 'pending' (already in_progress, finished, or missing)
+ */
+export async function markDuelInProgress(duelId) {
+  const { rowCount } = await pool.query(
+    `UPDATE duels SET status = 'in_progress'
+     WHERE id = $1 AND status = 'pending'`,
+    [duelId],
+  );
+  return { applied: rowCount > 0 };
+}
+
+/**
+ * Returns the player's currently active (in_progress) duel, or null. Used by
+ * the disconnect listener to decide whether a mid-duel forfeit applies (RF-6.2)
+ * vs the lobby 60s reconnect grace (RF-2.7) — a DB query because there is no
+ * `socket.data.duelId` field anywhere in the WS layer (only room membership).
+ *
+ * @param {number} playerId
+ * @returns {Promise<{ id: number, player1_id: number, player2_id: number,
+ *                     status: string } | null>}
+ */
+export async function findActiveDuelForPlayer(playerId) {
+  const { rows } = await pool.query(
+    `SELECT id, player1_id, player2_id, status
+     FROM duels
+     WHERE (player1_id = $1 OR player2_id = $1) AND status = 'in_progress'`,
+    [playerId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
  * Atomically commits one resolved round: UPDATE duels (status/winner/end_reason),
  * UPDATE every duel_pokemon_state row, INSERT every moveRow — all in ONE
  * transaction. Any failure rolls everything back (no partial rounds).

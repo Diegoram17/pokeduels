@@ -130,6 +130,15 @@ export function createTurnCycle() {
       return buffers.has(duelId);
     },
 
+    /**
+     * Drops one duel's buffered actions (item #6 finish cleanup). Per-duel —
+     * never the global `clear()`, which wipes every concurrent duel's buffer
+     * and is test/shutdown-only. No-op on a missing key.
+     */
+    dropBuffer(duelId) {
+      buffers.delete(duelId);
+    },
+
     /** Drops every buffered action (test teardown / server shutdown). */
     clear() {
       buffers.clear();

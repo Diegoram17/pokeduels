@@ -53,6 +53,44 @@ describe('createTurnCycle buffer mechanics', () => {
   });
 });
 
+describe('createTurnCycle dropBuffer (per-duel buffer cleanup)', () => {
+  let cycle;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cycle = createTurnCycle();
+  });
+
+  it('drops only the target duel\'s buffer, leaving other duels\' buffers intact', () => {
+    cycle.bufferAction(7, 1, { moveIndex: 4 });
+    cycle.bufferAction(7, 2, { moveIndex: 4 });
+    cycle.bufferAction(8, 1, { moveIndex: 4 });
+
+    cycle.dropBuffer(7);
+
+    expect(cycle.hasBuffered(7)).toBe(false);
+    expect(cycle.hasBuffered(8)).toBe(true);
+  });
+
+  it('is a silent no-op on a duel with no buffer', () => {
+    expect(() => cycle.dropBuffer(7)).not.toThrow();
+    expect(cycle.hasBuffered(7)).toBe(false);
+  });
+
+  it('is a no-op on a missing key without touching other duels', () => {
+    cycle.bufferAction(8, 1, { moveIndex: 4 });
+    cycle.dropBuffer(999);
+    expect(cycle.hasBuffered(8)).toBe(true);
+  });
+
+  it('allows re-buffering a duel after its buffer was dropped', () => {
+    cycle.bufferAction(7, 1, { moveIndex: 4 });
+    cycle.dropBuffer(7);
+    const first = cycle.bufferAction(7, 1, { moveIndex: 3 });
+    expect(first).toEqual({ isFirst: true, pairComplete: false });
+  });
+});
+
 describe('createTurnCycle resolution short-circuits', () => {
   let cycle;
   const io = { to: vi.fn(() => ({ emit: vi.fn() })) };

@@ -216,6 +216,14 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     // WS sub-state advanced; the coarse engine FSM advanced to in_progress
     expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
     expect(getPhaseStore().get(duelId)).toBe('in_progress');
+
+    // The coarse duels.status column follows the FSM: the duel is LIVE only
+    // once both leads are picked. Before this write the column stayed
+    // 'pending' for the whole duel, which made the item-#6 in_progress-guarded
+    // repository operations (finishDuelWrite / findActiveDuelForPlayer /
+    // resolverRonda guard) permanently no-ops against real duels.
+    const duelRow = (await pool.query('SELECT status FROM duels WHERE id = $1', [duelId])).rows[0];
+    expect(duelRow.status).toBe('in_progress');
   }, 60000);
 
   it('rejects an invalid lead with duel:lead_rejected and no state change', async () => {
