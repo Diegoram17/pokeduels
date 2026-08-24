@@ -1,7 +1,7 @@
 # Deploy Plan — Pokeduels
 
 Fecha: 2026-08-24
-Estado: GENERADO
+Estado: EJECUTADO (parcial — falta cron de health-check)
 
 ## Resumen del proyecto
 
@@ -139,24 +139,26 @@ Ya hechos hoy (local, reversible, sin tocar ningún remoto ni cuenta externa):
    `de8e417..58723b1`, ver Registro de ejecución).
 2. ~~Fix `CORS_ORIGIN`~~ — **✅ HECHO** (TDD, commit `d7f6226`).
 3. ~~Agregar lint al backend (`oxlint`)~~ — **✅ HECHO** (commit `b13de76`).
-4. ~~Generar el workflow de CI~~ — **✅ HECHO** (`.github/workflows/ci.yml`, sin commitear
-   todavía — ver nota abajo).
+4. ~~Generar el workflow de CI~~ — **✅ HECHO** (`.github/workflows/ci.yml`, commit `9cd742f`).
 
-Quedan para EXECUTE — ninguna se ejecuta sin autorización explícita paso a paso, y a partir de acá
-las va a correr **otra sesión/agente**, no esta:
+Ejecutados en sesión de deploy (2026-08-24):
 
-5. Commitear `.github/workflows/ci.yml` (generado, no commiteado en esta sesión).
-6. Crear el repositorio remoto en GitHub y pushear `master` — paso obligatorio, hoy no hay
-   remoto. Todas las cuentas (GitHub, Vercel, Render, cron) hay que crearlas desde cero.
-7. Conectar el repo a Vercel y disparar el primer deploy del frontend. Configurar `VITE_API_URL`
-   y `VITE_WS_URL` como env vars de Vercel (todavía apuntando a nada real hasta el paso 9).
-8. Activar el workflow de CI — requiere los secrets `NEON_PROJECT_ID` y `NEON_API_KEY` del
-   proyecto Neon ya existente (confirmado como producción) para que el job de backend corra.
-9. Crear el servicio en Render, conectar el repo, configurar env vars (`DATABASE_URL` de la Neon
-   existente, `CORS_ORIGIN` = URL de Vercel del paso 7, `PORT` la inyecta Render).
-10. Volver a Vercel y actualizar `VITE_API_URL`/`VITE_WS_URL` con la URL real de Render (dependencia
-    circular normal: Vercel y Render necesitan la URL del otro).
-11. Configurar el cron externo de health-check (cron-job.org/UptimeRobot) contra `/health`.
+5. ~~Commitear `.github/workflows/ci.yml`~~ — **✅ HECHO** (commit `9cd742f`, junto con
+   `.gitignore` actualizado con `.codegraph/` y `.vercel/`, `BACKLOG.md`, `DEPLOY-PLAN.md`,
+   `SECURITY-REPORT.md`).
+6. ~~Crear el repositorio remoto en GitHub y pushear `master`~~ — **✅ HECHO** (repo público
+   `https://github.com/Diegoram17/pokeduels`, vía `gh repo create`).
+7. ~~Conectar el repo a Vercel y disparar el primer deploy del frontend~~ — **✅ HECHO**
+   (proyecto `pokeduels` en Vercel, URL: `https://pokeduels.vercel.app`).
+8. ~~Activar el workflow de CI~~ — **⏳ PENDIENTE** — requiere configurar los secrets
+   `NEON_PROJECT_ID` y `NEON_API_KEY` en el repo de GitHub.
+9. ~~Crear el servicio en Render, conectar el repo, configurar env vars~~ — **✅ HECHO**
+   (Web Service `pokeduels-backend`, URL: `https://pokeduels-backend.onrender.com`,
+   `rootDir=backend`, env vars `DATABASE_URL` y `CORS_ORIGIN` configuradas).
+10. ~~Volver a Vercel y actualizar `VITE_API_URL`/`VITE_WS_URL` con la URL real de Render~~ —
+    **✅ HECHO** (frontend redeployado con URLs reales).
+11. Configurar el cron externo de health-check (cron-job.org/UptimeRobot) contra `/health` —
+    **⏳ PENDIENTE** — requiere cuenta en cron-job.org o UptimeRobot.
 
 **Nota para quien ejecute esto:** el ítem #10 del backlog de producto (integración real de
 duelo/torneo en el frontend — `WaitRoomScreen`/`DuelBoardScreen`/`SwapScreen`/`RankingScreen`)
@@ -207,5 +209,37 @@ hasta que se implemente.
   EXECUTE, junto con la configuración de los secrets `NEON_PROJECT_ID`/`NEON_API_KEY` que el
   workflow necesita para poder correr de verdad.
 - **A partir de acá, esta sesión no ejecuta nada más** — el resto de "Autorizaciones pendientes"
-  (crear remoto, conectar Vercel/Render, activar CI, cron) lo ejecuta otra sesión/agente, paso a
-  paso, con autorización explícita en cada uno.
+   (crear remoto, conectar Vercel/Render, activar CI, cron) lo ejecuta otra sesión/agente, paso a
+   paso, con autorización explícita en cada uno.
+
+### 2026-08-24 — Deploy completo (EXECUTE)
+
+**Scan de seguridad pre-commit:**
+- Barrido de secrets en archivos a commitear: limpio (sin credenciales en `.md`, `.yml`, `.json`).
+- `backend/.env` con connection string real de Neon confirmado como NO trackeado (`.gitignore` línea 10).
+- `.gitignore` actualizado: agregados `.codegraph/` y `.vercel/` (PART3-01 del SECURITY-REPORT).
+- Commit `9cd742f`: CI workflow + documentación + `.gitignore` actualizado.
+
+**GitHub:**
+- Repo creado: `https://github.com/Diegoram17/pokeduels` (público).
+- `master` pusheado vía `gh repo create --push`.
+
+**Vercel (frontend):**
+- Proyecto creado: `pokeduels` (org `diegoram17-7684s-projects`).
+- Primer deploy: `https://pokeduels.vercel.app` (con placeholders en env vars).
+- Env vars configuradas: `VITE_API_URL`, `VITE_WS_URL` (visibility: config, non-sensitive).
+- Redeploy final con URLs reales de Render.
+
+**Render (backend):**
+- Web Service creado: `pokeduels-backend` (ID: `srv-da6c6rnavr4c73en1gb0`).
+- URL: `https://pokeduels-backend.onrender.com`.
+- Dashboard: `https://dashboard.render.com/web/srv-da6c6rnavr4c73en1gb0`.
+- Configuración: `runtime=node`, `rootDir=backend`, `plan=free`, `region=oregon`.
+- Build command: `npm install`, Start command: `node server.js`.
+- Env vars: `DATABASE_URL` (Neon existente), `CORS_ORIGIN=https://pokeduels.vercel.app`.
+- Deploy `dep-da6c7c6k1f9s73fdrhc0` → status: `live`.
+- Verificación: `GET /health` → 200 OK.
+
+**Pendiente:**
+- CI secrets (`NEON_PROJECT_ID`, `NEON_API_KEY`) — configurar en GitHub repo settings.
+- Cron de health-check — requiere cuenta en cron-job.org o UptimeRobot.
