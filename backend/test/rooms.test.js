@@ -9,6 +9,7 @@ import {
   joinOrResumeRoom,
   setPlayerReady,
   leaveRoom,
+  leaveOrCloseRoom,
   markPlayerConnected,
   markPlayerDisconnected,
   getRoomState,
@@ -337,6 +338,125 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
       expect(creatorState.ready).toBe(true);
       expect(creatorState.connected).toBe(true);
       expect(state.startersTaken).toEqual([pokemons[0].id]);
+    });
+  });
+
+  describe('db layer: leaveOrCloseRoom (item #7, PR 2 close-and-rank)', () => {
+    /**
+     * Creates a 1v1 room with two seated players and marks the room
+     * in_progress (as createDuelFromRoom does). Returns the room and players.
+     */
+    async function createPlayedRoom(prefix) {
+      const p1 = await createPlayer(`${prefix}1`);
+      const p2 = await createPlayer(`${prefix}2`);
+      const room = await createRoomWithCreator(2, p1.id);
+      await joinRoom(room.code, p2.id, `${prefix}2`);
+      await pool.query("UPDATE rooms SET status = 'in_progress' WHERE id = $1", [room.id]);
+      return { room, p1, p2 };
+    }
+
+    /**
+     * Inserts a finished duel into a room crediting `winnerId`. The second
+     * param lets a test force a specific finish order (older first) for the
+     * tiebreak scenario.
+     */
+    async function insertFinishedDuel(roomId, player1Id, player2Id, winnerId, opts = {}) {
+      await pool.query(
+        `INSERT INTO duels (room_id, player1_id, player2_id, round, status, winner_id, end_reason, created_at)
+         VALUES ($1, $2, $3, 'unica', 'finished', $4, 'ko', $5)`,
+        [
+          roomId,
+          player1Id,
+          player2Id,
+          winnerId,
+          opts.createdAt ?? '2024-01-01T00:00:00Z',
+        ],
+      );
+    }
+
+    it('closes an in_progress 1v1 room and ranks by win count (2-1 series)', async () => {
+      const { room, p1, p2 } = await createPlayedRoom('Rank2v1');
+      // 2 wins for p1, 1 for p2 -> p1 rank 1, p2 rank 2.
+      await insertFinishedDuel(room.id, p1.id, p2.id, p1.id);
+      await insertFinishedDuel(room.id, p1.id, p2.id, p1.id, { createdAt: '2024-01-02T00:00:00Z' });
+      await insertFinishedDuel(room.id, p1.id, p2.id, p2.id, { createdAt: '2024-01-03T00:00:00Z' });
+
+      const result = await leaveOrCloseRoom(room.id, p1.id);
+
+      expect(result.closed).toBe(true);
+      expect(result.roomId).toBe(room.id);
+      const rank = (id) => result.ranking.find((r) => r.playerId === id);
+      expect(rank(p1.id)).toMatchObject({ playerId: p1.id, finalRank: 1 });
+      expect(rank(p2.id)).toMatchObject({ playerId: p2.id, finalRank: 2 });
+
+      const { rows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
+      expect(rows[0].status).toBe('finished');
+      const { rows: seats } = await pool.query(
+        'SELECT player_id, final_rank FROM room_players WHERE room_id = $1 ORDER BY player_id',
+        [room.id],
+      );
+      const byId = Object.fromEntries(seats.map((s) => [s.player_id, s.final_rank]));
+      expect(byId[p1.id]).toBe(1);
+      expect(byId[p2.id]).toBe(2);
+    });
+
+    it('breaks a 1-1 tie by the most recently finished duel winner', async () => {
+      const { room, p1, p2 } = await createPlayedRoom('RankTie');
+      await insertFinishedDuel(room.id, p1.id, p2.id, p1.id, { createdAt: '2024-01-01T00:00:00Z' });
+      // Most recent finished duel's winner is p2 -> p2 must rank 1st (tiebreak).
+      await insertFinishedDuel(room.id, p1.id, p2.id, p2.id, { createdAt: '2024-01-02T00:00:00Z' });
+
+      const result = await leaveOrCloseRoom(room.id, p2.id);
+
+      expect(result.closed).toBe(true);
+      const rank = (id) => result.ranking.find((r) => r.playerId === id);
+      expect(rank(p2.id).finalRank).toBe(1);
+      expect(rank(p1.id).finalRank).toBe(2);
+    });
+
+    it('is idempotent: a second leave on an already-finished room is a no-op', async () => {
+      const { room, p1, p2 } = await createPlayedRoom('RankIdem');
+      await insertFinishedDuel(room.id, p1.id, p2.id, p1.id);
+
+      const first = await leaveOrCloseRoom(room.id, p1.id);
+      expect(first.closed).toBe(true);
+
+      // A second leave must not re-close, re-rank, or return closed again.
+      const second = await leaveOrCloseRoom(room.id, p2.id);
+      expect(second.closed).toBe(false);
+
+      const { rows } = await pool.query(
+        'SELECT final_rank FROM room_players WHERE room_id = $1 AND player_id = $2',
+        [room.id, p1.id],
+      );
+      expect(rows[0].final_rank).toBe(1);
+    });
+
+    it('delegates to leaveRoom for a waiting room (no duel ever played)', async () => {
+      const { room, p1, p2 } = await createPlayedRoom('RankWait');
+      // Reset the room back to waiting (no duel was actually created).
+      await pool.query("UPDATE rooms SET status = 'waiting' WHERE id = $1", [room.id]);
+
+      const result = await leaveOrCloseRoom(room.id, p2.id);
+
+      // Pre-tournament leave keeps the existing leaveRoom behavior: no close,
+      // no rank/event, and the seat is removed.
+      expect(result.closed).toBe(false);
+      expect(await getRoomPlayerSeat(room.id, p2.id)).toBeUndefined();
+      const { rows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
+      expect(rows[0].status).toBe('waiting');
+    });
+
+    it('keeps the winning seat ranked 1 even in a 1-0 series', async () => {
+      const { room, p1, p2 } = await createPlayedRoom('Rank1v0');
+      await insertFinishedDuel(room.id, p1.id, p2.id, p2.id);
+
+      const result = await leaveOrCloseRoom(room.id, p1.id);
+
+      expect(result.closed).toBe(true);
+      const rank = (id) => result.ranking.find((r) => r.playerId === id);
+      expect(rank(p2.id).finalRank).toBe(1);
+      expect(rank(p1.id).finalRank).toBe(2);
     });
   });
 

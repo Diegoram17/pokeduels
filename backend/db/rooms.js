@@ -287,6 +287,158 @@ export async function leaveRoom(roomId, playerId) {
 }
 
 /**
+ * Pure 1v1 final-rank decision (item #7, PR 2 close-and-rank). The primary
+ * rule ranks by total duel wins across the room's finished duels; the
+ * most-recently-finished duel's winner breaks a tie ONLY when win counts are
+ * exactly equal (never the primary rule). Exported separately so the decision
+ * is unit-testable without a DB.
+ *
+ * @param {number} player1Id
+ * @param {number} player2Id
+ * @param {Record<number, number>} winsByPlayer - playerId -> win count
+ * @param {number} tiebreakWinnerId - winner of the most recently finished duel
+ * @returns {{ playerId: number, finalRank: number }[]} the two seats, ordered
+ *          by finalRank (1 then 2)
+ */
+export function computeOneVOneRanks(player1Id, player2Id, winsByPlayer, tiebreakWinnerId) {
+  const wins1 = winsByPlayer[player1Id] ?? 0;
+  const wins2 = winsByPlayer[player2Id] ?? 0;
+
+  let first;
+  if (wins1 > wins2) first = player1Id;
+  else if (wins2 > wins1) first = player2Id;
+  else first = tiebreakWinnerId; // equal wins -> most-recent-duel winner (tiebreak only)
+  const second = first === player1Id ? player2Id : player1Id;
+
+  return [
+    { playerId: first, finalRank: 1 },
+    { playerId: second, finalRank: 2 },
+  ];
+}
+
+/**
+ * Unified room-close entrypoint (item #7, PR 2 1v1 close-and-rank). Called
+ * from room:leave and the lobby-grace disconnect callback in place of the raw
+ * leaveRoom. Branches on rooms.status under a FOR UPDATE room-row lock:
+ *
+ *   - 'waiting' (no duel ever played): delegates to the existing leaveRoom —
+ *     removes the seat, aborts the room when empty. No rank/close/event
+ *     (Out-of-Scope boundary, leaveRoom itself untouched).
+ *   - 'finished'/'aborted' (already closed): idempotent no-op — a second leave
+ *     never re-ranks or re-closes (near-simultaneous double-leave safety).
+ *   - 'in_progress' + max_players === 2: 1v1 close-and-rank — assigns
+ *     room_players.final_rank 1/2 by total win count (most-recent-duel
+ *     tiebreak), sets rooms.status='finished', and returns the ranking so the
+ *     caller can emit room:final_ranking. Seats are NOT deleted (the schema
+ *     comment on final_rank requires the row to survive).
+ *   - 'in_progress' + max_players === 4: delegates to leaveRoom for now — the
+ *     bracket/walkover leave path is PR 3.
+ *
+ * @param {number} roomId
+ * @param {number} playerId
+ * @returns {Promise<{ closed: boolean, roomId?: number,
+ *                     ranking?: { playerId:number, nickname:string, finalRank:number }[] }>}
+ *          closed=true only when the room was closed-and-ranked this call.
+ */
+export async function leaveOrCloseRoom(roomId, playerId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      'SELECT id, max_players, status FROM rooms WHERE id = $1 FOR UPDATE',
+      [roomId],
+    );
+    const room = rows[0];
+    if (!room) {
+      await client.query('COMMIT');
+      return { closed: false };
+    }
+
+    if (room.status === 'waiting') {
+      // Pre-tournament leave: no duel ever played. Release the lock first
+      // (leaveRoom opens its own transaction) and reuse the existing behavior.
+      await client.query('COMMIT');
+      await leaveRoom(roomId, playerId);
+      return { closed: false };
+    }
+
+    if (room.status !== 'in_progress') {
+      // Already finished/aborted: idempotent no-op (double-leave/double-disconnect).
+      await client.query('COMMIT');
+      return { closed: false };
+    }
+
+    // Only 1v1 close-and-rank is PR 2 scope; a 4-player in_progress room leaves
+    // through the bracket/walkover path (PR 3). Delegate so nothing regresses.
+    if (room.max_players !== 2) {
+      await client.query('COMMIT');
+      await leaveRoom(roomId, playerId);
+      return { closed: false };
+    }
+
+    const { rows: seatRows } = await client.query(
+      'SELECT player_id, nickname FROM room_players WHERE room_id = $1',
+      [roomId],
+    );
+    // A 1v1 close ranks BOTH seats; if the room somehow lacks exactly two, fall
+    // back to plain leaveRoom rather than emitting a malformed ranking.
+    if (seatRows.length !== 2) {
+      await client.query('COMMIT');
+      await leaveRoom(roomId, playerId);
+      return { closed: false };
+    }
+
+    const { rows: winRows } = await client.query(
+      `SELECT winner_id, COUNT(*)::int AS wins
+       FROM duels
+       WHERE room_id = $1 AND status = 'finished' AND winner_id IS NOT NULL
+       GROUP BY winner_id`,
+      [roomId],
+    );
+    const winsByPlayer = Object.fromEntries(winRows.map((r) => [r.winner_id, r.wins]));
+
+    const { rows: tieRows } = await client.query(
+      `SELECT winner_id FROM duels
+       WHERE room_id = $1 AND status = 'finished' AND winner_id IS NOT NULL
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`,
+      [roomId],
+    );
+    const tiebreakWinnerId = tieRows[0]?.winner_id ?? seatRows[0].player_id;
+
+    const [seat1, seat2] = seatRows;
+    const ranks = computeOneVOneRanks(
+      seat1.player_id,
+      seat2.player_id,
+      winsByPlayer,
+      tiebreakWinnerId,
+    );
+
+    for (const { playerId, finalRank } of ranks) {
+      await client.query(
+        'UPDATE room_players SET final_rank = $1 WHERE room_id = $2 AND player_id = $3',
+        [finalRank, roomId, playerId],
+      );
+    }
+    await client.query("UPDATE rooms SET status = 'finished' WHERE id = $1", [roomId]);
+
+    const ranking = ranks.map(({ playerId, finalRank }) => {
+      const seat = seatRows.find((s) => s.player_id === playerId);
+      return { playerId, nickname: seat.nickname, finalRank };
+    });
+
+    await client.query('COMMIT');
+    return { closed: true, roomId, ranking };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Marks a seated player connected (reconnect path). No error for unknown
  * seats — the caller controls seat existence.
  */
