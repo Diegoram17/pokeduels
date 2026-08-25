@@ -7,6 +7,7 @@ import { getTurnCycle } from './turnCycle.js';
 import { registerRoomHandlers } from './roomHandlers.js';
 import { registerTeamHandlers } from './teamHandlers.js';
 import { registerDuelHandlers } from './duelHandlers.js';
+import { createWsRateLimiter } from '../middleware/wsRateLimit.js';
 
 /**
  * Composition root for the WS lobby layer (design decision: "http.Server
@@ -52,6 +53,12 @@ export function createSocketServer(
   });
 
   io.on('connection', (socket) => {
+    // F2 per-socket rate limit: attach BEFORE any handler so every inbound
+    // event passes through the limiter regardless of which handler processes
+    // it. Breach → hard disconnect (socket.disconnect(true)), per the locked
+    // product decision (disconnect, not drop-only).
+    socket.onAny(createWsRateLimiter({ windowMs: 10000, limit: 40 }));
+
     registerRoomHandlers(io, socket, reconnectTimers, turnTimers, bracketWalkoverTimers);
     registerTeamHandlers(io, socket);
     registerDuelHandlers(io, socket, {

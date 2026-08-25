@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import { io as ioClient } from 'socket.io-client';
 import { createSocketServer } from '../ws/index.js';
 import { pool } from '../db/pool.js';
+import { createPlayer } from '../db/players.js';
 import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
 
 // Composition-root tests for createSocketServer: it must attach a real
@@ -107,6 +108,29 @@ describe.skipIf(!hasDatabase)('auth middleware (requires DATABASE_URL)', () => {
     });
     const err = await waitForEvent(client, 'connect_error');
     expect(err.message).toBe('unauthorized');
+    client.close();
+  });
+
+  it('disconnects a socket that exceeds the per-event rate limit (F2 wiring)', async () => {
+    const { httpServer, io, port } = await startHarness();
+    harnesses.push({ io, httpServer });
+
+    const player = await createPlayer('WSLimiterP1');
+    const client = ioClient(`http://127.0.0.1:${port}`, {
+      reconnection: false,
+      auth: { sessionToken: player.sessionToken },
+    });
+    await waitForEvent(client, 'connect');
+
+    // Production threshold is 40 events / 10s. Emit beyond it in a tight loop;
+    // the limiter (attached in io.on('connection') before handlers) must hard
+    // disconnect the socket.
+    const disconnectP = waitForEvent(client, 'disconnect');
+    for (let i = 0; i < 41; i++) {
+      client.emit('duel:nonexistent', { n: i });
+    }
+    await disconnectP;
+    expect(client.connected).toBe(false);
     client.close();
   });
 });
