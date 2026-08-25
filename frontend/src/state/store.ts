@@ -226,8 +226,11 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
       return { ...state, player: { ...state.player, nickname: action.nickname } }
 
     case 'sessionEstablished':
+      // New login session: wipe all room/game state to prevent cross-session
+      // contamination (stale rooms, team selections, duels from previous user).
+      // Only the player identity is carried over from the action.
       return {
-        ...state,
+        ...createInitialState(),
         player: {
           nickname: action.nickname,
           playerId: action.playerId,

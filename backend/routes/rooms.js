@@ -3,7 +3,9 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { HttpError } from '../lib/httpError.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createRoomCreateLimiter } from '../middleware/rateLimit.js';
-import { createRoomWithCreator, listWaitingRooms, joinRoom } from '../db/rooms.js';
+import { createRoomWithCreator, listWaitingRooms, joinRoom, getRoomByCode } from '../db/rooms.js';
+import { createBot, removeBot } from '../ws/botManager.js';
+import { broadcastRoomState } from '../ws/roomState.js';
 
 const VALID_MAX_PLAYERS = new Set([2, 4]);
 const MAX_NICKNAME_LENGTH = 30;
@@ -58,6 +60,47 @@ export function createRoomsRouter() {
       }
       const room = await joinRoom(req.params.code, req.player.id, nickname);
       res.status(201).json(room);
+    }),
+  );
+
+  // POST /api/rooms/:code/bots — create a bot in the room (authenticated).
+  // Only room members can create bots. The bot auto-selects a random team.
+  router.post(
+    '/:code/bots',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const room = await getRoomByCode(req.params.code);
+      if (!room) throw new HttpError(404, 'room not found');
+      
+      const bot = await createBot(room.id, req.player.id);
+      
+      // Broadcast updated room state
+      await broadcastRoomState(req.app.get('io'), room.id);
+      
+      res.status(201).json(bot);
+    }),
+  );
+
+  // DELETE /api/rooms/:code/bots/:botId — remove a bot from the room (authenticated).
+  // Only room members can remove bots.
+  router.delete(
+    '/:code/bots/:botId',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const room = await getRoomByCode(req.params.code);
+      if (!room) throw new HttpError(404, 'room not found');
+      
+      const botId = parseInt(req.params.botId, 10);
+      if (isNaN(botId)) throw new HttpError(400, 'invalid bot id');
+      
+      await removeBot(room.id, botId, req.player.id);
+      
+      // Broadcast updated room state (if room still exists)
+      if (!room.deleted) {
+        await broadcastRoomState(req.app.get('io'), room.id);
+      }
+      
+      res.status(204).send();
     }),
   );
 

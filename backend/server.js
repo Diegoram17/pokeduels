@@ -15,8 +15,12 @@ async function start() {
 
   // Shared http.Server so the Socket.IO layer (createSocketServer) attaches to
   // the same listener as the Express app.
-  const httpServer = createServer(createApp());
-  createSocketServer(httpServer, { corsOrigin: process.env.CORS_ORIGIN });
+  const app = createApp();
+  const httpServer = createServer(app);
+  const { io } = createSocketServer(httpServer, { corsOrigin: process.env.CORS_ORIGIN });
+  
+  // Make io available to route handlers (used by bot endpoints to broadcast room state)
+  app.set('io', io);
 
   // Boot-time orphan reconciliation (ADR-0008): a crash mid-duel must not
   // leave duels/rooms stuck in_progress. Awaited strictly before .listen() so

@@ -74,6 +74,18 @@ export async function listWaitingRooms() {
 }
 
 /**
+ * Returns the room row for a given code, or undefined if not found.
+ * Used by bot endpoints to resolve room code → room id.
+ */
+export async function getRoomByCode(code) {
+  const { rows } = await pool.query(
+    `SELECT id, code, max_players, status, created_by FROM rooms WHERE code = $1`,
+    [code],
+  );
+  return rows[0];
+}
+
+/**
  * Joins a player into a room inside one transaction that locks the room row
  * (SELECT ... FOR UPDATE) before counting room_players, so concurrent joins
  * serialize and a room can never exceed max_players. 404 for unknown codes;

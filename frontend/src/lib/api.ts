@@ -131,3 +131,20 @@ export function joinRoomByCode(code: string, nickname: string): Promise<RoomShel
     body: JSON.stringify({ nickname }),
   })
 }
+
+export interface BotPlayer {
+  id: string
+  nickname: string
+}
+
+export function createBot(roomCode: string): Promise<BotPlayer> {
+  return request<BotPlayer>(`/api/rooms/${roomCode}/bots`, {
+    method: 'POST',
+  })
+}
+
+export function removeBot(roomCode: string, botId: string): Promise<void> {
+  return request<void>(`/api/rooms/${roomCode}/bots/${botId}`, {
+    method: 'DELETE',
+  })
+}

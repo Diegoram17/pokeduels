@@ -1,6 +1,6 @@
 import type { RoomState, TournamentSlot } from '../state/schema'
 
-// Wait-room helpers: tournament slot labels, the player list with bot fillers,
+// Wait-room helpers: tournament slot labels, the player list,
 // and the semifinal pairings for the mini bracket.
 
 export const SLOT_LABELS: Record<TournamentSlot, string> = {
@@ -10,22 +10,26 @@ export const SLOT_LABELS: Record<TournamentSlot, string> = {
   final: 'FINAL',
 }
 
-export const BOT_NAMES = ['VORTEX_99', 'STEALTH_OP', 'CYBER_RONIN']
-
 export interface PlayerEntry {
   name: string
   isBot: boolean
+  playerId?: string
 }
 
 export function slotLabel(slot: TournamentSlot): string {
   return SLOT_LABELS[slot]
 }
 
+/**
+ * Builds the player list from actual room players (humans + bots).
+ * Bots are identified by the "🤖" prefix in their nickname (set by backend).
+ */
 export function buildPlayerList(room: RoomState): PlayerEntry[] {
-  const humans = room.players.map((player) => ({ name: player.nickname, isBot: false }))
-  const missing = Math.max(0, room.maxPlayers - room.players.length)
-  const bots = BOT_NAMES.slice(0, missing).map((name) => ({ name, isBot: true }))
-  return [...humans, ...bots]
+  return room.players.map((player) => ({
+    name: player.nickname,
+    isBot: player.nickname.startsWith('🤖'),
+    playerId: player.playerId,
+  }))
 }
 
 export function semifinalPairings(players: string[]): [string, string][] {

@@ -1,9 +1,11 @@
 import { Navigate, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useMockState } from '../state/useMockState'
 import type { DuelSlot, RoomState, TournamentSlot, TournamentState } from '../state/schema'
 import { deriveDuelSlot } from '../state/store'
 import { buildPlayerList, slotLabel } from '../lib/waitRoom'
 import { roomMode, roomModeLabel } from '../lib/rooms'
+import { createBot, removeBot, describeApiError } from '../lib/api'
 
 /**
  * Screen 4: Wait Room (#10 PR 2). Renders the player list, a real bracket
@@ -21,33 +23,100 @@ function SlotLabel({ slot }: { slot: DuelSlot }) {
   )
 }
 
-function PlayerRow({ name, isBot }: { name: string; isBot: boolean }) {
+function PlayerRow({ 
+  name, 
+  isBot, 
+  playerId,
+  roomCode,
+  onBotRemoved 
+}: { 
+  name: string
+  isBot: boolean
+  playerId?: string
+  roomCode?: string
+  onBotRemoved?: () => void
+}) {
+  const [removing, setRemoving] = useState(false)
+
+  async function handleRemoveBot() {
+    if (!roomCode || !playerId || !onBotRemoved) return
+    setRemoving(true)
+    try {
+      await removeBot(roomCode, playerId)
+      onBotRemoved()
+    } catch (err) {
+      console.error('Failed to remove bot:', err)
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   return (
     <div className={`player-row${isBot ? ' player-row--pending' : ' player-row--ready'}`}>
       <span className="avatar-fallback">
         <span className="material-symbols-outlined" aria-hidden="true">
-          person
+          {isBot ? 'smart_toy' : 'person'}
         </span>
       </span>
       <div className="info">
         <div className="name">{name}</div>
       </div>
-      <span
-        className={`material-symbols-outlined${isBot ? '' : ' pd-icon--fill'}`}
-        aria-hidden="true"
-        style={{ color: isBot ? 'var(--pd-text-meta)' : 'var(--pd-yellow)' }}
-      >
-        {isBot ? 'hourglass_empty' : 'check_circle'}
-      </span>
+      {isBot && roomCode && playerId ? (
+        <button
+          type="button"
+          onClick={handleRemoveBot}
+          disabled={removing}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: removing ? 'wait' : 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+          title="Quitar bot"
+        >
+          <span
+            className="material-symbols-outlined"
+            aria-hidden="true"
+            style={{ color: 'var(--pd-danger)', fontSize: 20 }}
+          >
+            {removing ? 'hourglass_empty' : 'close'}
+          </span>
+        </button>
+      ) : (
+        <span
+          className="material-symbols-outlined pd-icon--fill"
+          aria-hidden="true"
+          style={{ color: 'var(--pd-yellow)' }}
+        >
+          check_circle
+        </span>
+      )}
     </div>
   )
 }
 
-function PlayerList({ players }: { players: ReturnType<typeof buildPlayerList> }) {
+function PlayerList({ 
+  players,
+  roomCode,
+  onBotRemoved 
+}: { 
+  players: ReturnType<typeof buildPlayerList>
+  roomCode?: string
+  onBotRemoved?: () => void
+}) {
   return (
     <div className="player-list" data-testid="player-list">
       {players.map((entry) => (
-        <PlayerRow key={entry.name} name={entry.name} isBot={entry.isBot} />
+        <PlayerRow 
+          key={entry.playerId || entry.name} 
+          name={entry.name} 
+          isBot={entry.isBot}
+          playerId={entry.playerId}
+          roomCode={roomCode}
+          onBotRemoved={onBotRemoved}
+        />
       ))}
     </div>
   )
@@ -144,6 +213,60 @@ function LeaveRoomButton() {
 }
 
 /**
+ * Bot management controls: add bots to fill empty slots.
+ */
+function BotManager({ 
+  room,
+  onBotAdded 
+}: { 
+  room: RoomState
+  onBotAdded: () => void 
+}) {
+  const [adding, setAdding] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const currentPlayers = room.players.length
+  const hasEmptySlots = currentPlayers < room.maxPlayers
+
+  async function handleAddBot() {
+    if (!hasEmptySlots) return
+    setAdding(true)
+    setError(null)
+    try {
+      await createBot(room.code)
+      onBotAdded()
+    } catch (err) {
+      setError(describeApiError(err))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  if (!hasEmptySlots) return null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pd-space-2)' }}>
+      <button
+        type="button"
+        className="pd-btn pd-btn--secondary pd-btn--block"
+        onClick={handleAddBot}
+        disabled={adding}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--pd-space-2)' }}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>
+          smart_toy
+        </span>
+        {adding ? 'AGREGANDO...' : 'AGREGAR BOT'}
+      </button>
+      {error && (
+        <p role="alert" className="pd-meta" style={{ color: 'var(--pd-danger)', margin: 0, textAlign: 'center' }}>
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
  * 1v1 post-duel re-ready (#10): shown when a 1v1 duel finished and the room
  * stayed in_progress (pendingDuelId null means no rematch has bootstrapped
  * yet). REVANCHA re-readies through the existing room:ready pipeline; SALIR
@@ -179,6 +302,7 @@ function WaitRoomScreen() {
   const [state, actions] = useMockState()
   const navigate = useNavigate()
   const room = state.room
+  const [, forceUpdate] = useState(0)
 
   if (!room) {
     return <Navigate to="/lobby" replace />
@@ -191,6 +315,11 @@ function WaitRoomScreen() {
   const showRematch =
     !isTournament && state.duel?.phase === 'finished' && state.pendingDuelId === null
   const won = state.duel?.winnerId === state.player.playerId
+
+  // Force re-render when bots are added/removed (room state updates via WS)
+  const handleBotChange = () => {
+    forceUpdate(n => n + 1)
+  }
 
   return (
     <div className="pd-page wait-shell">
@@ -238,9 +367,14 @@ function WaitRoomScreen() {
             </div>
           </div>
 
-          <PlayerList players={players} />
+          <PlayerList 
+            players={players} 
+            roomCode={room.code}
+            onBotRemoved={handleBotChange}
+          />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pd-space-3)' }}>
+            <BotManager room={room} onBotAdded={handleBotChange} />
             <LeaveRoomButton />
             <button
               type="button"
