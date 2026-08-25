@@ -68,6 +68,10 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
     it('retries transparently on a single code collision and succeeds with a distinct code', async () => {
       generateRoomCode.mockClear();
       const collidingCode = 'ABCJKM';
+      // Clean up any leftover room from a previous run so the INSERT below
+      // never hits a stale duplicate-key from a prior CI run.
+      await pool.query('DELETE FROM rooms WHERE code = $1', [collidingCode]);
+
       const seedPlayer = await createPlayer('CollideOnceSeedDb');
       const { rows: insertedRows } = await pool.query(
         'INSERT INTO rooms (code, max_players, created_by) VALUES ($1, $2, $3) RETURNING id',
@@ -96,6 +100,10 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
     it('throws after 5 consecutive code collisions and creates no room', async () => {
       generateRoomCode.mockClear();
       const collidingCode = 'DEFGHJ';
+      // Clean up any leftover room from a previous run so the INSERT below
+      // never hits a stale duplicate-key from a prior CI run.
+      await pool.query('DELETE FROM rooms WHERE code = $1', [collidingCode]);
+
       const seedPlayer = await createPlayer('CollideExhaustedSeedDb');
       const { rows: insertedRows } = await pool.query(
         'INSERT INTO rooms (code, max_players, created_by) VALUES ($1, $2, $3) RETURNING id',
