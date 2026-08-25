@@ -80,6 +80,7 @@ function DuelProbe() {
       <span data-testid="rejection">{state.duel?.lastRejection?.reason ?? 'none'}</span>
       <span data-testid="bracket">{bracketSummary(state.tournament)}</span>
       <span data-testid="ranking">{rankingSummary(state.finalRanking)}</span>
+      <span data-testid="aborted">{state.roomAborted?.reason ?? 'none'}</span>
       <button
         type="button"
         onClick={() =>
@@ -234,6 +235,33 @@ describe('MockStateProvider — tournament bracket and final ranking consumption
       })
     })
     expect(screen.getByTestId('ranking').textContent).toBe('1:Ash:champ|2:Misty:cont')
+  })
+})
+
+describe('MockStateProvider — room:aborted recovery signal', () => {
+  it('dispatches the roomAborted action when room:aborted is emitted', () => {
+    renderProvider()
+    act(() => {
+      screen.getByRole('button', { name: 'establish' }).click()
+    })
+    expect(screen.getByTestId('aborted').textContent).toBe('none')
+
+    act(() => {
+      fakeSocket._fire('room:aborted', { reason: 'server_restart' })
+    })
+    expect(screen.getByTestId('aborted').textContent).toBe('server_restart')
+  })
+
+  it('subscribes and unsubscribes room:aborted in the central socket effect', () => {
+    const { unmount } = renderProvider()
+    act(() => {
+      screen.getByRole('button', { name: 'establish' }).click()
+    })
+    expect(fakeSocket.on).toHaveBeenCalledWith('room:aborted', expect.any(Function))
+    act(() => {
+      unmount()
+    })
+    expect(fakeSocket.off).toHaveBeenCalledWith('room:aborted')
   })
 })
 

@@ -102,6 +102,7 @@ describe('serializeMockState / parseMockState', () => {
       duel: null,
       pendingDuelId: '42',
       finalRanking: [{ rank: 1, name: 'Ash', champion: true }],
+      roomAborted: null,
     }
     const parsed = parseMockState(serializeMockState(state))
     expect(parsed).toEqual(state)
@@ -495,6 +496,40 @@ describe('reduceMockState — roomFinalRanking', () => {
       { rank: 1, name: 'Ash', champion: true },
       { rank: 2, name: 'Misty', champion: false },
     ])
+  })
+})
+
+describe('reduceMockState — roomAborted / roomAbortedAcknowledged', () => {
+  it('records a room:aborted reason so the UI can show a recovery banner', () => {
+    const base = makeDuelStateFixture()
+    const s = reduceMockState(base, {
+      type: 'roomAborted',
+      reason: 'server_restart',
+    })
+    expect(s.roomAborted).toEqual({ reason: 'server_restart' })
+  })
+
+  it('overwrites a previous reason when a new abort arrives', () => {
+    let s = reduceMockState(makeDuelStateFixture(), {
+      type: 'roomAborted',
+      reason: 'first',
+    })
+    s = reduceMockState(s, { type: 'roomAborted', reason: 'second' })
+    expect(s.roomAborted).toEqual({ reason: 'second' })
+  })
+
+  it('clears the aborted marker once the player acknowledges it', () => {
+    let s = reduceMockState(makeDuelStateFixture(), {
+      type: 'roomAborted',
+      reason: 'server_restart',
+    })
+    expect(s.roomAborted).not.toBeNull()
+    const after = reduceMockState(s, { type: 'roomAbortedAcknowledged' })
+    expect(after.roomAborted).toBeNull()
+  })
+
+  it('starts with no aborted marker', () => {
+    expect(createInitialState().roomAborted).toBeNull()
   })
 })
 
