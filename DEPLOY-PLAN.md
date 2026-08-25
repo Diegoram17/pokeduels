@@ -297,3 +297,17 @@ job de `frontend` si corre. No bloqueó este deploy porque el cambio no toca `ba
   No se investigó la causa raíz del lado de Vercel (fuera del control del proyecto); si se repite
   seguido, vale la pena abrir un ticket de soporte con Vercel adjuntando los `inspectorUrl` de los
   deploys fallidos.
+
+**Confirmado recurrente, no fue un evento único:** el siguiente push a `master` (commit `9f29c3b`,
+solo este mismo `DEPLOY-PLAN.md`, sin tocar `frontend/`) disparó el deploy automático de Vercel de
+nuevo — **falló otra vez**, firma idéntica (`Restored build cache from previous deployment
+(A1erYcoNN5wfHrn41pAUq2kvxCPd)` → `vite: command not found`, sin paso de install visible), a pesar
+de que ese ID de cache (`A1erYcoNN5wfHrn41pAUq2kvxCPd`) es exactamente el deploy exitoso anterior.
+Es decir: **todo deploy disparado por push normal (que restaura cache) falla; solo un
+`--force` (que descarta cache) funciona.** La alias de producción NO se movió (Vercel no
+re-aliasea en un deploy fallido), así que `https://pokeduels.vercel.app` siguió sirviendo el build
+bueno (`index-q7gD4FQZ.js`) sin interrupción — pero el pipeline de auto-deploy en sí está roto de
+forma consistente hasta que alguien decida cómo resolverlo (deshabilitar la build cache del
+proyecto en Vercel, u otra causa raíz por investigar). Esto queda reportado al usuario, no resuelto
+unilateralmente — es un cambio de configuración de infraestructura, fuera del alcance ya
+autorizado de "pushear y deployar este fix".
