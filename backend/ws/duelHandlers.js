@@ -95,6 +95,15 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
         throw new WsError('duel:lead_rejected', { pokemonId, reason: 'not_participant' });
       }
 
+      // F1 phase guard: a lead may only be selected during lead-selection.
+      // Mid-duel bench activation via a direct `duel:select_lead` WS call is
+      // rejected explicitly (never silently applied), as defense-in-depth on
+      // top of the roster-wide `already_active` DB check in
+      // validateLeadSelectionCore. Both layers close the same exploit.
+      if (getPhaseStore().get(duelId) !== PHASES.LEAD_SELECTION) {
+        throw new WsError('duel:lead_rejected', { pokemonId, reason: 'not_lead_phase' });
+      }
+
       try {
         await activateLead(duelId, playerId, pokemonId);
       } catch (err) {
