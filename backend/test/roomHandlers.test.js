@@ -144,13 +144,31 @@ describe('registerRoomHandlers', () => {
       expect(broadcastRoomState).not.toHaveBeenCalled();
     });
 
-    it('swallows DB HttpErrors (e.g. unknown code) without crashing the socket', async () => {
+    it('translates a DB HttpError (unknown code) into a room:join_rejected event to the client', async () => {
       joinOrResumeRoom.mockRejectedValueOnce(new HttpError(404, 'room not found'));
+      const rejected = vi.fn();
+      socket.on('room:join_rejected', rejected);
 
       socket.emit('room:join', { code: 'NOPE00' });
-      await vi.waitFor(() => expect(errorSpy).toHaveBeenCalled());
+      await vi.waitFor(() => expect(rejected).toHaveBeenCalled());
 
+      expect(rejected).toHaveBeenCalledWith({ code: 'NOPE00', reason: 'not_found' });
       expect(socket.join).not.toHaveBeenCalled();
+      // A translated WsError is a client-visible rejection, not a swallowed fault.
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('translates a full/not-waiting HttpError into room:join_rejected with reason unavailable', async () => {
+      joinOrResumeRoom.mockRejectedValueOnce(new HttpError(409, 'room is full'));
+      const rejected = vi.fn();
+      socket.on('room:join_rejected', rejected);
+
+      socket.emit('room:join', { code: 'ABC123' });
+      await vi.waitFor(() => expect(rejected).toHaveBeenCalled());
+
+      expect(rejected).toHaveBeenCalledWith({ code: 'ABC123', reason: 'unavailable' });
+      expect(socket.join).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
     });
   });
 

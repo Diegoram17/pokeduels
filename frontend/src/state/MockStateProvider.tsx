@@ -108,6 +108,20 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       pendingJoinRef.current = null
       socket.emit('duel:join', { duelId: Number(pendingJoin) })
     }
+
+    // Re-sync a persisted room membership on every (re)connect — mirrors the
+    // pendingJoinRef pattern above, but for rooms: loadMockState() can restore
+    // a room from a previous session, and without this the client never tells
+    // the server it's back, so it never receives a fresh room:state and every
+    // room:ready/leave silently no-ops (socket.data.roomId stays undefined).
+    const persistedRoomCode = stateRef.current.room?.code
+    if (persistedRoomCode) {
+      socket.emit('room:join', {
+        code: persistedRoomCode,
+        nickname: stateRef.current.player.nickname,
+      })
+    }
+
     socket.on('room:state', (payload: unknown) => {
       const room = payload as {
         code: string
@@ -217,6 +231,13 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       send({ type: 'roomAborted', reason })
     })
 
+    // room:join_rejected — the persisted room no longer exists server-side
+    // (finished/aborted/deleted). Drop it locally instead of leaving the user
+    // stuck on a dead wait-room screen forever.
+    socket.on('room:join_rejected', () => {
+      send({ type: 'roomJoinRejected' })
+    })
+
     return () => {
       socket.off('room:state')
       socket.off('duel:start')
@@ -228,6 +249,7 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       socket.off('tournament:bracket')
       socket.off('room:final_ranking')
       socket.off('room:aborted')
+      socket.off('room:join_rejected')
       disconnectSocket()
       setSessionToken(null)
       socketRef.current = null

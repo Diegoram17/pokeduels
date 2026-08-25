@@ -4,6 +4,7 @@ import { render, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { MockStateProvider } from '../MockStateProvider'
 import { useMockState } from '../useMockState'
+import { createInitialState, serializeMockState, STORAGE_KEY } from '../store'
 import { io } from 'socket.io-client'
 import type { Socket } from 'socket.io-client'
 
@@ -134,5 +135,54 @@ describe('MockStateProvider socket lifecycle', () => {
     })
 
     expect(fakeSocket.disconnect).toHaveBeenCalled()
+  })
+
+  it('re-emits room:join for a persisted room on connect (resync after reload)', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      serializeMockState({
+        ...createInitialState(),
+        player: { nickname: 'Ash', playerId: 'p1', sessionToken: 'token-1' },
+        room: {
+          code: 'AB12',
+          maxPlayers: 2,
+          status: 'waiting',
+          players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
+        },
+      }),
+    )
+
+    renderProvider()
+
+    expect(io).toHaveBeenCalledTimes(1)
+    expect(fakeSocket.emit).toHaveBeenCalledWith('room:join', {
+      code: 'AB12',
+      nickname: 'Ash',
+    })
+  })
+
+  it('clears the persisted room when the server rejects the rejoin (room:join_rejected)', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      serializeMockState({
+        ...createInitialState(),
+        player: { nickname: 'Ash', playerId: 'p1', sessionToken: 'token-1' },
+        room: {
+          code: 'AB12',
+          maxPlayers: 2,
+          status: 'waiting',
+          players: [{ playerId: 'p1', nickname: 'Ash', ready: false, connected: true }],
+        },
+      }),
+    )
+
+    renderProvider()
+    expect(screen.getByTestId('roster').textContent).toBe('Ash')
+
+    act(() => {
+      fakeSocket._fire('room:join_rejected')
+    })
+
+    expect(screen.getByTestId('roster').textContent).toBe('no-room')
   })
 })

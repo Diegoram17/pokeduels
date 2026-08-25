@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { createSocketServer } from './ws/index.js';
 import { pool } from './db/pool.js';
-import { reconcileOrphanedDuels } from './db/reconciliation.js';
+import { reconcileOrphanedDuels, reconcileStaleWaitingRooms } from './db/reconciliation.js';
 import { loadTypeEffectivenessCache } from './engine/typeEffectiveness.js';
 
 const port = process.env.PORT ?? 3000;
@@ -27,6 +27,7 @@ async function start() {
   // no client can connect to unreconciled state. Errors propagate (fail
   // closed) — a reconciliation failure aborts boot via the catch below.
   await reconcileOrphanedDuels();
+  await reconcileStaleWaitingRooms();
 
   httpServer.listen(port, () => {
     console.log(`pokeduels API listening on port ${port}`);

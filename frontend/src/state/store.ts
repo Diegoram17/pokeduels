@@ -231,6 +231,7 @@ export type MockStateAction =
   | { type: 'roomFinalRanking'; ranking: RankingEntry[] }
   | { type: 'roomAborted'; reason: string }
   | { type: 'roomAbortedAcknowledged' }
+  | { type: 'roomJoinRejected' }
   | { type: 'resetSession' }
 
 export function reduceMockState(state: MockState, action: MockStateAction): MockState {
@@ -402,6 +403,19 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
     // The player clicked "back to lobby" on the recovery banner.
     case 'roomAbortedAcknowledged':
       return { ...state, roomAborted: null }
+
+    // room:join_rejected — the persisted room no longer exists server-side
+    // (finished/aborted/deleted). Reset the room-scoped slice so WaitRoomScreen
+    // (which redirects to /lobby when !room) bounces the user instead of
+    // leaving them stuck on a dead wait-room screen.
+    case 'roomJoinRejected':
+      return {
+        ...state,
+        room: null,
+        tournament: null,
+        duel: null,
+        pendingDuelId: null,
+      }
 
     // "Play again": wipe the whole session (room, team, tournament, duel,
     // pending duel, ranking) but keep the player's nickname (design:

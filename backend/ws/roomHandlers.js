@@ -12,6 +12,8 @@ import { withWsHandler } from '../ws/wsFaultIsolation.js';
 import { bootstrapDuelIfReady, bootstrapBracketIfReady } from '../ws/duelBootstrap.js';
 import { createDuelLifecycle } from '../ws/duelLifecycle.js';
 import { advanceTournamentOrRematch, walkoverPendingDuel } from '../ws/tournamentLifecycle.js';
+import { HttpError } from '../lib/httpError.js';
+import { WsError } from '../lib/wsError.js';
 
 const MAX_NICKNAME_LENGTH = 30;
 
@@ -79,7 +81,18 @@ export function registerRoomHandlers(
           ? payload.nickname
           : socket.data.player.nickname;
 
-      const room = await joinOrResumeRoom(code, playerId, nickname);
+      let room;
+      try {
+        room = await joinOrResumeRoom(code, playerId, nickname);
+      } catch (err) {
+        if (err instanceof HttpError) {
+          throw new WsError('room:join_rejected', {
+            code,
+            reason: err.statusCode === 404 ? 'not_found' : 'unavailable',
+          });
+        }
+        throw err;
+      }
       socket.data.roomId = room.id;
       socket.join(`room:${room.id}`);
       reconnectTimers.cancel(room.id, playerId);

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { pool } from '../db/pool.js';
 import { createPlayer } from '../db/players.js';
 import { createRoomWithCreator } from '../db/rooms.js';
-import { reconcileOrphanedDuels } from '../db/reconciliation.js';
+import { reconcileOrphanedDuels, reconcileStaleWaitingRooms } from '../db/reconciliation.js';
 import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
 
 /**
@@ -181,5 +181,80 @@ describe.skipIf(!hasDatabase)('reconcileOrphanedDuels (requires DATABASE_URL)', 
     expect(result.roomIds).toEqual([]);
     const { rows } = await pool.query('SELECT status FROM duels WHERE id = $1', [done.duelId]);
     expect(rows[0].status).toBe('finished');
+  });
+
+  // --- reconcileStaleWaitingRooms (Bug 1, ADR-0008 extension) ---
+  async function makeStaleWaitingRoom({ status = 'waiting', connected = true, withTeamSelection = false }) {
+    const p1 = await createPlayer('StaleP1' + Math.floor(Math.random() * 1e9));
+    playerIds.push(p1.id);
+    const room = await createRoomWithCreator(2, p1.id);
+    roomIds.push(room.id);
+    await pool.query("UPDATE rooms SET status = $1 WHERE id = $2", [status, room.id]);
+    if (!connected) {
+      await pool.query(
+        'UPDATE room_players SET connected = FALSE WHERE room_id = $1 AND player_id = $2',
+        [room.id, p1.id],
+      );
+    }
+    if (withTeamSelection) {
+      const { rows: pokemons } = await pool.query('SELECT id FROM pokemons ORDER BY id LIMIT 1');
+      await pool.query(
+        'INSERT INTO team_selections (room_id, player_id, pokemon_id, is_starter, slot) VALUES ($1, $2, $3, TRUE, 1)',
+        [room.id, p1.id, pokemons[0].id],
+      );
+    }
+    return room;
+  }
+
+  it('deletes a stale waiting room whose player still shows connected=TRUE (hard crash never ran markPlayerDisconnected)', async () => {
+    const room = await makeStaleWaitingRoom({ connected: true });
+
+    const result = await reconcileStaleWaitingRooms();
+
+    expect(result.roomIds).toEqual(expect.arrayContaining([room.id]));
+    const { rows } = await pool.query('SELECT id FROM rooms WHERE id = $1', [room.id]);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('deletes a stale waiting room whose players are all disconnected', async () => {
+    const room = await makeStaleWaitingRoom({ connected: false });
+
+    const result = await reconcileStaleWaitingRooms();
+
+    expect(result.roomIds).toEqual(expect.arrayContaining([room.id]));
+    const { rows } = await pool.query('SELECT id FROM rooms WHERE id = $1', [room.id]);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('cascades the deletion to room_players and team_selections of the swept room', async () => {
+    const room = await makeStaleWaitingRoom({ withTeamSelection: true });
+
+    await reconcileStaleWaitingRooms();
+
+    const { rows: rp } = await pool.query('SELECT id FROM room_players WHERE room_id = $1', [room.id]);
+    expect(rp).toHaveLength(0);
+    const { rows: ts } = await pool.query('SELECT id FROM team_selections WHERE room_id = $1', [room.id]);
+    expect(ts).toHaveLength(0);
+  });
+
+  it('leaves in_progress, finished, and aborted rooms untouched', async () => {
+    const inProgress = await makeStaleWaitingRoom({ status: 'in_progress' });
+    const finished = await makeStaleWaitingRoom({ status: 'finished' });
+    const aborted = await makeStaleWaitingRoom({ status: 'aborted' });
+    const ids = [inProgress.id, finished.id, aborted.id];
+
+    await reconcileStaleWaitingRooms();
+
+    const { rows } = await pool.query('SELECT id FROM rooms WHERE id = ANY($1::int[])', [ids]);
+    expect(rows.map((r) => r.id).sort()).toEqual([...ids].sort());
+  });
+
+  it('is a no-op when no waiting rooms exist', async () => {
+    // Only a finished room exists — the sweep must not touch it nor error.
+    await makeStaleWaitingRoom({ status: 'finished' });
+
+    const result = await reconcileStaleWaitingRooms();
+
+    expect(result.roomIds).toEqual([]);
   });
 });

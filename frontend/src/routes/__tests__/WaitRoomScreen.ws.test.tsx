@@ -261,3 +261,38 @@ describe('WaitRoomScreen — real bracket', () => {
     expect(screen.getByTestId('slot-label')).toHaveTextContent('SEMIFINAL A')
   })
 })
+
+describe('WaitRoomScreen — StartMatchButton emits room:ready', () => {
+  function renderFullWaiting1v1() {
+    return renderWaitRoom({
+      player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+      room: {
+        code: 'AB12',
+        maxPlayers: 2,
+        status: 'waiting',
+        players: [
+          { playerId: '10', nickname: 'Ash', ready: false, connected: true },
+          { playerId: '11', nickname: 'Misty', ready: false, connected: true },
+        ],
+      },
+      teamSelection: { starterId: 25, rosterIds: [] },
+      tournament: null,
+      duelPokemonState: [],
+      duel: null,
+      pendingDuelId: null,
+      finalRanking: null,
+      roomAborted: null,
+    })
+  }
+
+  it('is shown on a full waiting room and clicking it emits room:ready with ready:true', () => {
+    renderFullWaiting1v1()
+    const button = screen.getByRole('button', { name: /iniciar partida/i })
+    expect(button).toBeInTheDocument()
+
+    act(() => {
+      button.click()
+    })
+    expect(fakeSocket.emit).toHaveBeenCalledWith('room:ready', { ready: true })
+  })
+})

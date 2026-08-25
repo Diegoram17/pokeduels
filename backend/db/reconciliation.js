@@ -40,3 +40,36 @@ export async function reconcileOrphanedDuels() {
     client.release();
   }
 }
+
+/**
+ * Boot-time reconciliation (ADR-0008 extension): a `waiting` room can only
+ * exist while players hold a live WS connection to THIS process. A boot
+ * means no connection from before survived it, so every room still
+ * `status='waiting'` at boot time is abandoned — the in-memory reconnect
+ * grace timer that would normally clean it up (reconnectTimers.js) does
+ * not survive a process restart. Deletion cascades to room_players and
+ * team_selections via existing FKs. Errors propagate (fail closed), same
+ * contract as reconcileOrphanedDuels.
+ */
+export async function reconcileStaleWaitingRooms() {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: stale } = await client.query(
+      "SELECT id FROM rooms WHERE status = 'waiting'",
+    );
+    if (stale.length > 0) {
+      await client.query(
+        "DELETE FROM rooms WHERE id = ANY($1::int[])",
+        [stale.map((r) => r.id)],
+      );
+    }
+    await client.query('COMMIT');
+    return { roomIds: stale.map((r) => r.id) };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}

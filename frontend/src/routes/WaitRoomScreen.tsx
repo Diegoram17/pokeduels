@@ -212,6 +212,28 @@ function LeaveRoomButton() {
   )
 }
 
+function StartMatchButton({
+  isFull,
+  isReady,
+  onStart,
+}: {
+  isFull: boolean
+  isReady: boolean
+  onStart: () => void
+}) {
+  if (!isFull || isReady) return null
+  return (
+    <button
+      type="button"
+      className="pd-btn pd-btn--primary pd-btn--block"
+      onClick={onStart}
+    >
+      <span className="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+      INICIAR PARTIDA
+    </button>
+  )
+}
+
 /**
  * Bot management controls: add bots to fill empty slots.
  */
@@ -225,37 +247,52 @@ function BotManager({
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const currentPlayers = room.players.length
-  const hasEmptySlots = currentPlayers < room.maxPlayers
+  const emptySlots = room.maxPlayers - currentPlayers
+  const hasEmptySlots = emptySlots > 0
 
-  async function handleAddBot() {
+  async function handleAddBots() {
     if (!hasEmptySlots) return
     setAdding(true)
     setError(null)
     try {
-      await createBot(room.code)
-      onBotAdded()
+      // Sequential on purpose, NOT Promise.all: autoSelectBotTeam reads the
+      // "available starters" list before writing its pick, so concurrent bot
+      // creations could read the same list and collide on
+      // uq_starter_por_sala (unique starter per room).
+      for (let i = 0; i < emptySlots; i += 1) {
+        await createBot(room.code)
+      }
     } catch (err) {
       setError(describeApiError(err))
     } finally {
+      // Refresh even on partial failure — some bots may have been added
+      // before the request that failed.
+      onBotAdded()
       setAdding(false)
     }
   }
 
   if (!hasEmptySlots) return null
 
+  // maxPlayers === 2 (1v1): emptySlots is always exactly 1 here -> "AGREGAR BOT".
+  // maxPlayers === 4 (torneo): 1 empty slot -> "AGREGAR BOT"; 2 or 3 -> "AGREGAR BOTS"
+  // and one click fills every remaining seat.
+  const label = emptySlots > 1 ? 'AGREGAR BOTS' : 'AGREGAR BOT'
+  const loadingLabel = emptySlots > 1 ? 'AGREGANDO BOTS...' : 'AGREGANDO...'
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pd-space-2)' }}>
       <button
         type="button"
         className="pd-btn pd-btn--secondary pd-btn--block"
-        onClick={handleAddBot}
+        onClick={handleAddBots}
         disabled={adding}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--pd-space-2)' }}
       >
         <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>
           smart_toy
         </span>
-        {adding ? 'AGREGANDO...' : 'AGREGAR BOT'}
+        {adding ? loadingLabel : label}
       </button>
       {error && (
         <p role="alert" className="pd-meta" style={{ color: 'var(--pd-danger)', margin: 0, textAlign: 'center' }}>
@@ -379,6 +416,11 @@ function WaitRoomScreen() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pd-space-3)' }}>
             <BotManager room={room} onBotAdded={handleBotChange} />
+            <StartMatchButton
+              isFull={players.length === room.maxPlayers}
+              isReady={isReady}
+              onStart={() => actions.setReady(true)}
+            />
             <button
               type="button"
               className="pd-btn pd-btn--block"
@@ -437,5 +479,7 @@ export {
   BracketMini,
   EnterDuelButton,
   LeaveRoomButton,
+  StartMatchButton,
+  BotManager,
   PostDuelRematchPanel,
 }

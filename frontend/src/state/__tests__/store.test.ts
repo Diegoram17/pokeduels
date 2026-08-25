@@ -533,6 +533,29 @@ describe('reduceMockState — roomAborted / roomAbortedAcknowledged', () => {
   })
 })
 
+describe('reduceMockState — roomJoinRejected', () => {
+  it('clears the room-scoped slice (room/tournament/duel/pendingDuelId) while leaving player untouched', () => {
+    let s = makeDuelStateFixture()
+    s = reduceMockState(s, {
+      type: 'tournamentBracket',
+      bracket: { semiA: { duelId: '42', playerA: '10', playerB: '11' } },
+    })
+    s = reduceMockState(s, { type: 'pendingDuelSet', duelId: '42' })
+    s = reduceMockState(s, {
+      type: 'roomFinalRanking',
+      ranking: [{ rank: 1, name: 'Ash', champion: true }],
+    })
+
+    const after = reduceMockState(s, { type: 'roomJoinRejected' })
+
+    expect(after.player).toEqual(s.player)
+    expect(after.room).toBeNull()
+    expect(after.tournament).toBeNull()
+    expect(after.duel).toBeNull()
+    expect(after.pendingDuelId).toBeNull()
+  })
+})
+
 describe('deriveDuelSlot', () => {
   it('returns 1v1 without a tournament', () => {
     expect(deriveDuelSlot('42', null)).toBe('1v1')

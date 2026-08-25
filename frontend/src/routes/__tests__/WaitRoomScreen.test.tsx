@@ -114,3 +114,70 @@ describe('WaitRoomScreen', () => {
     expect(screen.getByText('LOBBY-LANDED')).toBeInTheDocument()
   })
 })
+
+describe('StartMatchButton', () => {
+  it('is hidden when the room is not full', () => {
+    renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
+    expect(screen.queryByRole('button', { name: /iniciar partida/i })).not.toBeInTheDocument()
+  })
+
+  it('is shown when the room is full and the player is not ready yet', () => {
+    renderWaitRoom(
+      seedRoom(2, [
+        { playerId: 'p1', nickname: 'Ash' },
+        { playerId: 'p2', nickname: 'Misty' },
+      ]),
+    )
+    expect(screen.getByRole('button', { name: /iniciar partida/i })).toBeInTheDocument()
+  })
+
+  it('is hidden when the player is already ready', () => {
+    renderWaitRoom((actions) => {
+      actions.sessionEstablished({ playerId: 'p1', sessionToken: 't1', nickname: 'Ash' })
+      actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
+      actions.receiveRoomState({
+        code: 'AB12',
+        maxPlayers: 2,
+        status: 'waiting',
+        players: [
+          { playerId: 'p1', nickname: 'Ash', ready: true, connected: true },
+          { playerId: 'p2', nickname: 'Misty', ready: true, connected: true },
+        ],
+      })
+    })
+    expect(screen.queryByRole('button', { name: /iniciar partida/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('BotManager', () => {
+  it('shows AGREGAR BOTS for a tournament room with multiple empty slots', () => {
+    renderWaitRoom(seedRoom(4, [{ playerId: 'p1', nickname: 'Ash' }]))
+    expect(screen.getByRole('button', { name: /agregar bots/i })).toBeInTheDocument()
+  })
+
+  it('shows AGREGAR BOT for a tournament room with a single empty slot', () => {
+    renderWaitRoom(
+      seedRoom(4, [
+        { playerId: 'p1', nickname: 'Ash' },
+        { playerId: 'p2', nickname: 'Misty' },
+        { playerId: 'p3', nickname: 'Brock' },
+      ]),
+    )
+    expect(screen.getByRole('button', { name: /agregar bot/i })).toBeInTheDocument()
+  })
+
+  it('shows AGREGAR BOT for a 1v1 room (single empty slot)', () => {
+    renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
+    expect(screen.getByRole('button', { name: /agregar bot/i })).toBeInTheDocument()
+  })
+
+  it('is hidden when the room is full', () => {
+    renderWaitRoom(
+      seedRoom(2, [
+        { playerId: 'p1', nickname: 'Ash' },
+        { playerId: 'p2', nickname: 'Misty' },
+      ]),
+    )
+    expect(screen.queryByRole('button', { name: /agregar bot/i })).not.toBeInTheDocument()
+  })
+})
