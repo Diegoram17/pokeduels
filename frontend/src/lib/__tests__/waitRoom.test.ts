@@ -38,22 +38,36 @@ describe('slotLabel', () => {
 })
 
 describe('buildPlayerList', () => {
-  it('fills a 1v1 room with one bot', () => {
+  it('returns only real players in a 1v1 room', () => {
     const list = buildPlayerList(room1v1)
     expect(list).toEqual([
-      { name: 'Ash', isBot: false },
-      { name: 'VORTEX_99', isBot: true },
+      { name: 'Ash', isBot: false, playerId: 'p1' },
     ])
   })
 
-  it('fills a tournament room with three bots', () => {
+  it('returns only real players in a tournament room', () => {
     const list = buildPlayerList(roomTournament)
-    expect(list).toHaveLength(4)
-    expect(list[0]).toEqual({ name: 'Ash', isBot: false })
-    expect(list.filter((entry) => entry.isBot)).toHaveLength(3)
+    expect(list).toHaveLength(1)
+    expect(list[0]).toEqual({ name: 'Ash', isBot: false, playerId: 'p1' })
   })
 
-  it('adds no bots when the room is already full', () => {
+  it('identifies bots by 🤖 prefix in nickname', () => {
+    const roomWithBot: RoomState = {
+      code: 'AB12',
+      maxPlayers: 2,
+      status: 'waiting',
+      players: [
+        { playerId: 'p1', nickname: 'Ash', ready: false, connected: true },
+        { playerId: 'b1', nickname: '🤖 Misty', ready: true, connected: true },
+      ],
+    }
+    const list = buildPlayerList(roomWithBot)
+    expect(list).toHaveLength(2)
+    expect(list[0]).toEqual({ name: 'Ash', isBot: false, playerId: 'p1' })
+    expect(list[1]).toEqual({ name: '🤖 Misty', isBot: true, playerId: 'b1' })
+  })
+
+  it('returns all players when the room is full', () => {
     const list = buildPlayerList(fullRoom)
     expect(list).toHaveLength(4)
     expect(list.filter((entry) => entry.isBot)).toHaveLength(0)

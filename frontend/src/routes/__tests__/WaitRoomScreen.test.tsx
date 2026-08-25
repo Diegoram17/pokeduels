@@ -67,13 +67,13 @@ function seedRoom(maxPlayers: 2 | 4, players: { playerId: string; nickname: stri
 }
 
 describe('WaitRoomScreen', () => {
-  it('shows the player list with the real roster and bot fillers for a 1v1 room', () => {
+  it('shows the player list with real players for a 1v1 room', () => {
     renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
 
     const playerList = screen.getByTestId('player-list')
     expect(within(playerList).getByText('Ash')).toBeInTheDocument()
-    expect(within(playerList).getByText('VORTEX_99')).toBeInTheDocument()
-    expect(screen.getByText('2 / 2')).toBeInTheDocument()
+    // Counter shows actual players (1/2), not filled with fake bots
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
   })
 
   it('labels a 1v1 room DUELO 1V1 and hides the bracket', () => {
@@ -88,7 +88,8 @@ describe('WaitRoomScreen', () => {
 
     expect(screen.getByTestId('slot-label')).toHaveTextContent('TORNEO DE 4')
     expect(screen.queryByRole('region', { name: /cuadro/i })).not.toBeInTheDocument()
-    expect(screen.getByText('4 / 4')).toBeInTheDocument()
+    // Counter shows actual players (1/4), not filled with fake bots
+    expect(screen.getByText('1 / 4')).toBeInTheDocument()
   })
 
   it('leaves the room and returns to the lobby', async () => {
