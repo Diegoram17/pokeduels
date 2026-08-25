@@ -140,7 +140,7 @@ en `UX-DESIGN.md`.
 | ID | Requisito | Criterio |
 |---|---|---|
 | RNF-1 | Latencia de resolución de turno | < 500 ms percibidos |
-| RNF-2 | Responsive | Funcional en móvil y desktop |
+| RNF-2 | Desktop-only | Funcional en desktop. Sin soporte móvil (decisión explícita, 2026-08-25 — ver "No alcance") |
 | RNF-3 | Seguridad del motor | Ningún cálculo de daño en cliente |
 | RNF-4 | Costo de despliegue | Compatible con tiers gratuitos de Vercel/Render/Neon |
 | RNF-5 | Sprites | Consumidos desde PokeAPI, no almacenados localmente |
@@ -150,6 +150,7 @@ en `UX-DESIGN.md`.
 
 Excluido deliberadamente para mantener el alcance acotado:
 
+- Soporte móvil/tablet — el juego es desktop-only (decisión explícita, 2026-08-25, corrige RNF-2 v1.0 que pedía "funcional en móvil y desktop"; sin ese requisito, no hace falta layout responsive)
 - Fidelidad competitiva al metajuego real de Pokémon (EVs/IVs, naturalezas, habilidades)
 - Precisión / probabilidad de fallar un ataque
 - Golpes críticos
