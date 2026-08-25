@@ -68,6 +68,7 @@ function renderTeamSelect() {
     duel: null,
     pendingDuelId: null,
     finalRanking: null,
+    roomAborted: null,
   }
   localStorage.setItem(STORAGE_KEY, serializeMockState(seeded))
   return render(

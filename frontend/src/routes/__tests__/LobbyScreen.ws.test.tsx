@@ -71,6 +71,7 @@ function renderLobby(session?: boolean) {
       duel: null,
       pendingDuelId: null,
       finalRanking: null,
+      roomAborted: null,
     }
     localStorage.setItem(STORAGE_KEY, serializeMockState(seeded))
   }

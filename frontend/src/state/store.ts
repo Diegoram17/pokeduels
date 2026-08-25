@@ -38,6 +38,7 @@ export function createInitialState(): MockState {
     duel: null,
     pendingDuelId: null,
     finalRanking: null,
+    roomAborted: null,
   }
 }
 
@@ -215,6 +216,8 @@ export type MockStateAction =
   | { type: 'duelOpponentDisconnected' }
   | { type: 'tournamentBracket'; bracket: Partial<Record<TournamentSlot, BracketPairing | null>> }
   | { type: 'roomFinalRanking'; ranking: RankingEntry[] }
+  | { type: 'roomAborted'; reason: string }
+  | { type: 'roomAbortedAcknowledged' }
   | { type: 'resetSession' }
 
 export function reduceMockState(state: MockState, action: MockStateAction): MockState {
@@ -373,6 +376,16 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
     // ranking the client may have shown.
     case 'roomFinalRanking':
       return { ...state, finalRanking: action.ranking }
+
+    // room:aborted — the backend restarted / tore the room down (ADR-0008).
+    // The player may be on any screen, so we surface a top-level flag that a
+    // global banner reads; no silent auto-redirect (product decision).
+    case 'roomAborted':
+      return { ...state, roomAborted: { reason: action.reason } }
+
+    // The player clicked "back to lobby" on the recovery banner.
+    case 'roomAbortedAcknowledged':
+      return { ...state, roomAborted: null }
 
     // "Play again": wipe the whole session (room, team, tournament, duel,
     // pending duel, ranking) but keep the player's nickname (design:

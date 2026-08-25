@@ -106,6 +106,7 @@ function seedSession(maxPlayers: 2 | 4) {
     duel: null,
     pendingDuelId: null,
     finalRanking: null,
+    roomAborted: null,
   }
   localStorage.setItem(STORAGE_KEY, serializeMockState(state))
 }
@@ -146,6 +147,7 @@ function liveDuelState(duelId: number): MockState {
     },
     pendingDuelId: null,
     finalRanking: null,
+    roomAborted: null,
   }
 }
 

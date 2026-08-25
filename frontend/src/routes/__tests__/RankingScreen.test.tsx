@@ -112,6 +112,7 @@ function makeRankingState(overrides: Partial<MockState> = {}): MockState {
     duel: makeFinishedDuel('10'),
     pendingDuelId: null,
     finalRanking: null,
+    roomAborted: null,
     ...overrides,
   }
 }

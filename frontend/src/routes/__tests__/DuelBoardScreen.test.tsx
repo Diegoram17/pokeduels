@@ -107,6 +107,7 @@ function buildLiveState(overrides: Partial<MockState> = {}): MockState {
     duel: makeDuel('awaiting_actions'),
     pendingDuelId: null,
     finalRanking: null,
+    roomAborted: null,
     ...overrides,
   }
 }

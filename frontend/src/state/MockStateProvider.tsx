@@ -46,6 +46,8 @@ export interface MockStateActions {
   surrenderDuel(): void
   /** Emits duel:join for a server-announced duel id. */
   joinDuel(duelId: string): void
+  /** Clears the room:aborted recovery banner (the player clicked "back to lobby"). */
+  acknowledgeRoomAborted(): void
   resetSession(): void
 }
 
@@ -201,6 +203,14 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       send({ type: 'roomFinalRanking', ranking: rows })
     })
 
+    // room:aborted — the backend tore the room down / restarted (ADR-0008).
+    // Surface a top-level flag driving a global recovery banner; no silent
+    // auto-redirect (product decision). Arrives while on any screen.
+    socket.on('room:aborted', (payload: unknown) => {
+      const { reason } = payload as { reason: string }
+      send({ type: 'roomAborted', reason })
+    })
+
     return () => {
       socket.off('room:state')
       socket.off('duel:start')
@@ -211,6 +221,7 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       socket.off('duel:opponent_disconnected')
       socket.off('tournament:bracket')
       socket.off('room:final_ranking')
+      socket.off('room:aborted')
       disconnectSocket()
       socketRef.current = null
       pendingJoinRef.current = null
@@ -311,6 +322,9 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
           // mount-time resync emit is never lost.
           pendingJoinRef.current = String(duelId)
         }
+      },
+      acknowledgeRoomAborted: () => {
+        send({ type: 'roomAbortedAcknowledged' })
       },
       resetSession: () => {
         // "Play again" keeps the nickname/token but must drop the live WS

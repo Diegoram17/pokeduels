@@ -114,6 +114,7 @@ function baseState(duel: MockState['duel'], duelPokemonState: DuelPokemonState[]
     duel,
     pendingDuelId: null,
     finalRanking: null,
+    roomAborted: null,
   }
 }
 
