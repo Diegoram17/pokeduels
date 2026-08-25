@@ -56,7 +56,9 @@ export async function createRoomWithCreator(maxPlayers, playerId) {
 
 /**
  * Lists rooms still waiting for players, each with its current occupancy
- * (count of room_players). Non-waiting rooms are excluded.
+ * (count of room_players). Non-waiting rooms are excluded. Empty rooms are
+ * deleted automatically when the last player leaves, so no stale cleanup
+ * filter is needed here.
  */
 export async function listWaitingRooms() {
   const { rows } = await pool.query(
@@ -244,8 +246,10 @@ export async function setPlayerReady(roomId, playerId, ready) {
 /**
  * Removes a player's seat: deletes team_selections (releasing any starter
  * reservation) and the room_players row in one transaction. If the resulting
- * seated count is 0, the room is closed (status -> 'aborted', design decision:
- * no row delete, history preserved via cascade-safe status). No return value.
+ * seated count is 0 AND the room is still 'waiting', the room is DELETED
+ * (empty rooms should not accumulate). Rooms 'in_progress' are never deleted
+ * here — they close through leaveOrCloseRoom's ranking path instead.
+ * No return value.
  */
 export async function leaveRoom(roomId, playerId) {
   const client = await pool.connect();
@@ -263,15 +267,18 @@ export async function leaveRoom(roomId, playerId) {
       [roomId, playerId],
     );
 
-    const { rows } = await client.query(
+    const { rows: countRows } = await client.query(
       'SELECT COUNT(*)::int AS n FROM room_players WHERE room_id = $1',
       [roomId],
     );
-    if (rows[0].n === 0) {
-      await client.query(
-        "UPDATE rooms SET status = 'aborted' WHERE id = $1 AND status = 'waiting'",
+    if (countRows[0].n === 0) {
+      const { rows: statusRows } = await client.query(
+        'SELECT status FROM rooms WHERE id = $1',
         [roomId],
       );
+      if (statusRows[0]?.status === 'waiting') {
+        await client.query('DELETE FROM rooms WHERE id = $1', [roomId]);
+      }
     }
 
     await client.query('COMMIT');

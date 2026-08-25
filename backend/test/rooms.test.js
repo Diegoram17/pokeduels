@@ -289,7 +289,7 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
       expect(roomRows[0].status).toBe('waiting');
     });
 
-    it('leaveRoom closes the room (aborted) when the last seated player leaves', async () => {
+    it('leaveRoom deletes the room when the last seated player leaves a waiting room', async () => {
       const creator = await createPlayer('WsCloseCreator');
       const room = await createRoomWithCreator(2, creator.id);
 
@@ -300,8 +300,8 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
         [room.id],
       );
       expect(seats[0].n).toBe(0);
-      const { rows: roomRows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
-      expect(roomRows[0].status).toBe('aborted');
+      const { rows: roomRows } = await pool.query('SELECT id FROM rooms WHERE id = $1', [room.id]);
+      expect(roomRows.length).toBe(0);
     });
 
     it('markPlayerConnected / markPlayerDisconnected flip the connected flag', async () => {

@@ -176,27 +176,21 @@ describe.skipIf(!hasDatabase)('room lobby over WS (requires DATABASE_URL)', () =
     thirdClient.close();
   });
 
-  it('closes the room (aborted) when the last seated player leaves', async () => {
+  it('deletes the room when the last seated player leaves a waiting room', async () => {
     const harness = await startHarness();
     const { creator, joiner, room } = await createSeatedRoom();
     const { creatorClient, joinerClient } = await seatBoth(harness, creator, joiner, room);
 
-    // Both leave: first leaves a waiting room at 1 player, second closes it.
+    // Both leave: first leaves a waiting room at 1 player, second triggers deletion.
     joinerClient.emit('room:leave');
     await waitForEvent(joinerClient, 'room:state');
-    // Wait for the CLOSING broadcast specifically: the creator may still have
-    // the joiner's-leave "waiting" room:state in flight, and a plain
-    // waitForEvent would intermittently capture that stale state instead of
-    // the "aborted" one. waitForRoomState drains past non-matching states.
-    const stateP = waitForRoomState(creatorClient, (s) => s.status === 'aborted');
+    // After the second leave, the room is deleted (no broadcast, no aborted status).
     creatorClient.emit('room:leave');
-    const state = await stateP;
+    // Give the server time to process the leave and deletion.
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    expect(state.status).toBe('aborted');
-    expect(state.players).toHaveLength(0);
-
-    const { rows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [room.id]);
-    expect(rows[0].status).toBe('aborted');
+    const { rows } = await pool.query('SELECT id FROM rooms WHERE id = $1', [room.id]);
+    expect(rows.length).toBe(0);
   });
 
   it('does not reset another player ready flag when a player leaves', async () => {
