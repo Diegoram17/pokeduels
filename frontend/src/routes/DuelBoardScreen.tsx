@@ -6,6 +6,7 @@ import type { MoveIndex } from '../engine/damage'
 import { humanActivePokemon, rivalActivePokemon, computePostDuelRoute } from '../lib/duelFlow'
 import {
   BASIC_ATTACK_INDEX,
+  LEAD_SELECTION_TIMEOUT_SECONDS,
   MAX_HP,
   MOVE_SLOTS,
   TURN_TIMEOUT_SECONDS,
@@ -247,6 +248,15 @@ function LeadPicker({
   roster: DuelPokemonState[]
   onPick: (pokemonId: number) => void
 }) {
+  // Cosmetic-only countdown (spec: "MUST be cosmetic and MUST NOT auto-submit
+  // on expiry") — the server owns lead selection; when the timer hits zero the
+  // pick buttons simply remain available.
+  const [remaining, setRemaining] = useState(LEAD_SELECTION_TIMEOUT_SECONDS)
+  useEffect(() => {
+    const id = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000)
+    return () => clearInterval(id)
+  }, [])
+
   return (
     <div className="lead-picker" data-testid="lead-picker">
       <h2 className="pd-title" style={{ margin: 0 }}>
@@ -254,6 +264,13 @@ function LeadPicker({
       </h2>
       <p className="pd-body" style={{ margin: '8px 0 16px' }}>
         Selecciona el Pokémon que abrirá el combate.
+      </p>
+      <p
+        data-testid="lead-countdown"
+        className="pd-stat pd-stat--xl"
+        style={{ color: 'var(--pd-yellow)', margin: '0 0 12px' }}
+      >
+        {String(remaining).padStart(2, '0')}
       </p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {roster.map((p) => (
@@ -411,6 +428,21 @@ function DuelBoardScreen() {
     handledDuelId.current = duel.duelId
     navigate(route.path, { replace: true })
   }, [duel, state, navigate])
+
+  // Mid-duel reconnection (spec: Mid-Duel Reconnection): a fresh mount with an
+  // in-progress duel re-emits duel:join so the server resyncs duel:state —
+  // a page refresh mid-duel must not keep rendering stale localStorage state.
+  // Mount-scoped on purpose: re-emitting on every duel change would spam the
+  // server. The ref guard makes it emit exactly once per mount (StrictMode-safe)
+  // while a remount gets a fresh ref and re-syncs against the current duel.
+  const resyncedDuelId = useRef<string | null>(null)
+  useEffect(() => {
+    if (!duel || duel.phase === 'finished') return
+    if (resyncedDuelId.current === duel.duelId) return
+    resyncedDuelId.current = duel.duelId
+    actions.joinDuel(duel.duelId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // The `!duel` redirect happens AFTER every hook above has been declared —
   // moving it earlier would make hook calls conditional (see Rules of Hooks).

@@ -62,6 +62,11 @@ function dispatchAndPersist(dispatch: (action: MockStateAction) => void) {
 export function MockStateProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduceMockState, undefined, loadMockState)
   const socketRef = useRef<Socket | null>(null)
+  // A duel:join queued while the socket was not yet connected (child mount
+  // effects run BEFORE the provider's connect effect, so a screen mounting
+  // with an in-progress duel — e.g. a refresh mid-duel — must not lose its
+  // resync emit; it is flushed as soon as the socket exists).
+  const pendingJoinRef = useRef<string | null>(null)
   // Always-current state for socket listeners and emitting actions (the
   // connect effect and the actions memo capture the first render otherwise).
   const stateRef = useRef(state)
@@ -86,6 +91,15 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
 
     const socket = connectSocket(token)
     socketRef.current = socket
+
+    // Flush a duel:join queued by a screen that mounted before this effect ran
+    // (child effects run before parent effects on mount) — e.g. DuelBoardScreen
+    // re-emitting duel:join to resync mid-duel state after a refresh.
+    const pendingJoin = pendingJoinRef.current
+    if (pendingJoin != null) {
+      pendingJoinRef.current = null
+      socket.emit('duel:join', { duelId: Number(pendingJoin) })
+    }
     socket.on('room:state', (payload: unknown) => {
       const room = payload as {
         code: string
@@ -199,6 +213,7 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       socket.off('room:final_ranking')
       disconnectSocket()
       socketRef.current = null
+      pendingJoinRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.player.sessionToken])
@@ -287,13 +302,22 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
         socketRef.current?.emit('duel:surrender', { duelId: Number(duelId) })
       },
       joinDuel: (duelId) => {
-        socketRef.current?.emit('duel:join', { duelId: Number(duelId) })
+        const socket = socketRef.current
+        if (socket) {
+          socket.emit('duel:join', { duelId: Number(duelId) })
+        } else {
+          // Socket not connected yet (the provider's connect effect runs after
+          // child mount effects): queue the join and flush it on connect so a
+          // mount-time resync emit is never lost.
+          pendingJoinRef.current = String(duelId)
+        }
       },
       resetSession: () => {
         // "Play again" keeps the nickname/token but must drop the live WS
         // connection (design: disconnect on resetSession).
         disconnectSocket()
         socketRef.current = null
+        pendingJoinRef.current = null
         send({ type: 'resetSession' })
       },
     }

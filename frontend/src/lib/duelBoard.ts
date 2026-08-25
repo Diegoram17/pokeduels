@@ -6,6 +6,10 @@ import type { MoveIndex } from '../engine/damage'
 
 export const MAX_HP = 100
 export const TURN_TIMEOUT_SECONDS = 8
+// Lead-selection countdown (spec: "The countdown shown MUST be cosmetic and
+// MUST NOT auto-submit on expiry"). Unspecified duration — picked here; the
+// server owns lead selection, so expiry only leaves the pick available.
+export const LEAD_SELECTION_TIMEOUT_SECONDS = 30
 export const BASIC_ATTACK_INDEX: MoveIndex = 3
 export const TIMEOUT_NOTICE = 'SIN TIEMPO, ATAQUE BÁSICO'
 

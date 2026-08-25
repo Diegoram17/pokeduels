@@ -147,16 +147,15 @@ function LeaveRoomButton() {
  * 1v1 post-duel re-ready (#10): shown when a 1v1 duel finished and the room
  * stayed in_progress (pendingDuelId null means no rematch has bootstrapped
  * yet). REVANCHA re-readies through the existing room:ready pipeline; SALIR
- * leaves the room.
+ * reuses the shared LeaveRoomButton (design: "'SALIR' (existing
+ * LeaveRoomButton)").
  */
 function PostDuelRematchPanel({
   won,
   onRematch,
-  onLeave,
 }: {
   won: boolean
   onRematch: () => void
-  onLeave: () => void
 }) {
   return (
     <div className="pd-card" data-testid="rematch-panel" style={{ padding: 24, textAlign: 'center' }}>
@@ -166,13 +165,11 @@ function PostDuelRematchPanel({
       <p className="pd-body" style={{ margin: '8px 0 20px' }}>
         La sala sigue abierta. ¿Revancha o salir?
       </p>
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-        <button type="button" className="pd-btn pd-btn--primary" onClick={onRematch}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <button type="button" className="pd-btn pd-btn--primary pd-btn--block" onClick={onRematch}>
           REVANCHA
         </button>
-        <button type="button" className="pd-btn pd-btn--ghost" onClick={onLeave}>
-          SALIR
-        </button>
+        <LeaveRoomButton />
       </div>
     </div>
   )
@@ -264,7 +261,6 @@ function WaitRoomScreen() {
             <PostDuelRematchPanel
               won={won}
               onRematch={() => actions.setReady(true)}
-              onLeave={() => navigate('/lobby')}
             />
           </div>
         ) : (

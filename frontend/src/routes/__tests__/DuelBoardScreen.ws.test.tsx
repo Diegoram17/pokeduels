@@ -110,6 +110,45 @@ function seedSession(maxPlayers: 2 | 4) {
   localStorage.setItem(STORAGE_KEY, serializeMockState(state))
 }
 
+/**
+ * A MockState whose duel is ALREADY in progress — exactly what localStorage
+ * holds after a page refresh mid-duel. Used to prove DuelBoardScreen re-emits
+ * duel:join on mount (and on remount) so the server resyncs duel:state (spec:
+ * Mid-Duel Reconnection).
+ */
+function liveDuelState(duelId: number): MockState {
+  return {
+    player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+    room: {
+      code: 'AB12',
+      maxPlayers: 2,
+      status: 'in_progress',
+      players: [
+        { playerId: '10', nickname: 'Ash', ready: true, connected: true },
+        { playerId: '11', nickname: 'Misty', ready: true, connected: true },
+      ],
+    },
+    teamSelection: { starterId: 25, rosterIds: [5, 6, 23] },
+    tournament: null,
+    duelPokemonState: [
+      { duelId: String(duelId), ownerId: 10, pokemonId: 25, name: 'Pikachu', type: 'electric', spriteUrl: 'front-pikachu', backSpriteUrl: 'back-pikachu', currentHp: 75, ppMove1: 3, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+      { duelId: String(duelId), ownerId: 11, pokemonId: 23, name: 'Pidgeot', type: 'flying', spriteUrl: 'front-pidgeot', backSpriteUrl: 'back-pidgeot', currentHp: 75, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+    ],
+    duel: {
+      duelId: String(duelId),
+      slot: '1v1',
+      phase: 'awaiting_actions',
+      turnNumber: 2,
+      winnerId: null,
+      endReason: null,
+      opponentDisconnected: false,
+      lastRejection: null,
+    },
+    pendingDuelId: null,
+    finalRanking: null,
+  }
+}
+
 function DuelProbe() {
   const [state] = useMockState()
   return (
@@ -126,8 +165,12 @@ function WaitForDuel({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-function renderBoard(maxPlayers: 2 | 4 = 2) {
-  seedSession(maxPlayers)
+function renderBoard(maxPlayers: 2 | 4 = 2, seed?: MockState) {
+  if (seed) {
+    localStorage.setItem(STORAGE_KEY, serializeMockState(seed))
+  } else {
+    seedSession(maxPlayers)
+  }
   return render(
     <MockStateProvider>
       <MemoryRouter initialEntries={['/duel']}>
@@ -410,5 +453,72 @@ describe('DuelBoardScreen — finish routing (server-driven)', () => {
     await waitFor(() => {
       expect(screen.getByText('RANKING-LANDED')).toBeInTheDocument()
     })
+  })
+})
+
+describe('DuelBoardScreen — lead-selection countdown (cosmetic)', () => {
+  it('shows a visible countdown during lead selection and ticks it down', () => {
+    vi.useFakeTimers()
+    renderBoard(2)
+    startLeadSelection()
+
+    const countdown = screen.getByTestId('lead-countdown')
+    expect(countdown.textContent).toBe('30')
+
+    act(() => {
+      vi.advanceTimersByTime(3000)
+    })
+    expect(countdown.textContent).toBe('27')
+  })
+
+  it('lets the countdown expire without auto-submitting a lead — the pick stays available', () => {
+    vi.useFakeTimers()
+    renderBoard(2)
+    startLeadSelection()
+
+    act(() => {
+      vi.advanceTimersByTime(31000)
+    })
+
+    expect(fakeSocket.emit).not.toHaveBeenCalledWith('duel:select_lead', expect.anything())
+    expect(screen.getByText('ELIGE TU PRIMER POKÉMON')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /pikachu/i })).toBeEnabled()
+  })
+})
+
+describe('DuelBoardScreen — mid-duel reconnection (duel:join re-emit)', () => {
+  it('re-emits duel:join on mount so an already-in-progress duel resyncs duel:state from the server', () => {
+    renderBoard(2, liveDuelState(42))
+
+    expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 42 })
+    // The resynced board renders the live phase, not a fresh lead picker.
+    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
+  })
+
+  it('re-emits duel:join on remount (fresh instance) against the current local duel', () => {
+    const first = renderBoard(2, liveDuelState(42))
+    expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 42 })
+
+    first.unmount()
+
+    // Between mounts the local duel is replaced (e.g. a rematch bootstrapped
+    // while the player was away): the remount must resync against the duel the
+    // client now has — never reuse context from the previous mount.
+    renderBoard(2, liveDuelState(99))
+
+    expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 99 })
+    const emitMock = fakeSocket.emit as unknown as ReturnType<typeof vi.fn>
+    const joinCalls = emitMock.mock.calls.filter((call: unknown[]) => call[0] === 'duel:join')
+    expect(joinCalls).toHaveLength(2)
+  })
+
+  it('does not re-emit duel:join for a finished duel (finish routing owns that state)', () => {
+    const live = liveDuelState(42)
+    renderBoard(2, {
+      ...live,
+      duel: { ...live.duel!, phase: 'finished', winnerId: '10', endReason: 'ko' },
+    })
+
+    expect(fakeSocket.emit).not.toHaveBeenCalledWith('duel:join', expect.anything())
   })
 })
