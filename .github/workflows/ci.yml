@@ -52,12 +52,26 @@ jobs:
       - name: Run non-gated backend tests (no DATABASE_URL)
         run: npm test
 
+      # Check if Neon secrets are available before attempting to create a branch.
+      # This step always runs and sets an output that downstream steps use.
+      - name: Check if Neon secrets are available
+        id: check_neon
+        run: |
+          if [ -n "$NEON_PROJECT_ID" ] && [ -n "$NEON_API_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+
       # DB-gated block — runs only when Neon secrets are provisioned. When they
       # are absent this whole block is skipped VISIBLY (see the always-run
       # summary step), never silently reported as passing.
       - name: Create ephemeral Neon branch for this run
         id: neon_branch
-        if: secrets.NEON_PROJECT_ID != '' && secrets.NEON_API_KEY != ''
+        if: steps.check_neon.outputs.available == 'true'
         uses: neondatabase/create-branch-action@v6
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
@@ -98,7 +112,7 @@ jobs:
         run: |
           echo "## Backend test summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ -n "$NEON_PROJECT_ID" ] && [ -n "$NEON_API_KEY" ]; then
+          if [ "$NEON_AVAILABLE" = "true" ]; then
             echo "- 266 non-gated tests ran." >> "$GITHUB_STEP_SUMMARY"
             echo "- 162 DB-gated tests ran against an ephemeral Neon branch." >> "$GITHUB_STEP_SUMMARY"
           else
@@ -106,5 +120,4 @@ jobs:
             echo "- 162 DB-gated tests SKIPPED: NEON_PROJECT_ID / NEON_API_KEY secrets are not configured. This is a skip, not a pass - a regression in those tests would surface once secrets are provisioned." >> "$GITHUB_STEP_SUMMARY"
           fi
         env:
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_AVAILABLE: ${{ steps.check_neon.outputs.available }}
