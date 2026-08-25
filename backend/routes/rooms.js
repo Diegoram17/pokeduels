@@ -93,10 +93,10 @@ export function createRoomsRouter() {
       const botId = parseInt(req.params.botId, 10);
       if (isNaN(botId)) throw new HttpError(400, 'invalid bot id');
       
-      await removeBot(room.id, botId, req.player.id);
+      const result = await removeBot(room.id, botId, req.player.id);
       
       // Broadcast updated room state (if room still exists)
-      if (!room.deleted) {
+      if (!result.roomDeleted) {
         await broadcastRoomState(req.app.get('io'), room.id);
       }
       

@@ -47,7 +47,7 @@ export async function createBot(roomId, creatorPlayerId) {
     // Create bot player
     const botName = '🤖 ' + BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + 
                     Math.floor(Math.random() * 1000);
-    const { rows: botRows } = await pool.query(
+    const { rows: botRows } = await client.query(
       `INSERT INTO players (nickname, is_bot) VALUES ($1, TRUE) 
        RETURNING id, nickname`,
       [botName]
