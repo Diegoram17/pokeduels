@@ -316,6 +316,10 @@ function WaitRoomScreen() {
     !isTournament && state.duel?.phase === 'finished' && state.pendingDuelId === null
   const won = state.duel?.winnerId === state.player.playerId
 
+  // Find current player's ready state from the room roster
+  const currentPlayer = room.players.find((p) => p.playerId === state.player.playerId)
+  const isReady = currentPlayer?.ready ?? false
+
   // Force re-render when bots are added/removed (room state updates via WS)
   const handleBotChange = () => {
     forceUpdate(n => n + 1)
@@ -375,6 +379,24 @@ function WaitRoomScreen() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pd-space-3)' }}>
             <BotManager room={room} onBotAdded={handleBotChange} />
+            <button
+              type="button"
+              className="pd-btn pd-btn--block"
+              onClick={() => actions.setReady(!isReady)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 'var(--pd-space-2)',
+                background: isReady ? 'var(--pd-success, #22c55e)' : undefined,
+                borderColor: isReady ? 'var(--pd-success, #22c55e)' : undefined,
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>
+                {isReady ? 'check_circle' : 'radio_button_unchecked'}
+              </span>
+              {isReady ? 'LISTO ✓' : 'LISTO'}
+            </button>
             <LeaveRoomButton />
             <button
               type="button"
