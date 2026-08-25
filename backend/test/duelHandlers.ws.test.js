@@ -335,6 +335,30 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     return { ...ctx, duelId };
   }
 
+  it('rejects duel:select_lead with duel:lead_rejected when not in lead-selection phase (F1)', async () => {
+    const harness = await startHarness();
+    const { c1, duelId, p1, p2, p1Team } = await createActingDuel(harness);
+
+    // createActingDuel left the duel in_progress (both leads picked), so the
+    // phase is no longer LEAD_SELECTION. A direct mid-duel bench activation
+    // via the WS API must be explicitly rejected, never silently applied.
+    expect(getPhaseStore().get(duelId)).toBe('in_progress');
+
+    const rejP = waitForEvent(c1, 'duel:lead_rejected', 30000);
+    c1.emit('duel:select_lead', { duelId, pokemonId: p1Team[1] });
+    const rej = await rejP;
+    expect(rej).toMatchObject({ pokemonId: p1Team[1], reason: 'not_lead_phase' });
+
+    // State unchanged: still exactly one active pokemon for P1 (their lead),
+    // and the mid-duel attempt did not activate a second.
+    const state = await getDuelState(duelId);
+    const p1Roster = state.pokemonStates.filter((p) => p.player_id === p1.id);
+    expect(p1Roster.filter((p) => p.is_active).map((p) => p.pokemon_id)).toEqual([p1Team[0]]);
+    // Opponent unaffected.
+    const p2Roster = state.pokemonStates.filter((p) => p.player_id === p2.id);
+    expect(p2Roster.filter((p) => p.is_active).map((p) => p.pokemon_id)).toHaveLength(1);
+  }, 60000);
+
   it('resolves a round once both players act: duel:turn_resolved with camelCase state', async () => {
     const harness = await startHarness({ turnTimeoutMs: 60000 }); // timer must not fire mid-test
     const { c1, c2, duelId, p1 } = await createActingDuel(harness);
@@ -457,9 +481,10 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     );
     expect(rows[0]).toMatchObject({ status: 'finished', winner_id: p2.id, end_reason: 'ko' });
 
-    // sub-state cleaned up; coarse FSM terminal
+    // sub-state cleaned up; coarse FSM terminal. The phase-store entry is
+    // evicted on finalization (F6, ADR-0005 terminal-state eviction).
     expect(getRoundStateStore().get(duelId)).toBeUndefined();
-    expect(getPhaseStore().get(duelId)).toBe('finished');
+    expect(getPhaseStore().get(duelId)).toBeUndefined();
   }, 120000);
 
   it('advances sub-state to AWAITING_SWITCH after a single-Pokémon KO round (no team wipe)', async () => {
