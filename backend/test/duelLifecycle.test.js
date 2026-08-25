@@ -6,6 +6,8 @@ import {
 } from '../ws/duelLifecycle.js';
 import { createTurnCycle } from '../ws/turnCycle.js';
 import { createRoundStateStore, ROUND_SUB_STATES } from '../ws/duelRoundState.js';
+import { getPhaseStore, resetPhaseStore } from '../engine/duelPhaseStore.js';
+import { PHASES } from '../engine/stateMachine.js';
 
 // Unit tests for the centralized duel-finish lifecycle (item #6, PR 2).
 //
@@ -154,6 +156,45 @@ describe('finalizeDuelSideEffects', () => {
 
     expect(turnTimers.cancel).toHaveBeenCalledWith(7);
     expect(io.to).toHaveBeenCalledWith('duel:7');
+  });
+});
+
+describe('finalizeDuelSideEffects — phase store cleanup (F6)', () => {
+  beforeEach(() => {
+    resetPhaseStore();
+  });
+
+  it('deletes the duel entry from the phase store after finalization', async () => {
+    const { lifecycle, io } = makeHarness();
+    getPhaseStore().set(7, PHASES.IN_PROGRESS);
+    // Positive control: the entry is live before finalization.
+    expect(getPhaseStore().get(7)).toBe(PHASES.IN_PROGRESS);
+
+    await lifecycle.finalizeDuelSideEffects(io, 7, 2, 'ko');
+
+    expect(getPhaseStore().get(7)).toBeUndefined();
+  });
+
+  it('returns the phase store to its pre-run baseline after N duels are finalized', async () => {
+    const { lifecycle, io } = makeHarness();
+    const duelIds = [11, 12, 13, 14, 15];
+    for (const id of duelIds) {
+      getPhaseStore().set(id, PHASES.IN_PROGRESS);
+    }
+    // Positive control: all N entries are live before any finalization.
+    for (const id of duelIds) {
+      expect(getPhaseStore().get(id)).toBe(PHASES.IN_PROGRESS);
+    }
+
+    for (const id of duelIds) {
+      await lifecycle.finalizeDuelSideEffects(io, id, 2, 'ko');
+    }
+
+    // Baseline was empty (reset above); every entry attributable to these
+    // duels must be gone, leaving the store back at baseline size.
+    for (const id of duelIds) {
+      expect(getPhaseStore().get(id)).toBeUndefined();
+    }
   });
 });
 
