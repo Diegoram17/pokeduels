@@ -18,7 +18,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -46,14 +46,24 @@ jobs:
       - run: npm run lint
 
       # 162 of the backend's tests are DB-gated (skipped without DATABASE_URL).
-      # An ephemeral Neon branch gives this run a real, isolated Postgres so
-      # the full suite runs in CI instead of just the 266 non-gated tests.
-      # Requires NEON_PROJECT_ID + NEON_API_KEY as repo secrets — set once
-      # during EXECUTE, when the Neon project (already used as production) is
-      # connected to this repo. Until then this job fails at this step, which
-      # is expected and does not block anything else in the workflow.
+      # When NEON_PROJECT_ID + NEON_API_KEY secrets are set, an ephemeral Neon
+      # branch gives this run a real, isolated Postgres so the full suite runs.
+      # Without those secrets, only the 266 non-gated tests run (still valid).
+      - name: Check if Neon secrets are available
+        id: check_neon
+        run: |
+          if [ -n "$NEON_PROJECT_ID" ] && [ -n "$NEON_API_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+
       - name: Create ephemeral Neon branch for this run
         id: neon_branch
+        if: steps.check_neon.outputs.available == 'true'
         uses: neondatabase/create-branch-action@v6
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
@@ -61,22 +71,24 @@ jobs:
           branch_name: ci-${{ github.run_id }}
 
       - name: Run migrations against the ephemeral branch
+        if: steps.neon_branch.outputs.db_url
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
         run: node ./node_modules/node-pg-migrate/bin/node-pg-migrate.js up
 
       - name: Seed catalog data
+        if: steps.neon_branch.outputs.db_url
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
         run: node seed/index.js
 
-      - name: Run backend test suite (DB-gated tests included)
+      - name: Run backend test suite (DB-gated tests included when Neon available)
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
         run: npm test
 
       - name: Delete ephemeral Neon branch
-        if: always()
+        if: always() && steps.neon_branch.outputs.db_url
         uses: neondatabase/delete-branch-action@v3
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
