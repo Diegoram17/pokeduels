@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import { validateNickname } from '../lib/validation'
-import { createSession, describeApiError } from '../lib/api'
+import { createSession, setSessionToken, describeApiError } from '../lib/api'
 import ErrorBanner from '../components/ErrorBanner'
 import loginBg from '../assets/login-bg.jpg'
 
@@ -37,6 +37,7 @@ function NicknameForm() {
     setSessionError(null)
     try {
       const session = await createSession(value)
+      setSessionToken(session.sessionToken)
       actions.sessionEstablished({
         playerId: session.playerId,
         sessionToken: session.sessionToken,

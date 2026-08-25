@@ -20,6 +20,7 @@ import type {
 } from './schema'
 import type { RankingEntry } from '../lib/ranking'
 import { connectSocket, disconnectSocket } from '../lib/socket'
+import { setSessionToken } from '../lib/api'
 import { getCachedCatalog } from '../lib/catalog'
 import type { MoveIndex } from '../engine/damage'
 
@@ -90,6 +91,11 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = state.player.sessionToken
     if (!token) return
+
+    // Keep the REST client's Authorization header in sync with the WS token
+    // so POST /api/rooms and other authenticated endpoints work after a
+    // page reload (the token is restored from localStorage by loadMockState).
+    setSessionToken(token)
 
     const socket = connectSocket(token)
     socketRef.current = socket
@@ -223,6 +229,7 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       socket.off('room:final_ranking')
       socket.off('room:aborted')
       disconnectSocket()
+      setSessionToken(null)
       socketRef.current = null
       pendingJoinRef.current = null
     }
