@@ -98,4 +98,6 @@ export interface MockState {
   pendingDuelId: string | null
   /** Authoritative podium, set only by room:final_ranking. */
   finalRanking: RankingEntry[] | null
+  /** Set by room:aborted (backend restart / room torn down) to drive the global recovery banner; cleared by acknowledgeRoomAborted. */
+  roomAborted: { reason: string } | null
 }

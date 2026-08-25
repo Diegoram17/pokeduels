@@ -113,6 +113,7 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
       duel: makeFinished1v1Duel('10'),
       pendingDuelId: null,
       finalRanking: null,
+      roomAborted: null,
     })
 
     expect(screen.getByText('¡GANASTE EL DUELO!')).toBeInTheDocument()
@@ -131,6 +132,7 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
       duel: makeFinished1v1Duel('11'),
       pendingDuelId: null,
       finalRanking: null,
+      roomAborted: null,
     })
 
     expect(screen.getByText('PERDISTE EL DUELO')).toBeInTheDocument()
@@ -146,6 +148,7 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
       duel: makeFinished1v1Duel('10'),
       pendingDuelId: null,
       finalRanking: null,
+      roomAborted: null,
     })
 
     act(() => {
@@ -178,6 +181,7 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
       duel: makeFinished1v1Duel('10'),
       pendingDuelId: null,
       finalRanking: null,
+      roomAborted: null,
     })
 
     act(() => {
@@ -200,6 +204,7 @@ describe('WaitRoomScreen — real bracket', () => {
       duel: null,
       pendingDuelId: null,
       finalRanking: null,
+      roomAborted: null,
     })
 
     act(() => {
@@ -232,6 +237,7 @@ describe('WaitRoomScreen — real bracket', () => {
       duel: null,
       pendingDuelId: null,
       finalRanking: null,
+      roomAborted: null,
     })
 
     act(() => {
