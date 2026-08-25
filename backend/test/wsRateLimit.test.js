@@ -15,6 +15,7 @@ import { createWsRateLimiter } from '../middleware/wsRateLimit.js';
 
 /** Builds a minimal fake socket exposing only what the limiter touches. */
 function makeSocket(id) {
+  const handlers = {};
   return {
     id,
     disconnected: false,
@@ -22,6 +23,14 @@ function makeSocket(id) {
     disconnect(close) {
       this.disconnected = true;
       this.disconnectCalls.push(close);
+    },
+    once(event, fn) {
+      handlers[event] = fn;
+    },
+    // Simulates the socket disconnecting and firing its once-registered
+    // 'disconnect' listeners, as the real Socket.IO socket does.
+    fireDisconnect() {
+      handlers.disconnect?.();
     },
   };
 }
@@ -66,10 +75,11 @@ describe('createWsRateLimiter', () => {
   });
 
   it('disconnects with a hard close (disconnect(true))', () => {
-    const handler = createWsRateLimiter({ windowMs: 10000, limit: 0 });
+    const handler = createWsRateLimiter({ windowMs: 10000, limit: 1 });
     const socket = makeSocket('s-3');
 
-    dispatch(handler, socket, 'x', 1);
+    dispatch(handler, socket, 'a', 1); // first event establishes the window
+    dispatch(handler, socket, 'b', 2); // 2nd event breaches limit 1
 
     expect(socket.disconnected).toBe(true);
     expect(socket.disconnectCalls).toEqual([true]);
@@ -109,5 +119,25 @@ describe('createWsRateLimiter', () => {
     // B's counter is untouched — a single event stays under its limit.
     dispatch(handler, socketB, 'x', 1);
     expect(socketB.disconnected).toBe(false);
+  });
+
+  it('resets a socket counter when that socket disconnects', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    const handler = createWsRateLimiter({ windowMs: 10000, limit: 2 });
+    const socket = makeSocket('s-5');
+
+    dispatch(handler, socket, 'a', 1);
+    dispatch(handler, socket, 'b', 2);
+    dispatch(handler, socket, 'c', 3); // breach within same window
+    expect(socket.disconnected).toBe(true);
+
+    // Reconnect the same socket.id within the SAME window: because the
+    // disconnect cleared its counter, the full budget is available again.
+    socket.disconnected = false;
+    socket.fireDisconnect();
+    dispatch(handler, socket, 'd', 4);
+    dispatch(handler, socket, 'e', 5);
+    expect(socket.disconnected).toBe(false);
   });
 });
