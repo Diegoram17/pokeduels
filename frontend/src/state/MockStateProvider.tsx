@@ -134,7 +134,11 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
         code: room.code,
         maxPlayers: room.maxPlayers,
         status: room.status,
-        players: room.players,
+        // The backend serializes Postgres integer ids as numbers, but the
+        // schema (RoomPlayer.playerId) is string. Normalize here so the roster
+        // matches state.player.playerId and the stringified bracket pairings
+        // under strict === lookups (BracketMini.nameOf, isReady).
+        players: room.players.map((p) => ({ ...p, playerId: String(p.playerId) })),
       })
     })
 
@@ -266,7 +270,10 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       sessionEstablished: (payload) =>
         send({
           type: 'sessionEstablished',
-          playerId: payload.playerId,
+          // POST /api/session returns the player id as a Postgres integer; the
+          // schema (PlayerState.playerId) is string, and strict === lookups
+          // (isReady, BracketMini.nameOf) depend on the string form.
+          playerId: String(payload.playerId),
           sessionToken: payload.sessionToken,
           nickname: payload.nickname,
         }),

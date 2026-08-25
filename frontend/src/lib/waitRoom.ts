@@ -13,6 +13,7 @@ export const SLOT_LABELS: Record<TournamentSlot, string> = {
 export interface PlayerEntry {
   name: string
   isBot: boolean
+  ready: boolean
   playerId?: string
 }
 
@@ -28,6 +29,7 @@ export function buildPlayerList(room: RoomState): PlayerEntry[] {
   return room.players.map((player) => ({
     name: player.nickname,
     isBot: player.nickname.startsWith('🤖'),
+    ready: player.ready,
     playerId: player.playerId,
   }))
 }

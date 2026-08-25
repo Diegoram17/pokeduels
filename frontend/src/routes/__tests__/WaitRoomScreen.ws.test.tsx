@@ -164,10 +164,29 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
     const enterButton = screen.getByRole('button', { name: /entrar al combate/i })
     expect(enterButton).toBeInTheDocument()
 
+    // Clicking joins the duel WITHOUT navigating yet (race-condition fix: the
+    // screen must not bounce to /duel before duel:state has actually landed,
+    // otherwise DuelBoardScreen redirects straight back to /wait-room).
     act(() => {
       enterButton.click()
     })
     expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 99 })
+    expect(screen.queryByText('DUEL-LANDED')).not.toBeInTheDocument()
+
+    // Once the server resolves the join with duel:state, the player is routed
+    // into the duel with state ready to render.
+    act(() => {
+      fakeSocket._fire('duel:state', {
+        duelId: 99,
+        turnNumber: 1,
+        winnerId: null,
+        endReason: null,
+        pokemonStates: [
+          { duelId: 99, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+          { duelId: 99, ownerId: 11, pokemonId: 5, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+        ],
+      })
+    })
     expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
   })
 
@@ -259,40 +278,5 @@ describe('WaitRoomScreen — real bracket', () => {
     })
 
     expect(screen.getByTestId('slot-label')).toHaveTextContent('SEMIFINAL A')
-  })
-})
-
-describe('WaitRoomScreen — StartMatchButton emits room:ready', () => {
-  function renderFullWaiting1v1() {
-    return renderWaitRoom({
-      player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
-      room: {
-        code: 'AB12',
-        maxPlayers: 2,
-        status: 'waiting',
-        players: [
-          { playerId: '10', nickname: 'Ash', ready: false, connected: true },
-          { playerId: '11', nickname: 'Misty', ready: false, connected: true },
-        ],
-      },
-      teamSelection: { starterId: 25, rosterIds: [] },
-      tournament: null,
-      duelPokemonState: [],
-      duel: null,
-      pendingDuelId: null,
-      finalRanking: null,
-      roomAborted: null,
-    })
-  }
-
-  it('is shown on a full waiting room and clicking it emits room:ready with ready:true', () => {
-    renderFullWaiting1v1()
-    const button = screen.getByRole('button', { name: /iniciar partida/i })
-    expect(button).toBeInTheDocument()
-
-    act(() => {
-      button.click()
-    })
-    expect(fakeSocket.emit).toHaveBeenCalledWith('room:ready', { ready: true })
   })
 })

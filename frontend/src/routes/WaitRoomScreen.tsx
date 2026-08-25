@@ -1,5 +1,5 @@
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMockState } from '../state/useMockState'
 import type { DuelSlot, RoomState, TournamentSlot, TournamentState } from '../state/schema'
 import { deriveDuelSlot } from '../state/store'
@@ -25,13 +25,15 @@ function SlotLabel({ slot }: { slot: DuelSlot }) {
 
 function PlayerRow({ 
   name, 
-  isBot, 
+  isBot,
+  ready,
   playerId,
   roomCode,
   onBotRemoved 
 }: { 
   name: string
   isBot: boolean
+  ready: boolean
   playerId?: string
   roomCode?: string
   onBotRemoved?: () => void
@@ -52,7 +54,7 @@ function PlayerRow({
   }
 
   return (
-    <div className={`player-row${isBot ? ' player-row--pending' : ' player-row--ready'}`}>
+    <div className={`player-row${ready ? ' player-row--ready' : ' player-row--pending'}`}>
       <span className="avatar-fallback">
         <span className="material-symbols-outlined" aria-hidden="true">
           {isBot ? 'smart_toy' : 'person'}
@@ -84,7 +86,7 @@ function PlayerRow({
             {removing ? 'hourglass_empty' : 'close'}
           </span>
         </button>
-      ) : (
+      ) : ready ? (
         <span
           className="material-symbols-outlined pd-icon--fill"
           aria-hidden="true"
@@ -92,7 +94,7 @@ function PlayerRow({
         >
           check_circle
         </span>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -113,6 +115,7 @@ function PlayerList({
           key={entry.playerId || entry.name} 
           name={entry.name} 
           isBot={entry.isBot}
+          ready={entry.ready}
           playerId={entry.playerId}
           roomCode={roomCode}
           onBotRemoved={onBotRemoved}
@@ -180,14 +183,28 @@ function EnterDuelButton() {
   const [state, actions] = useMockState()
   const navigate = useNavigate()
   const pendingDuelId = state.pendingDuelId
+  const duel = state.duel
+  // Navigate to /duel only once the join the player explicitly requested has
+  // actually resolved (duel:state). Without the guard, any duel:state landing
+  // while on the wait-room would yank the user off it — breaking the
+  // explicit-click gate and the tournament wait/round view (which shows the
+  // live slot label from a duel already in state).
+  const requestedDuelIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (requestedDuelIdRef.current && duel?.duelId === requestedDuelIdRef.current) {
+      navigate('/duel')
+    }
+  }, [duel, navigate])
+
   if (pendingDuelId == null) return null
   return (
     <button
       type="button"
       className="pd-btn pd-btn--primary"
       onClick={() => {
+        requestedDuelIdRef.current = pendingDuelId
         actions.joinDuel(pendingDuelId)
-        navigate('/duel')
       }}
     >
       <span className="material-symbols-outlined" aria-hidden="true">
@@ -212,30 +229,8 @@ function LeaveRoomButton() {
   )
 }
 
-function StartMatchButton({
-  isFull,
-  isReady,
-  onStart,
-}: {
-  isFull: boolean
-  isReady: boolean
-  onStart: () => void
-}) {
-  if (!isFull || isReady) return null
-  return (
-    <button
-      type="button"
-      className="pd-btn pd-btn--primary pd-btn--block"
-      onClick={onStart}
-    >
-      <span className="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-      INICIAR PARTIDA
-    </button>
-  )
-}
-
 /**
- * Bot management controls: add bots to fill empty slots.
+ * Bot management controls: add a bot to the room (one per click).
  */
 function BotManager({ 
   room,
@@ -255,30 +250,17 @@ function BotManager({
     setAdding(true)
     setError(null)
     try {
-      // Sequential on purpose, NOT Promise.all: autoSelectBotTeam reads the
-      // "available starters" list before writing its pick, so concurrent bot
-      // creations could read the same list and collide on
-      // uq_starter_por_sala (unique starter per room).
-      for (let i = 0; i < emptySlots; i += 1) {
-        await createBot(room.code)
-      }
+      await createBot(room.code)
     } catch (err) {
       setError(describeApiError(err))
     } finally {
-      // Refresh even on partial failure — some bots may have been added
-      // before the request that failed.
+      // Refresh even on failure — the request may have partially succeeded.
       onBotAdded()
       setAdding(false)
     }
   }
 
   if (!hasEmptySlots) return null
-
-  // maxPlayers === 2 (1v1): emptySlots is always exactly 1 here -> "AGREGAR BOT".
-  // maxPlayers === 4 (torneo): 1 empty slot -> "AGREGAR BOT"; 2 or 3 -> "AGREGAR BOTS"
-  // and one click fills every remaining seat.
-  const label = emptySlots > 1 ? 'AGREGAR BOTS' : 'AGREGAR BOT'
-  const loadingLabel = emptySlots > 1 ? 'AGREGANDO BOTS...' : 'AGREGANDO...'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pd-space-2)' }}>
@@ -292,7 +274,7 @@ function BotManager({
         <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 20 }}>
           smart_toy
         </span>
-        {adding ? loadingLabel : label}
+        {adding ? 'AGREGANDO...' : 'AGREGAR BOT'}
       </button>
       {error && (
         <p role="alert" className="pd-meta" style={{ color: 'var(--pd-danger)', margin: 0, textAlign: 'center' }}>
@@ -416,11 +398,6 @@ function WaitRoomScreen() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pd-space-3)' }}>
             <BotManager room={room} onBotAdded={handleBotChange} />
-            <StartMatchButton
-              isFull={players.length === room.maxPlayers}
-              isReady={isReady}
-              onStart={() => actions.setReady(true)}
-            />
             <button
               type="button"
               className="pd-btn pd-btn--block"
@@ -479,7 +456,6 @@ export {
   BracketMini,
   EnterDuelButton,
   LeaveRoomButton,
-  StartMatchButton,
   BotManager,
   PostDuelRematchPanel,
 }

@@ -42,8 +42,12 @@ function SessionProbe() {
   return (
     <div>
       <span data-testid="token">{state.player.sessionToken ?? 'none'}</span>
+      <span data-testid="player-id">{state.player.playerId ?? 'none'}</span>
       <span data-testid="roster">
         {state.room?.players.map((p) => p.nickname).join(',') ?? 'no-room'}
+      </span>
+      <span data-testid="roster-ids">
+        {state.room?.players.map((p) => p.playerId).join(',') ?? 'no-room'}
       </span>
       <button
         type="button"
@@ -56,6 +60,20 @@ function SessionProbe() {
         }
       >
         establish
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          actions.sessionEstablished({
+            // The backend serializes Postgres ids as numbers at runtime; the
+            // provider must normalize them to the schema's string form.
+            playerId: 10 as unknown as string,
+            sessionToken: 'token-1',
+            nickname: 'Ash',
+          })
+        }
+      >
+        establishNumeric
       </button>
       <button type="button" onClick={() => actions.resetSession()}>
         reset
@@ -121,6 +139,38 @@ describe('MockStateProvider socket lifecycle', () => {
     })
 
     expect(screen.getByTestId('roster').textContent).toBe('Ash,Misty')
+  })
+
+  it('stringifies numeric player ids from room:state (Postgres int -> schema string)', () => {
+    renderProvider()
+    act(() => {
+      screen.getByRole('button', { name: 'establish' }).click()
+    })
+
+    act(() => {
+      fakeSocket._fire('room:state', {
+        roomId: 1,
+        code: 'AB12',
+        status: 'waiting',
+        maxPlayers: 2,
+        players: [
+          { playerId: 10, nickname: 'Ash', ready: false, connected: true },
+          { playerId: 11, nickname: 'Misty', ready: true, connected: true },
+        ],
+        startersTaken: [],
+      })
+    })
+
+    expect(screen.getByTestId('roster-ids').textContent).toBe('10,11')
+  })
+
+  it('stringifies the numeric player id from sessionEstablished', () => {
+    renderProvider()
+    act(() => {
+      screen.getByRole('button', { name: 'establishNumeric' }).click()
+    })
+
+    expect(screen.getByTestId('player-id').textContent).toBe('10')
   })
 
   it('disconnects the socket on resetSession', () => {

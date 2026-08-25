@@ -4,7 +4,7 @@
 // WS behaviors (rematch panel, pending-duel entry, real bracket) live in
 // WaitRoomScreen.ws.test.tsx.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { render, screen, within } from '@testing-library/react'
@@ -14,6 +14,12 @@ import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
 import type { MockStateActions } from '../../state/useMockState'
 import WaitRoomScreen from '../WaitRoomScreen'
+import { createBot } from '../../lib/api'
+
+vi.mock('../../lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/api')>()
+  return { ...actual, createBot: vi.fn() }
+})
 
 function SeedProbe({ seed }: { seed?: (actions: MockStateActions) => void }) {
   const [, actions] = useMockState()
@@ -115,44 +121,23 @@ describe('WaitRoomScreen', () => {
   })
 })
 
-describe('StartMatchButton', () => {
-  it('is hidden when the room is not full', () => {
-    renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
-    expect(screen.queryByRole('button', { name: /iniciar partida/i })).not.toBeInTheDocument()
-  })
-
-  it('is shown when the room is full and the player is not ready yet', () => {
+describe('WaitRoomScreen — single LISTO action (no separate start button)', () => {
+  it('renders only the LISTO toggle once the room is full — no duplicate INICIAR PARTIDA', () => {
     renderWaitRoom(
       seedRoom(2, [
         { playerId: 'p1', nickname: 'Ash' },
         { playerId: 'p2', nickname: 'Misty' },
       ]),
     )
-    expect(screen.getByRole('button', { name: /iniciar partida/i })).toBeInTheDocument()
-  })
-
-  it('is hidden when the player is already ready', () => {
-    renderWaitRoom((actions) => {
-      actions.sessionEstablished({ playerId: 'p1', sessionToken: 't1', nickname: 'Ash' })
-      actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
-      actions.receiveRoomState({
-        code: 'AB12',
-        maxPlayers: 2,
-        status: 'waiting',
-        players: [
-          { playerId: 'p1', nickname: 'Ash', ready: true, connected: true },
-          { playerId: 'p2', nickname: 'Misty', ready: true, connected: true },
-        ],
-      })
-    })
     expect(screen.queryByRole('button', { name: /iniciar partida/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /listo/i })).toBeInTheDocument()
   })
 })
 
 describe('BotManager', () => {
-  it('shows AGREGAR BOTS for a tournament room with multiple empty slots', () => {
+  it('shows a single AGREGAR BOT button for a tournament room with multiple empty slots', () => {
     renderWaitRoom(seedRoom(4, [{ playerId: 'p1', nickname: 'Ash' }]))
-    expect(screen.getByRole('button', { name: /agregar bots/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /agregar bot/i })).toBeInTheDocument()
   })
 
   it('shows AGREGAR BOT for a tournament room with a single empty slot', () => {
@@ -171,6 +156,14 @@ describe('BotManager', () => {
     expect(screen.getByRole('button', { name: /agregar bot/i })).toBeInTheDocument()
   })
 
+  it('adds exactly one bot per click, even when several seats are empty', async () => {
+    const user = userEvent.setup()
+    renderWaitRoom(seedRoom(4, [{ playerId: 'p1', nickname: 'Ash' }]))
+    await user.click(screen.getByRole('button', { name: /agregar bot/i }))
+    expect(createBot).toHaveBeenCalledTimes(1)
+    expect(createBot).toHaveBeenCalledWith('AB12')
+  })
+
   it('is hidden when the room is full', () => {
     renderWaitRoom(
       seedRoom(2, [
@@ -179,5 +172,27 @@ describe('BotManager', () => {
       ]),
     )
     expect(screen.queryByRole('button', { name: /agregar bot/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('WaitRoomScreen — player ready indicators', () => {
+  it('shows a ready check only on players who are actually ready', () => {
+    renderWaitRoom((actions) => {
+      actions.setNickname('Ash')
+      actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
+      actions.receiveRoomState({
+        code: 'AB12',
+        maxPlayers: 2,
+        status: 'waiting',
+        players: [
+          { playerId: 'p1', nickname: 'Ash', ready: true, connected: true },
+          { playerId: 'p2', nickname: 'Misty', ready: false, connected: true },
+        ],
+      })
+    })
+
+    const playerList = screen.getByTestId('player-list')
+    expect(within(playerList).getAllByText('check_circle')).toHaveLength(1)
+    expect(within(playerList).getByText('Misty')).toBeInTheDocument()
   })
 })
