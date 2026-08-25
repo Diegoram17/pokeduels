@@ -2,6 +2,7 @@ import { finishDuelWrite } from '../repositories/duelRepository.js';
 import { getTurnCycle } from './turnCycle.js';
 import { getRoundStateStore } from './duelRoundState.js';
 import { getTurnTimerRegistry } from './turnTimers.js';
+import { getPhaseStore } from '../engine/duelPhaseStore.js';
 
 /**
  * Centralized duel-finish lifecycle (item #6, PR 2). Single termination path for
@@ -34,8 +35,10 @@ export function createDuelLifecycle({
    * Cleans up a finished duel's per-duel side effects and broadcasts the
    * outcome. Called only after the finish write applied (or by the KO path
    * after its own guarded transactional write). All cleanup is per-duel and
-   * idempotent: cancels the 10s turn window, drops the buffered actions, and
-   * deletes the WS round sub-state — never the global `clear()` on any store.
+   * idempotent: cancels the 10s turn window, drops the buffered actions,
+   * deletes the WS round sub-state, and evicts the duel phase-store entry
+   * (ADR-0005 terminal-state eviction) — never the global `clear()` on any
+   * store.
    *
    * @param {import('socket.io').Server} io
    * @param {number} duelId
@@ -46,6 +49,7 @@ export function createDuelLifecycle({
     turnTimers.cancel(duelId);
     turnCycle.dropBuffer(duelId);
     duelRoundState.delete(duelId);
+    getPhaseStore().delete(duelId);
     io.to(`duel:${duelId}`).emit('duel:finished', { duelId, winnerId, endReason });
   }
 
