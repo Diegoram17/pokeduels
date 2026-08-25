@@ -31,11 +31,20 @@ vi.mock('../lib/roomCode.js', async (importOriginal) => {
 const CODE_RE = /^[A-HJKMNP-Z2-9]{6}$/;
 
 describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
+  // Track room ids created by collision tests so afterAll can clean them up.
+  // Without this, hard-coded collision codes ('ABCJKM', 'DEFGHJ') persist
+  // across CI runs and cause "duplicate key" failures on the next run.
+  const collisionRoomIds = [];
+
   beforeAll(async () => {
     await ensureSchemaAndSeed(pool);
   }, SEED_TIMEOUT);
 
   afterAll(async () => {
+    // Clean up rooms created by collision tests (hard-coded codes).
+    if (collisionRoomIds.length) {
+      await pool.query('DELETE FROM rooms WHERE id = ANY($1::int[])', [collisionRoomIds]);
+    }
     await pool.end();
   });
 
@@ -60,10 +69,12 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
       generateRoomCode.mockClear();
       const collidingCode = 'ABCJKM';
       const seedPlayer = await createPlayer('CollideOnceSeedDb');
-      await pool.query(
-        'INSERT INTO rooms (code, max_players, created_by) VALUES ($1, $2, $3)',
+      const { rows: insertedRows } = await pool.query(
+        'INSERT INTO rooms (code, max_players, created_by) VALUES ($1, $2, $3) RETURNING id',
         [collidingCode, 2, seedPlayer.id],
       );
+      collisionRoomIds.push(insertedRows[0].id);
+
       // First call returns the already-taken code (forces a 23505 on
       // rooms_code_key); the queue then drains and the next call falls back
       // to the real generator, producing a fresh, non-colliding code.
@@ -86,10 +97,12 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
       generateRoomCode.mockClear();
       const collidingCode = 'DEFGHJ';
       const seedPlayer = await createPlayer('CollideExhaustedSeedDb');
-      await pool.query(
-        'INSERT INTO rooms (code, max_players, created_by) VALUES ($1, $2, $3)',
+      const { rows: insertedRows } = await pool.query(
+        'INSERT INTO rooms (code, max_players, created_by) VALUES ($1, $2, $3) RETURNING id',
         [collidingCode, 2, seedPlayer.id],
       );
+      collisionRoomIds.push(insertedRows[0].id);
+
       // All 5 retry attempts (MAX_ROOM_CODE_RETRIES) collide with the same
       // pre-seeded code, so the loop must exhaust and reject.
       generateRoomCode
