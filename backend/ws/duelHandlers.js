@@ -13,6 +13,7 @@ import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
 import { withWsHandler } from './wsFaultIsolation.js';
 import { createDuelLifecycle } from './duelLifecycle.js';
 import { advanceTournamentOrRematch } from './tournamentLifecycle.js';
+import { isBotPlayer, opponentOf, selectBotLead, makeBotDuelAction } from './botManager.js';
 
 /**
  * Registers the duel event handlers for one connected socket (item #5). Every
@@ -117,6 +118,20 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       // (item #6's in_progress-guarded repository operations depend on it).
       const roundState = getRoundStateStore();
       roundState.markLeadReady(duelId, playerId);
+
+      // Server-side bot lead: a bot has no socket, so when the human picks its
+      // lead we auto-select the bot's lead too (random healthy roster pokemon).
+      // Without this the duel stays in lead_selection forever — the bot never
+      // answers duel:start, the rival never fields a pokemon, and the lead
+      // countdown simply runs out.
+      const rivalId = opponentOf(state.duel, playerId);
+      if (await isBotPlayer(rivalId)) {
+        const picked = await selectBotLead(duelId, rivalId);
+        if (picked != null) {
+          roundState.markLeadReady(duelId, rivalId);
+        }
+      }
+
       if (roundState.bothLeadsReady(duelId) && getPhaseStore().get(duelId) === PHASES.LEAD_SELECTION) {
         getPhaseStore().set(duelId, transition(PHASES.LEAD_SELECTION, EVENTS.SELECT_LEADS));
         roundState.set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
@@ -156,6 +171,24 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
         throw toRejectionWsError('duel:switch_rejected', err, { switchTo });
       }
       getRoundStateStore().set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
+
+      // Server-side bot switch: if the bot lost its active and must switch in
+      // a bench unit, pick one for it too — otherwise the duel stalls in
+      // awaiting_switch forever (the bot never answers duel:awaiting_switch).
+      const currentState = await getDuelState(duelId);
+      const rivalId = opponentOf(currentState.duel, playerId);
+      if (await isBotPlayer(rivalId)) {
+        const rivalRoster = currentState.pokemonStates.filter((p) => p.player_id === rivalId);
+        const needsSwitch = !rivalRoster.some((p) => p.is_active) && rivalRoster.some((p) => !p.fainted);
+        if (needsSwitch) {
+          const candidates = rivalRoster.filter((p) => !p.fainted && !p.is_active);
+          if (candidates.length > 0) {
+            const pick = candidates[Math.floor(Math.random() * candidates.length)];
+            await applySwitchDecision(duelId, rivalId, pick.pokemon_id);
+          }
+        }
+      }
+
       // Broadcast the fresh snapshot so the switcher's client reflects the new
       // active pokemon without waiting for the next duel:turn_resolved.
       const freshState = await getDuelState(duelId);
@@ -193,6 +226,25 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       const action = { moveIndex };
       const { isFirst, pairComplete } = turnCycle.bufferAction(duelId, playerId, action);
 
+      // Server-side bot turn: a bot has no socket, so as soon as the human
+      // buffers its action we generate the bot's response — the round resolves
+      // immediately instead of waiting for a 10s timeout nobody can answer.
+      let complete = pairComplete;
+      if (!complete) {
+        const rivalId = opponentOf(state.duel, playerId);
+        if (await isBotPlayer(rivalId)) {
+          const botAction = await makeBotDuelAction(duelId, rivalId, state.pokemonStates);
+          if (botAction?.type === 'move') {
+            complete = turnCycle.bufferAction(duelId, rivalId, { moveIndex: botAction.moveIndex }).pairComplete;
+          } else if (botAction?.type === 'switch') {
+            // No active pokemon: switch the bot in first, then it attacks with
+            // the always-available basic attack this turn.
+            await applySwitchDecision(duelId, rivalId, botAction.pokemonId);
+            complete = turnCycle.bufferAction(duelId, rivalId, { moveIndex: 4 }).pairComplete;
+          }
+        }
+      }
+
       // First action of the pair arms the 10s window; on expiry the missing
       // player's timeout action is filled and the round resolves.
       if (isFirst) {
@@ -203,7 +255,7 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       }
       // Pair complete: cancel the timer and resolve now (the timer callback
       // would only fill an action for a player who already acted).
-      if (pairComplete) {
+      if (complete) {
         turnTimers.cancel(duelId);
         await turnCycle.attemptResolveTurn(io, duelId);
       }
@@ -216,13 +268,15 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       const playerId = socket.data.player.id;
 
       // Server-side re-validation (RF-5.5): the client-side confirmation
-      // dialog is never trusted (ENG-04). The surrender is accepted ONLY for
-      // a participant of a duel whose coarse status is still in_progress.
+      // dialog is never trusted (ENG-04). The surrender is accepted for a
+      // participant of a duel that has not finished — including the
+      // lead_selection window (duels.status is still 'pending' until both
+      // leads are picked), so a player stuck pre-battle can always concede.
       const state = await fetchDuelForParticipant(duelId, playerId);
       if (!state) {
         throw new WsError('duel:surrender_rejected', { duelId, reason: 'not_participant' });
       }
-      if (state.duel.status !== 'in_progress') {
+      if (!['pending', 'in_progress'].includes(state.duel.status)) {
         throw new WsError('duel:surrender_rejected', { duelId, reason: 'not_in_progress' });
       }
 

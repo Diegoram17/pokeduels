@@ -118,6 +118,16 @@ describe.skipIf(!hasDatabase)('mid-duel disconnect over WS (requires DATABASE_UR
         ).then((r) => r.rows[0].n === 2),
       20000,
     );
+    // Both leads are active, but the handler still has to mark the duel live
+    // (status -> in_progress) after its final activateLead. A disconnect right
+    // after would see a still-pending duel and skip the forfeit — wait for the
+    // stable state so the forfeit path is the one under test.
+    await waitUntil(
+      () =>
+        pool.query('SELECT status FROM duels WHERE id = $1', [duelId])
+          .then((r) => r.rows[0].status === 'in_progress'),
+      20000,
+    );
   }
 
   /**

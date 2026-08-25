@@ -98,7 +98,7 @@ export async function finishDuelWrite(duelId, winnerId, endReason) {
   const { rowCount } = await pool.query(
     `UPDATE duels
      SET status = 'finished', winner_id = $2, end_reason = $3
-     WHERE id = $1 AND status = 'in_progress'`,
+     WHERE id = $1 AND status IN ('pending', 'in_progress')`,
     [duelId, winnerId, endReason],
   );
   return { applied: rowCount > 0 };

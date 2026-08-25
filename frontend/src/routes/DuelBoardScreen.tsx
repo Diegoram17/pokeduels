@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import type { DuelPokemonState } from '../state/schema'
@@ -13,7 +13,6 @@ import {
   isBasicAttack,
   moveDamageLabel,
 } from '../lib/duelBoard'
-import { useBotAutomation } from '../hooks/useBotAutomation'
 
 /**
  * Screen 5: Duel Board (#10 PR 2). Server-authoritative gameplay: lead
@@ -405,16 +404,9 @@ function DuelBoardScreen() {
   const navigate = useNavigate()
   const handledDuelId = useRef<string | null>(null)
 
-  // Identify bot players in this duel (nicknames starting with 🤖)
-  const botPlayerIds = useMemo(() => {
-    if (!state.room) return []
-    return state.room.players
-      .filter(p => p.nickname.startsWith('🤖'))
-      .map(p => p.playerId)
-  }, [state.room])
-
-  // Automate bot actions during the duel
-  useBotAutomation(duel, state.duelPokemonState, botPlayerIds)
+  // Bot actions are server-controlled (backend/ws/botManager.js + duelHandlers
+  // auto-fill lead/turn/switch for bot players) — the client never impersonates
+  // a bot on the human's socket.
 
   // KO detection: the server snapshot flips the duel to awaiting_switch when
   // the human active faints with bench remaining — send the player to the

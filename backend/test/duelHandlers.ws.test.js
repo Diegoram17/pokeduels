@@ -199,6 +199,11 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
         ).then((r) => r.rows[0].n === 2),
       20000,
     );
+    // Both leads are active in the DB, but the handler still has to advance
+    // the engine FSM (bothLeadsReady -> transition -> in_progress) after its
+    // final activateLead. Wait for that phase too so a test reading
+    // getPhaseStore() immediately after is not racing the handler.
+    await waitUntil(() => getPhaseStore().get(duelId) === 'in_progress', 20000);
   }
 
   it('advances the duel to AWAITING_ACTIONS once both players pick a valid lead', async () => {
@@ -603,23 +608,26 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
       expect(rows[0].winner_id).toBeNull();
     }, 120000);
 
-    it('rejects a surrender before the duel is in_progress (pending) with no state change', async () => {
+    it('accepts a surrender during lead selection (pending) so a stuck pre-battle player can concede', async () => {
       const harness = await startHarness({ turnTimeoutMs: 60000 });
       const ctx = await createSeatedAndTeamedRoom(harness);
       const { duelId } = await readyBoth(ctx); // duel created 'pending'; no leads picked
+      await joinDuel(ctx, duelId); // both sockets join the duel channel to receive broadcasts
 
-      const rejP = waitForEvent(ctx.c1, 'duel:surrender_rejected', 30000);
+      // A player stuck in the lead-selection window (e.g. waiting on a bot that
+      // never answers) must still be able to surrender.
+      const finP = waitForEvent(ctx.c1, 'duel:finished', 30000);
       ctx.c1.emit('duel:surrender', { duelId });
-      const rej = await rejP;
-      expect(rej).toMatchObject({ reason: 'not_in_progress' });
+      const fin = await finP;
+      expect(fin).toMatchObject({ duelId, winnerId: ctx.p2.id, endReason: 'surrender' });
 
       const { rows } = await pool.query(
         'SELECT status, winner_id, end_reason FROM duels WHERE id = $1',
         [duelId],
       );
-      expect(rows[0].status).toBe('pending');
-      expect(rows[0].winner_id).toBeNull();
-      expect(rows[0].end_reason).toBeNull();
+      expect(rows[0].status).toBe('finished');
+      expect(rows[0].winner_id).toBe(ctx.p2.id);
+      expect(rows[0].end_reason).toBe('surrender');
     }, 120000);
   });
 
@@ -660,6 +668,68 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
       expect(after).toMatchObject({ status: 'finished', winner_id: p2.id, end_reason: 'surrender' });
       // The finish cleanup also ran: WS round sub-state is gone.
       expect(getRoundStateStore().get(duelId)).toBeUndefined();
+    }, 120000);
+  });
+
+  describe('bot-vs-human duel (server-controlled bot)', () => {
+    it('auto-selects the bot lead when the human picks, then resolves the round on the human action', async () => {
+      const harness = await startHarness({ turnTimeoutMs: 60000 });
+      const human = await createPlayer('BotHuman');
+      const room = await createRoomWithCreator(2, human.id);
+      roomIds.push(room.id);
+
+      const { client: c1 } = await joinRoomViaWs(harness, human, room.code);
+
+      // Human team via the DB (starter + 5 roster).
+      const pokes = (
+        await pool.query('SELECT id FROM pokemons ORDER BY id LIMIT 12')
+      ).rows.map((r) => r.id);
+      const humanTeam = pokes.slice(0, 6);
+      await selectStarter(room.id, human.id, humanTeam[0]);
+      await selectRoster(room.id, human.id, humanTeam.slice(1));
+
+      // Bot seated directly in the DB: ready=TRUE from the start, full team.
+      const { rows: botRows } = await pool.query(
+        `INSERT INTO players (nickname, is_bot) VALUES ($1, TRUE) RETURNING id`,
+        ['🤖 BotPrueba'],
+      );
+      const botId = botRows[0].id;
+      await pool.query(
+        `INSERT INTO room_players (room_id, player_id, nickname, connected, ready)
+         VALUES ($1, $2, $3, TRUE, TRUE)`,
+        [room.id, botId, '🤖 BotPrueba'],
+      );
+      const botTeam = pokes.slice(6, 12);
+      await selectStarter(room.id, botId, botTeam[0]);
+      await selectRoster(room.id, botId, botTeam.slice(1));
+
+      // Human ready -> both ready -> bootstrap fires duel:start.
+      const startP = waitForEvent(c1, 'duel:start', 30000);
+      c1.emit('room:ready', { ready: true });
+      await waitForEvent(c1, 'room:state');
+      const { duelId } = await startP;
+
+      // Join the duel channel.
+      const joinedP = waitForEvent(c1, 'duel:state');
+      c1.emit('duel:join', { duelId });
+      await joinedP;
+
+      // Human picks its lead -> the server auto-selects the bot lead and
+      // broadcasts duel:state with BOTH actives (the rival is now visible).
+      const settledP = waitForEvent(c1, 'duel:state', 30000);
+      c1.emit('duel:select_lead', { duelId, pokemonId: humanTeam[0] });
+      const settled = await settledP;
+      expect(settled.pokemonStates.filter((p) => p.isActive)).toHaveLength(2);
+      expect(getPhaseStore().get(duelId)).toBe('in_progress');
+
+      // Human acts -> the bot answers immediately (no 10s wait) -> the round
+      // resolves: the bot's active pokemon took the human's damage.
+      const resolvedP = waitForEvent(c1, 'duel:turn_resolved', 45000);
+      c1.emit('duel:select_action', { duelId, moveIndex: 4 });
+      const resolved = await resolvedP;
+      expect(resolved.pokemonStates.filter((p) => p.isActive)).toHaveLength(2);
+      const botActive = resolved.pokemonStates.find((p) => p.ownerId === botId && p.isActive);
+      expect(botActive.currentHp).toBeLessThan(100);
     }, 120000);
   });
 });

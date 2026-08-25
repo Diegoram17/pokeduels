@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { selectStarter, selectRoster } from '../db/teamSelections.js';
+import { getPlayerRoster, activateLead } from '../repositories/duelRepository.js';
 
 /**
  * Bot manager: handles creation, removal, and AI decisions for bot players.
@@ -175,40 +176,69 @@ async function autoSelectBotTeam(roomId, botId) {
 }
 
 /**
- * Makes a random duel action for a bot. Called by the duel handler when it's a bot's turn.
- * Returns the action to take: { type: 'move', moveIndex: 0-2 } or { type: 'switch', pokemonId: number }
+ * True when the player id belongs to a server-controlled bot. Bots have no
+ * socket, so every bot decision (lead, attack, switch) must be made here —
+ * the client-side useBotAutomation cannot impersonate them (the WS layer
+ * resolves identity from the emitting socket).
+ */
+export async function isBotPlayer(playerId) {
+  const { rows } = await pool.query('SELECT is_bot FROM players WHERE id = $1', [playerId]);
+  return rows[0]?.is_bot === true;
+}
+
+/**
+ * The other participant of a duel, from the canonical duel row
+ * ({ player1_id, player2_id }).
+ */
+export function opponentOf(duel, playerId) {
+  return playerId === duel.player1_id ? duel.player2_id : duel.player1_id;
+}
+
+/**
+ * Server-side first-lead selection for a bot: activates a random healthy
+ * roster pokemon as its lead. Returns the picked pokemon id, or null when the
+ * bot already has an active pokemon or nothing is selectable.
+ */
+export async function selectBotLead(duelId, botId) {
+  const roster = await getPlayerRoster(duelId, botId);
+  if (roster.some((p) => p.is_active)) return null;
+  const candidates = roster.filter((p) => !p.fainted && !p.is_active);
+  if (candidates.length === 0) return null;
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  await activateLead(duelId, botId, pick.pokemon_id);
+  return pick.pokemon_id;
+}
+
+/**
+ * Makes a random duel action for a bot (server-side). The duel state rows are
+ * the canonical snake_case shapes from getDuelState().pokemonStates.
+ * Returns the action to take: { type: 'move', moveIndex: 1-4 } or
+ * { type: 'switch', pokemonId } or null when the bot cannot act at all.
  */
 export async function makeBotDuelAction(duelId, botPlayerId, pokemonStates) {
-  // Get bot's active pokemon
-  const botPokemon = pokemonStates.filter(p => p.ownerId === botPlayerId);
-  const activePokemon = botPokemon.find(p => p.isActive && !p.fainted);
-  
+  const botPokemon = pokemonStates.filter((p) => p.player_id === botPlayerId);
+  const activePokemon = botPokemon.find((p) => p.is_active && !p.fainted);
+
   if (!activePokemon) {
-    // No active pokemon, must switch
-    const availableSwitch = botPokemon.find(p => !p.fainted && !p.isActive);
+    // No active pokemon, must switch in a bench unit.
+    const availableSwitch = botPokemon.find((p) => !p.fainted && !p.is_active);
     if (availableSwitch) {
-      return { type: 'switch', pokemonId: availablePokemon.pokemonId };
+      return { type: 'switch', pokemonId: availableSwitch.pokemon_id };
     }
-    return null; // No available actions (shouldn't happen)
+    return null;
   }
 
-  // Check if any moves have PP
-  const movesWithPP = [0, 1, 2].filter(moveIndex => {
-    const ppKey = `ppMove${moveIndex + 1}`;
-    return activePokemon[ppKey] > 0;
-  });
+  // Moves 1-3 consume PP; move 4 (basic attack) is always available.
+  const movesWithPP = [1, 2, 3].filter((moveIndex) => activePokemon[`pp_move_${moveIndex}`] > 0);
 
   if (movesWithPP.length === 0) {
-    // No PP left, must switch
-    const availableSwitch = botPokemon.find(p => !p.fainted && !p.isActive);
+    const availableSwitch = botPokemon.find((p) => !p.fainted && !p.is_active);
     if (availableSwitch) {
-      return { type: 'switch', pokemonId: availableSwitch.pokemonId };
+      return { type: 'switch', pokemonId: availableSwitch.pokemon_id };
     }
-    // No switches available, use move 0 anyway (will be rejected by backend)
-    return { type: 'move', moveIndex: 0 };
+    return { type: 'move', moveIndex: 4 };
   }
 
-  // Pick random move
   const randomMoveIndex = movesWithPP[Math.floor(Math.random() * movesWithPP.length)];
   return { type: 'move', moveIndex: randomMoveIndex };
 }
