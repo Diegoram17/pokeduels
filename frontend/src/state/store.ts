@@ -226,6 +226,7 @@ export type MockStateAction =
   | { type: 'duelFinished'; duelId: string; winnerId: string; endReason: DuelState['endReason'] }
   | { type: 'duelLeadSelection'; ownerId: number; pokemonId: number }
   | { type: 'duelActionRejected'; moveIndex: number; reason: string }
+  | { type: 'duelSwitchRejected'; switchTo: number; reason: string }
   | { type: 'duelOpponentDisconnected' }
   | { type: 'tournamentBracket'; bracket: Partial<Record<TournamentSlot, BracketPairing | null>> }
   | { type: 'roomFinalRanking'; ranking: RankingEntry[] }
@@ -343,8 +344,9 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
     }
 
     // Optimistic echo of the player's own duel:select_lead emit: activate the
-    // picked lead and leave lead_selection so the picker closes. The server
-    // re-validates the pick; the next snapshot owns the authoritative actives.
+    // picked lead locally so the picker UI reflects it immediately. Phase stays
+    // 'lead_selection' — only the server's duel:state broadcast (once BOTH
+    // leads are ready) advances the phase, via deriveDuelPhase on the real snapshot.
     case 'duelLeadSelection': {
       const { duel, duelPokemonState } = state
       if (!duel || duel.phase !== 'lead_selection') return state
@@ -356,7 +358,6 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
       return {
         ...state,
         duelPokemonState: updated,
-        duel: { ...duel, phase: 'awaiting_actions' },
       }
     }
 
@@ -368,6 +369,17 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
       return {
         ...state,
         duel: { ...duel, lastRejection: { moveIndex: action.moveIndex, reason: action.reason } },
+      }
+    }
+
+    // duel:switch_rejected — surface the rejection so the swap screen can stay
+    // put and let the player retry; the phase/turn are untouched.
+    case 'duelSwitchRejected': {
+      const duel = state.duel
+      if (!duel) return state
+      return {
+        ...state,
+        duel: { ...duel, lastRejection: { moveIndex: null, reason: action.reason } },
       }
     }
 

@@ -121,6 +121,11 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
         getPhaseStore().set(duelId, transition(PHASES.LEAD_SELECTION, EVENTS.SELECT_LEADS));
         roundState.set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
         await markDuelInProgress(duelId);
+        // Broadcast the live snapshot so both clients see each other's active
+        // lead immediately — the rival lead is NOT broadcast until this point
+        // (previously it waited for the first duel:turn_resolved).
+        const freshState = await getDuelState(duelId);
+        io.to(`duel:${duelId}`).emit('duel:state', mapDuelStateToCamelCase(freshState));
       }
     }),
   );
@@ -151,6 +156,10 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
         throw toRejectionWsError('duel:switch_rejected', err, { switchTo });
       }
       getRoundStateStore().set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
+      // Broadcast the fresh snapshot so the switcher's client reflects the new
+      // active pokemon without waiting for the next duel:turn_resolved.
+      const freshState = await getDuelState(duelId);
+      io.to(`duel:${duelId}`).emit('duel:state', mapDuelStateToCamelCase(freshState));
     }),
   );
 

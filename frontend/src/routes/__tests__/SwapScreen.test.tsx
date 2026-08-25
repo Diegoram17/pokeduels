@@ -8,7 +8,7 @@ import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
-import { STORAGE_KEY, serializeMockState } from '../../state/store'
+import { STORAGE_KEY, serializeMockState, type DuelSnapshot } from '../../state/store'
 import { setCachedCatalog } from '../../lib/catalog'
 import type { Pokemon } from '../../lib/catalog'
 import type { DuelPokemonState, MockState } from '../../state/schema'
@@ -161,6 +161,24 @@ function buildLiveVoluntaryState(): MockState {
   )
 }
 
+// Server broadcast after a successful duel:switch_decision: Snorlax (5) is now
+// the human's active, the previous lead is deactivated (fainted only in the
+// forced case). The client navigates back only once this snapshot lands.
+function switchSnapshot(pikachuFainted: boolean): DuelSnapshot {
+  return {
+    duelId: 42,
+    turnNumber: 2,
+    winnerId: null,
+    endReason: null,
+    pokemonStates: [
+      { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: pikachuFainted ? 0 : 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: pikachuFainted },
+      { duelId: 42, ownerId: 10, pokemonId: 5, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+      { duelId: 42, ownerId: 10, pokemonId: 6, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+      { duelId: 42, ownerId: 11, pokemonId: 23, type: 'flying', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+    ],
+  }
+}
+
 function renderSwapFromState(state: MockState, initialPath: string) {
   localStorage.setItem(STORAGE_KEY, serializeMockState(state))
   return render(
@@ -206,9 +224,14 @@ describe('SwapScreen — forced mode', () => {
       duelId: 42,
       switchTo: 5,
     })
+    // Navigation waits for the server's duel:state broadcast (emitted after a
+    // successful applySwitchDecision) — no emit-and-navigate race.
+    act(() => {
+      fakeSocket._fire('duel:state', switchSnapshot(true))
+    })
     expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
     // The server owns the new active pokemon — the client does not flip it.
-    expect(screen.getByTestId('active-probe').textContent).toContain('active:none')
+    expect(screen.getByTestId('active-probe').textContent).toContain('active:5')
   })
 })
 
@@ -250,6 +273,29 @@ describe('SwapScreen — voluntary mode', () => {
       duelId: 42,
       switchTo: 5,
     })
+    // Navigation waits for the server's duel:state broadcast confirming the switch.
+    act(() => {
+      fakeSocket._fire('duel:state', switchSnapshot(false))
+    })
     expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
+  })
+
+  it('stays on the swap screen and surfaces the reason when the switch is rejected', async () => {
+    renderSwapFromState(buildLiveVoluntaryState(), '/swap?mode=voluntary')
+
+    act(() => {
+      screen.getByRole('button', { name: /snorlax/i }).click()
+    })
+    act(() => {
+      screen.getByRole('button', { name: /confirmar cambio/i }).click()
+    })
+
+    act(() => {
+      fakeSocket._fire('duel:switch_rejected', { switchTo: 5, reason: 'fainted' })
+    })
+
+    expect(screen.queryByText('DUEL-LANDED')).not.toBeInTheDocument()
+    expect(screen.getByText(/CAMBIO RECHAZADO/i)).toBeInTheDocument()
+    expect(screen.getByText(/fainted/i)).toBeInTheDocument()
   })
 })

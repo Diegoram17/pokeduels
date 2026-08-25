@@ -188,6 +188,13 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       send({ type: 'duelActionRejected', moveIndex: moveIndex - 1, reason })
     })
 
+    // duel:switch_rejected — surface the rejection so the swap screen stays put
+    // and the player can retry (no auto-navigation happens on rejection).
+    socket.on('duel:switch_rejected', (payload: unknown) => {
+      const { switchTo, reason } = payload as { switchTo: number; reason: string }
+      send({ type: 'duelSwitchRejected', switchTo, reason })
+    })
+
     // duel:opponent_disconnected — non-blocking notice, cleared by the next
     // snapshot (duelTurnResolved / duelFinished carry fresh duel state).
     socket.on('duel:opponent_disconnected', () => {
@@ -249,6 +256,7 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       socket.off('duel:turn_resolved')
       socket.off('duel:finished')
       socket.off('duel:action_rejected')
+      socket.off('duel:switch_rejected')
       socket.off('duel:opponent_disconnected')
       socket.off('tournament:bracket')
       socket.off('room:final_ranking')

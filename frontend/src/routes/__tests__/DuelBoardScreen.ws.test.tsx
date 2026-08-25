@@ -203,11 +203,37 @@ function startLeadSelection() {
   })
 }
 
-/** Lead-selection snapshot + optimistic pick (Pikachu) -> round 1 awaiting_actions. */
+/**
+ * The server broadcast emitted once BOTH leads are ready (duelHandlers now
+ * emits duel:state after markDuelInProgress): both sides field an active
+ * pokemon, so the client derives phase 'awaiting_actions'.
+ */
+function leadsSettledSnapshot(activePokemonId: number = 25): DuelSnapshot {
+  return {
+    duelId: 42,
+    turnNumber: 1,
+    winnerId: null,
+    endReason: null,
+    pokemonStates: [
+      { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: activePokemonId === 25, fainted: false },
+      { duelId: 42, ownerId: 10, pokemonId: 5, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: activePokemonId === 5, fainted: false },
+      { duelId: 42, ownerId: 10, pokemonId: 6, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: activePokemonId === 6, fainted: false },
+      { duelId: 42, ownerId: 11, pokemonId: 23, type: 'flying', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+    ],
+  }
+}
+
+/**
+ * Lead-selection snapshot + optimistic pick (Pikachu) + the server's
+ * leads-settled broadcast -> round 1 awaiting_actions.
+ */
 function startRound1() {
   startLeadSelection()
   act(() => {
     screen.getByRole('button', { name: /pikachu/i }).click()
+  })
+  act(() => {
+    fakeSocket._fire('duel:state', leadsSettledSnapshot())
   })
 }
 
@@ -242,7 +268,13 @@ describe('DuelBoardScreen — lead selection', () => {
       duelId: 42,
       pokemonId: 5,
     })
-    // Optimistic echo closes the picker and opens the move grid.
+    // The optimistic echo activates the pick locally but the phase stays
+    // lead_selection — the picker remains until the server broadcasts
+    // duel:state confirming both leads (which advances the phase).
+    expect(screen.getByText('ELIGE TU PRIMER POKÉMON')).toBeInTheDocument()
+    act(() => {
+      fakeSocket._fire('duel:state', leadsSettledSnapshot(5))
+    })
     expect(screen.queryByText('ELIGE TU PRIMER POKÉMON')).not.toBeInTheDocument()
     expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
   })
@@ -253,8 +285,8 @@ describe('DuelBoardScreen — move submission', () => {
     renderBoard(2)
     startRound1()
 
-    // PR 1 contract: rivalActive is undefined until the first turn_resolved —
-    // the grid must NOT be gated on it.
+    // The grid must not be gated on the rival lead — it renders once the human
+    // active is set (the server's leads-settled broadcast already fields it).
     const grid = screen.getByRole('button', { name: /golpe fuerte/i })
     expect(grid).toBeEnabled()
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import type { DuelPokemonState } from '../state/schema'
@@ -53,9 +53,17 @@ function BenchPokemonCard({
         </span>
       )}
       <div className="art" style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(6,12,30,.5)' }}>
-        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 56, color: 'var(--pd-text-dim)' }}>
-          pets
-        </span>
+        {pokemon.spriteUrl ? (
+          <img
+            src={pokemon.spriteUrl}
+            alt={pokemon.name}
+            style={{ width: 96, height: 96, objectFit: 'contain', imageRendering: 'pixelated' }}
+          />
+        ) : (
+          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 56, color: 'var(--pd-text-dim)' }}>
+            pets
+          </span>
+        )}
       </div>
       <div className="body" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -156,7 +164,34 @@ function SwapScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [pendingSwap, setPendingSwap] = useState<number | null>(null)
+  const [switchError, setSwitchError] = useState<string | null>(null)
   const { duel, duelPokemonState, player } = state
+
+  // Bug 6: navigate only once the server confirms — the duel:state broadcast
+  // emitted after a successful applySwitchDecision flips the target to
+  // isActive. Emit-and-navigate would race the server write and show stale
+  // state on the board.
+  useEffect(() => {
+    if (pendingSwap == null) return
+    const target = duelPokemonState.find((p) => p.pokemonId === pendingSwap)
+    if (target?.isActive) {
+      setPendingSwap(null)
+      navigate('/duel')
+    }
+  }, [pendingSwap, duelPokemonState, navigate])
+
+  // If the server rejects the switch (duel:switch_rejected -> lastRejection
+  // with moveIndex null), stay put and surface the reason so the player can
+  // retry instead of bouncing back to the board with the old active pokemon.
+  useEffect(() => {
+    if (pendingSwap == null) return
+    const rejection = duel?.lastRejection
+    if (rejection && rejection.moveIndex == null) {
+      setSwitchError(rejection.reason)
+      setPendingSwap(null)
+    }
+  }, [pendingSwap, duel])
 
   if (!duel) {
     return <Navigate to="/duel" replace />
@@ -172,9 +207,10 @@ function SwapScreen() {
 
   const handleConfirm = () => {
     if (selectedId == null) return
+    setSwitchError(null)
+    setPendingSwap(selectedId)
     // Submits duel:switch_decision via WS — the server owns the new active.
     actions.confirmSwap(selectedId)
-    navigate('/duel')
   }
 
   return (
@@ -221,6 +257,11 @@ function SwapScreen() {
               ? 'Tu pokémon se debilitó — elige un nuevo combatiente'
               : 'Elige qué Pokémon enviar al combate'}
           </p>
+          {switchError && (
+            <p role="status" className="pd-label" style={{ color: 'var(--pd-danger)', textAlign: 'center', margin: '16px 0 0' }}>
+              CAMBIO RECHAZADO — {switchError.toUpperCase()}
+            </p>
+          )}
         </div>
 
         <BenchList pokemon={myPokemon} selectedId={selectedId} onSelect={handleSelect} />

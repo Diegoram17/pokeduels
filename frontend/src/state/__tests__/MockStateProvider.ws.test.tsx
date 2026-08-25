@@ -309,7 +309,9 @@ describe('MockStateProvider — emitting actions', () => {
       duelId: 42,
       pokemonId: 25,
     })
-    expect(screen.getByTestId('duel-phase').textContent).toBe('awaiting_actions')
+    // The optimistic echo activates the pick locally but the phase stays
+    // lead_selection until the server broadcasts duel:state with both leads.
+    expect(screen.getByTestId('duel-phase').textContent).toBe('lead_selection')
     expect(screen.getByTestId('active-name').textContent).toBe('Pikachu')
   })
 

@@ -83,8 +83,8 @@ export interface DuelState {
   endReason: 'ko' | 'surrender' | 'disconnect' | 'walkover' | null
   /** True from `duel:opponent_disconnected` until the next snapshot arrives. */
   opponentDisconnected: boolean
-  /** Last `duel:action_rejected` payload (insufficient_pp etc.); cleared on the next resolution. */
-  lastRejection: { moveIndex: number; reason: string } | null
+  /** Last `duel:action_rejected` / `duel:switch_rejected` payload (insufficient_pp etc.); cleared on the next snapshot. */
+  lastRejection: { moveIndex: number | null; reason: string } | null
 }
 
 export interface MockState {

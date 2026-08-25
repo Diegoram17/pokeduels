@@ -403,13 +403,15 @@ describe('reduceMockState — duelLeadSelection', () => {
     })
   }
 
-  it('activates the picked lead and leaves the lead_selection phase', () => {
+  it('activates the picked lead locally but keeps the lead_selection phase', () => {
     const s = reduceMockState(makeLeadDuel(), {
       type: 'duelLeadSelection',
       ownerId: 10,
       pokemonId: 25,
     })
-    expect(s.duel?.phase).toBe('awaiting_actions')
+    // Phase stays lead_selection — only the server's duel:state broadcast (once
+    // BOTH leads are ready) advances it via deriveDuelPhase.
+    expect(s.duel?.phase).toBe('lead_selection')
     expect(s.duelPokemonState.find((p) => p.ownerId === 10)?.isActive).toBe(true)
     expect(s.duelPokemonState.find((p) => p.ownerId === 11)?.isActive).toBe(false)
   })
