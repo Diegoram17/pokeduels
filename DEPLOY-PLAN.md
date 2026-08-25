@@ -251,3 +251,49 @@ hasta que se implemente.
 - Status: activo (status code 1).
 - Verificación: `GET /health` → 200 OK.
 - Propósito: mantener el backend de Render despierto (evitar cold start del free tier).
+
+### 2026-08-25 — Fix de 4 bugs reportados en producción (sala de espera / torneo 4 jugadores) + deploy
+
+**Cambio:** solo `frontend/` (7 archivos, sin migraciones, sin cambios de infra/secrets):
+1. `BotManager` (WaitRoomScreen.tsx) agregaba todos los slots vacíos de una — ahora agrega 1 bot
+   por click.
+2. Se eliminó el botón duplicado "Iniciar Partida"; `PlayerRow` ahora refleja el campo `ready`
+   real de cada jugador (antes dependía de `isBot`).
+3. `MockStateProvider` normaliza `playerId` a string en `room:state` y `sessionEstablished` (el
+   backend lo serializa como número de Postgres) — el cuadro de llaves resolvía ids crudos en vez
+   de nicknames por una comparación `===` string-vs-number.
+4. `EnterDuelButton` ya no navega a `/duel` antes de que llegue `duel:state` — eliminado el race
+   condition que rebotaba al jugador a la sala de espera sin entrar al duelo.
+
+**Verificación pre-deploy:** diff revisado línea por línea contra el plan original, frontend
+248/248 tests OK, `tsc -b` sin errores, `oxlint` sin errores. Commit `53caf44` (conventional
+commit, sin cambios en `backend/`).
+
+**Deploy gate saltado (conocido, documentado arriba):** el workflow de CI (`ci.yml`) sigue sin
+poder correr el job de `backend` — `NEON_PROJECT_ID`/`NEON_API_KEY` todavía no están configurados
+como secrets del repo (ítem #8 de "Autorizaciones pendientes", sin cambios desde 2026-08-24). El
+job de `frontend` si corre. No bloqueó este deploy porque el cambio no toca `backend/`.
+
+**Incidente durante el deploy — build cache de Vercel corrupta:**
+- `git push origin master` (commit `53caf44`) disparó el deploy automático de Vercel — **falló**:
+  `sh: line 1: vite: command not found` / `Command "vite build" exited with 127`, inmediatamente
+  después de `Restored build cache from previous deployment` (sin paso de install visible antes).
+- Antes de asumir que el cambio lo causó, se verificó el deploy del commit **anterior** (`c1f3399`,
+  2026-08-25 17:25, sin relación con este fix) vía
+  `gh api repos/.../deployments/.../statuses` + `vercel inspect <id> --logs`: **mismo error
+  exacto**. Confirmado: cache de build corrupta/flaky en el proyecto de Vercel, preexistente,
+  no causada por este commit.
+- **Remediación:** `vercel deploy --prod --force --yes` desde `frontend/` (proyecto ya linkeado
+  vía `.vercel/project.json`) — `--force` sin `--with-cache` descarta la cache corrupta y fuerza
+  `npm install` real. Build limpio (`72 modules transformed`, `built in 307ms`), deploy `READY`,
+  aliaseado a `https://pokeduels.vercel.app`.
+- **Verificación post-deploy:** `GET https://pokeduels.vercel.app/` → 200, sirviendo
+  `index-q7gD4FQZ.js` (hash del build recién generado, confirma que el alias apunta al deploy
+  nuevo). `GET https://pokeduels-backend.onrender.com/health` → 200 (backend no tocado, sigue
+  sano).
+- **Nota para el próximo deploy:** si vuelve a aparecer `vite: command not found` /
+  `command not found` después de `Restored build cache`, es este mismo problema — reintentar con
+  `vercel deploy --prod --force --yes` (sin `--with-cache`) en vez de re-diagnosticar desde cero.
+  No se investigó la causa raíz del lado de Vercel (fuera del control del proyecto); si se repite
+  seguido, vale la pena abrir un ticket de soporte con Vercel adjuntando los `inspectorUrl` de los
+  deploys fallidos.
