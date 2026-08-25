@@ -66,7 +66,20 @@ export function loadMockState(storage?: StorageLike): MockState {
   const store = storage ?? defaultStorage()
   if (!store) return createInitialState()
   const raw = store.getItem(STORAGE_KEY)
-  return parseMockState(raw) ?? createInitialState()
+  const state = parseMockState(raw) ?? createInitialState()
+  
+  // Detect stale state: if there's a room but no playerId, or if the player
+  // changed (different playerId) but room state persists, wipe everything
+  // except the player identity to prevent cross-session contamination.
+  if (state.room && (!state.player.playerId || !state.player.sessionToken)) {
+    // Stale room state without valid session - clear it
+    return {
+      ...createInitialState(),
+      player: state.player,
+    }
+  }
+  
+  return state
 }
 
 export function saveMockState(state: MockState, storage?: StorageLike): void {
