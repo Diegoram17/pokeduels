@@ -45,25 +45,19 @@ jobs:
       - run: npm ci
       - run: npm run lint
 
-      # 162 of the backend's tests are DB-gated (skipped without DATABASE_URL).
-      # When NEON_PROJECT_ID + NEON_API_KEY secrets are set, an ephemeral Neon
-      # branch gives this run a real, isolated Postgres so the full suite runs.
-      # Without those secrets, only the 266 non-gated tests run (still valid).
-      - name: Check if Neon secrets are available
-        id: check_neon
-        run: |
-          if [ -n "$NEON_PROJECT_ID" ] && [ -n "$NEON_API_KEY" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      # 266 of the backend's tests are NOT DB-gated: they run unconditionally on
+      # every PR with no DATABASE_URL and can fail the job. The remaining 162 are
+      # DB-gated (skipped when DATABASE_URL is absent) and only run inside the
+      # secret-gated Neon block below.
+      - name: Run non-gated backend tests (no DATABASE_URL)
+        run: npm test
 
+      # DB-gated block — runs only when Neon secrets are provisioned. When they
+      # are absent this whole block is skipped VISIBLY (see the always-run
+      # summary step), never silently reported as passing.
       - name: Create ephemeral Neon branch for this run
         id: neon_branch
-        if: steps.check_neon.outputs.available == 'true'
+        if: secrets.NEON_PROJECT_ID != '' && secrets.NEON_API_KEY != ''
         uses: neondatabase/create-branch-action@v6
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
@@ -82,7 +76,8 @@ jobs:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
         run: node seed/index.js
 
-      - name: Run backend test suite (DB-gated tests included when Neon available)
+      - name: Run DB-gated backend tests (162 tests, requires DATABASE_URL)
+        if: steps.neon_branch.outputs.db_url
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
         run: npm test
@@ -94,3 +89,22 @@ jobs:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           api_key: ${{ secrets.NEON_API_KEY }}
           branch: ci-${{ github.run_id }}
+
+      # Always-run summary so DB-gated skips are never silently green: every PR
+      # reports on the PR itself whether the 162 DB-gated tests ran or were
+      # skipped for lack of secrets.
+      - name: Report DB-gated test status to job summary
+        if: always()
+        run: |
+          echo "## Backend test summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$NEON_PROJECT_ID" ] && [ -n "$NEON_API_KEY" ]; then
+            echo "- 266 non-gated tests ran." >> "$GITHUB_STEP_SUMMARY"
+            echo "- 162 DB-gated tests ran against an ephemeral Neon branch." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- 266 non-gated tests ran." >> "$GITHUB_STEP_SUMMARY"
+            echo "- 162 DB-gated tests SKIPPED: NEON_PROJECT_ID / NEON_API_KEY secrets are not configured. This is a skip, not a pass - a regression in those tests would surface once secrets are provisioned." >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
