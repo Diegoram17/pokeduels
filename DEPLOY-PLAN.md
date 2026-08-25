@@ -269,6 +269,16 @@ hasta que se implemente.
 248/248 tests OK, `tsc -b` sin errores, `oxlint` sin errores. Commit `53caf44` (conventional
 commit, sin cambios en `backend/`).
 
+**Hallazgo aparte, no bloqueante — 1 test de backend rojo contra la DB de producción:** como
+chequeo de sanidad extra (backend sin cambios en este fix) se corrió `npm run test` en `backend/`
+contra el `DATABASE_URL` real de `.env` — que es la misma Neon de producción (riesgo ya aceptado,
+ver arriba). Resultado: 444 pass / 1 fail — `test/integration.test.js > reverts every table on
+migrate down` (`node-pg-migrate down 0` salió con exit 1). Se verificó de inmediato que la DB de
+producción no quedó dañada: `GET /api/pokemons` y `GET /api/rooms` en
+`https://pokeduels-backend.onrender.com` responden 200 con datos reales intactos. No se investigó
+la causa del test en sí (fuera de alcance de este fix, backend sin cambios) — queda como hallazgo
+para una sesión aparte, con la advertencia de que corre contra la base real.
+
 **Deploy gate saltado (conocido, documentado arriba):** el workflow de CI (`ci.yml`) sigue sin
 poder correr el job de `backend` — `NEON_PROJECT_ID`/`NEON_API_KEY` todavía no están configurados
 como secrets del repo (ítem #8 de "Autorizaciones pendientes", sin cambios desde 2026-08-24). El
@@ -303,11 +313,30 @@ solo este mismo `DEPLOY-PLAN.md`, sin tocar `frontend/`) disparó el deploy auto
 nuevo — **falló otra vez**, firma idéntica (`Restored build cache from previous deployment
 (A1erYcoNN5wfHrn41pAUq2kvxCPd)` → `vite: command not found`, sin paso de install visible), a pesar
 de que ese ID de cache (`A1erYcoNN5wfHrn41pAUq2kvxCPd`) es exactamente el deploy exitoso anterior.
-Es decir: **todo deploy disparado por push normal (que restaura cache) falla; solo un
-`--force` (que descarta cache) funciona.** La alias de producción NO se movió (Vercel no
-re-aliasea en un deploy fallido), así que `https://pokeduels.vercel.app` siguió sirviendo el build
-bueno (`index-q7gD4FQZ.js`) sin interrupción — pero el pipeline de auto-deploy en sí está roto de
-forma consistente hasta que alguien decida cómo resolverlo (deshabilitar la build cache del
-proyecto en Vercel, u otra causa raíz por investigar). Esto queda reportado al usuario, no resuelto
-unilateralmente — es un cambio de configuración de infraestructura, fuera del alcance ya
-autorizado de "pushear y deployar este fix".
+Es decir: todo deploy disparado por push normal (que restaura cache) fallaba; solo un `--force`
+(que descarta cache) funcionaba. La alias de producción NO se movió (Vercel no re-aliasea en un
+deploy fallido), así que `https://pokeduels.vercel.app` siguió sirviendo el build bueno
+(`index-q7gD4FQZ.js`) sin interrupción en ningún momento de este incidente.
+
+**Causa raíz real encontrada — no era la build cache.** Con autorización explícita del usuario se
+probó primero `vercel env add VERCEL_FORCE_NO_BUILD_CACHE production,preview --value 1`. El push
+siguiente (commit `694eaa3`) confirmó en el log (`VERCEL_FORCE_NO_BUILD_CACHE is set so skipping
+build cache step.`) que la cache SÍ se saltó — y **el deploy falló igual**, con el mismo
+`vite: command not found`, sin ningún paso de `Installing dependencies` en el log. Eso descartó la
+cache como causa. Consultando el proyecto directo contra la API de Vercel (`GET
+/v9/projects/prj_fvZ7mPqIBGPdO570QfVHc2ajPjNW`) apareció el dato real:
+**`rootDirectory: null`** — el proyecto nunca tuvo configurado `frontend` como raíz. Un deploy
+disparado por push clona el repo completo y opera desde la raíz del repo (sin `package.json` ahí),
+por eso nunca instala nada real y el framework preset intenta correr `vite build` de todos modos.
+Los deploys manuales por CLI "funcionaban" solo porque se corrían parados adentro de `frontend/`
+(vía `vercel deploy` con el `.vercel/project.json` local linkeado ahí), lo cual enmascaraba el
+`rootDirectory` roto del proyecto — nunca fue una cache flaky, fue esto desde el setup inicial
+(2026-08-24).
+
+**Fix aplicado (autorizado explícitamente):** `vercel project update --root-directory frontend` →
+`Root Directory: Auto → frontend`. Verificado con un commit vacío de prueba (`7b32823`, push
+normal, sin `--force`): **deploy automático exitoso** (`Vercel: success - Deployment has
+completed`), `https://pokeduels.vercel.app` → 200, backend `/health` → 200. El pipeline de
+auto-deploy en push quedó funcionando de verdad, sin depender de intervención manual.
+`VERCEL_FORCE_NO_BUILD_CACHE` quedó seteada igual (inofensiva, no es la causa pero tampoco molesta
+dejarla).
