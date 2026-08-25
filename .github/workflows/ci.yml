@@ -6,10 +6,18 @@ on:
   pull_request:
     branches: [master]
 
+# Cancel redundant runs: if a new push arrives while a previous run is still
+# in progress for the same branch/PR, cancel the older one. This saves CI
+# minutes and ensures the latest code is what gets validated.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
     name: Frontend (build, test, lint)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -22,14 +30,22 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
-      - run: npm run lint
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
 
   backend:
     name: Backend (test, lint)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -42,11 +58,14 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
-      - run: npm ci
-      - run: npm run lint
+      - name: Install dependencies
+        run: npm ci
 
-      # 266 of the backend's tests are NOT DB-gated: they run unconditionally on
-      # every PR with no DATABASE_URL and can fail the job. The remaining 162 are
+      - name: Lint
+        run: npm run lint
+
+      # 275 of the backend's tests are NOT DB-gated: they run unconditionally on
+      # every PR with no DATABASE_URL and can fail the job. The remaining 164 are
       # DB-gated (skipped when DATABASE_URL is absent) and only run inside the
       # secret-gated Neon block below.
       - name: Run non-gated backend tests (no DATABASE_URL)
@@ -90,7 +109,7 @@ jobs:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
         run: node seed/index.js
 
-      - name: Run DB-gated backend tests (162 tests, requires DATABASE_URL)
+      - name: Run DB-gated backend tests (164 tests, requires DATABASE_URL)
         if: steps.neon_branch.outputs.db_url
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
@@ -105,7 +124,7 @@ jobs:
           branch: ci-${{ github.run_id }}
 
       # Always-run summary so DB-gated skips are never silently green: every PR
-      # reports on the PR itself whether the 162 DB-gated tests ran or were
+      # reports on the PR itself whether the 164 DB-gated tests ran or were
       # skipped for lack of secrets.
       - name: Report DB-gated test status to job summary
         if: always()
@@ -113,11 +132,12 @@ jobs:
           echo "## Backend test summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ "$NEON_AVAILABLE" = "true" ]; then
-            echo "- 266 non-gated tests ran." >> "$GITHUB_STEP_SUMMARY"
-            echo "- 162 DB-gated tests ran against an ephemeral Neon branch." >> "$GITHUB_STEP_SUMMARY"
+            echo "- 275 non-gated tests ran." >> "$GITHUB_STEP_SUMMARY"
+            echo "- 164 DB-gated tests ran against an ephemeral Neon branch." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "- 266 non-gated tests ran." >> "$GITHUB_STEP_SUMMARY"
-            echo "- 162 DB-gated tests SKIPPED: NEON_PROJECT_ID / NEON_API_KEY secrets are not configured. This is a skip, not a pass - a regression in those tests would surface once secrets are provisioned." >> "$GITHUB_STEP_SUMMARY"
+            echo "- 275 non-gated tests ran." >> "$GITHUB_STEP_SUMMARY"
+            echo "- 164 DB-gated tests SKIPPED: NEON_PROJECT_ID / NEON_API_KEY secrets are not configured." >> "$GITHUB_STEP_SUMMARY"
+            echo "  To enable: add these secrets at Repository Settings > Secrets and variables > Actions." >> "$GITHUB_STEP_SUMMARY"
           fi
         env:
           NEON_AVAILABLE: ${{ steps.check_neon.outputs.available }}
