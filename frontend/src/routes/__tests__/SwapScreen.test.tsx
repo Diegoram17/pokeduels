@@ -298,4 +298,46 @@ describe('SwapScreen — voluntary mode', () => {
     expect(screen.getByText(/CAMBIO RECHAZADO/i)).toBeInTheDocument()
     expect(screen.getByText(/fainted/i)).toBeInTheDocument()
   })
+
+  it('does not let a stale rejection block a second, different switch attempt', async () => {
+    renderSwapFromState(buildLiveVoluntaryState(), '/swap?mode=voluntary')
+
+    // First attempt (Snorlax) is rejected.
+    act(() => {
+      screen.getByRole('button', { name: /snorlax/i }).click()
+    })
+    act(() => {
+      screen.getByRole('button', { name: /confirmar cambio/i }).click()
+    })
+    act(() => {
+      fakeSocket._fire('duel:switch_rejected', { switchTo: 5, reason: 'fainted' })
+    })
+    expect(screen.getByText(/CAMBIO RECHAZADO/i)).toBeInTheDocument()
+
+    // Second attempt (Eevee) must not be instantly failed by the leftover
+    // lastRejection object from the first attempt — it should wait for this
+    // attempt's own server response.
+    act(() => {
+      screen.getByRole('button', { name: /eevee/i }).click()
+    })
+    act(() => {
+      screen.getByRole('button', { name: /confirmar cambio/i }).click()
+    })
+    act(() => {
+      fakeSocket._fire('duel:state', {
+        duelId: 42,
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        pokemonStates: [
+          { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+          { duelId: 42, ownerId: 10, pokemonId: 5, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+          { duelId: 42, ownerId: 10, pokemonId: 6, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+          { duelId: 42, ownerId: 11, pokemonId: 23, type: 'flying', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+        ],
+      } satisfies DuelSnapshot)
+    })
+
+    expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
+  })
 })

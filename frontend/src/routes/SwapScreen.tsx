@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
-import type { DuelPokemonState } from '../state/schema'
+import type { DuelPokemonState, DuelState } from '../state/schema'
 import { MAX_HP } from '../lib/duelBoard'
 
 /**
@@ -167,6 +167,11 @@ function SwapScreen() {
   const [pendingSwap, setPendingSwap] = useState<number | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const { duel, duelPokemonState, player } = state
+  // Snapshot of lastRejection at submit time — a rejection left over from a
+  // PREVIOUS attempt keeps the same object reference until a new snapshot or
+  // rejection replaces it, so comparing by reference (not just moveIndex)
+  // stops a stale rejection from instantly failing the next retry.
+  const submittedRejectionRef = useRef<DuelState['lastRejection']>(null)
 
   // Bug 6: navigate only once the server confirms — the duel:state broadcast
   // emitted after a successful applySwitchDecision flips the target to
@@ -187,7 +192,11 @@ function SwapScreen() {
   useEffect(() => {
     if (pendingSwap == null) return
     const rejection = duel?.lastRejection
-    if (rejection && rejection.moveIndex == null) {
+    if (
+      rejection &&
+      rejection.moveIndex == null &&
+      rejection !== submittedRejectionRef.current
+    ) {
       setSwitchError(rejection.reason)
       setPendingSwap(null)
     }
@@ -208,6 +217,7 @@ function SwapScreen() {
   const handleConfirm = () => {
     if (selectedId == null) return
     setSwitchError(null)
+    submittedRejectionRef.current = duel.lastRejection
     setPendingSwap(selectedId)
     // Submits duel:switch_decision via WS — the server owns the new active.
     actions.confirmSwap(selectedId)
