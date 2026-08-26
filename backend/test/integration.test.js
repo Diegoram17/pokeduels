@@ -244,7 +244,17 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
     ).rejects.toMatchObject({ code: '23514' });
   });
 
-  it('reverts every table on migrate down', () => {
+  it('reverts every table on migrate down', async () => {
+    // Other integration files (e.g. tournamentLifecycle) can run before this
+    // one and leave `duels` rows with end_reason='walkover'. The 0003 down
+    // migration restores a CHECK that does NOT allow 'walkover', so the revert
+    // would fail on those rows. Clear every data table first so `down 0`
+    // reverts the full chain cleanly (the tables themselves are dropped by
+    // 0001's down, so TRUNCATE here only removes rows, never schema).
+    await pool.query(
+      'TRUNCATE TABLE moves, duel_pokemon_state, duels, team_selections, room_players, rooms, players, pokemons, type_effectiveness, types RESTART IDENTITY CASCADE',
+    );
+
     // node-pg-migrate v7's bare `down` defaults its count to 1 (see
     // getMigrationsToRun: `const { count: count2 = 1 } = options`), so it only
     // reverts the LAST applied migration and leaves 0001's 10 tables standing.
