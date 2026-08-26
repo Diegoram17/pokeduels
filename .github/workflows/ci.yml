@@ -101,7 +101,19 @@ jobs:
         if: steps.neon_branch.outputs.db_url
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
-        run: node ./node_modules/node-pg-migrate/bin/node-pg-migrate.js up
+        run: |
+          # A freshly created Neon branch can reject the first connections with
+          # "Control plane request failed" (XX000) while its compute spins up.
+          # Retry with backoff instead of failing the job on a transient error.
+          for attempt in 1 2 3 4 5; do
+            if node ./node_modules/node-pg-migrate/bin/node-pg-migrate.js up; then
+              echo "Migrations applied on attempt $attempt"
+              exit 0
+            fi
+            echo "migration attempt $attempt failed, retrying in 15s..."
+            sleep 15
+          done
+          exit 1
 
       - name: Seed catalog data
         if: steps.neon_branch.outputs.db_url
