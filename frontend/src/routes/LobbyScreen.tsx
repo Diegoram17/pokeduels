@@ -27,8 +27,16 @@ import ErrorBanner from '../components/ErrorBanner'
  * retry (no automatic redirects).
  */
 
-function WaitingRoomCard({ room }: { room: RoomSummary }) {
+function WaitingRoomCard({
+  room,
+  onJoin,
+}: {
+  room: RoomSummary
+  onJoin: (code: string) => Promise<void>
+}) {
   const mode = roomMode(room.max_players)
+  const full = room.player_count >= room.max_players
+  const joinable = room.status === 'waiting' && !full
   return (
     <div className="pd-card room-card">
       <div className="room-card-top">
@@ -67,11 +75,26 @@ function WaitingRoomCard({ room }: { room: RoomSummary }) {
           <span className="pd-meta">Jugadores</span>
         </div>
       </div>
+      <div className="pd-divider" />
+      <button
+        type="button"
+        className="pd-btn pd-btn--primary pd-btn--block"
+        disabled={!joinable}
+        onClick={() => onJoin(room.code)}
+      >
+        {full ? 'SALA LLENA' : 'UNIRSE A LA SALA'}
+      </button>
     </div>
   )
 }
 
-function RoomList({ rooms }: { rooms: RoomSummary[] }) {
+function RoomList({
+  rooms,
+  onJoin,
+}: {
+  rooms: RoomSummary[]
+  onJoin: (code: string) => Promise<void>
+}) {
   if (rooms.length === 0) {
     return (
       <div className="pd-card room-card room-card--empty">
@@ -82,7 +105,7 @@ function RoomList({ rooms }: { rooms: RoomSummary[] }) {
   return (
     <div className="room-grid">
       {rooms.map((room) => (
-        <WaitingRoomCard key={room.id} room={room} />
+        <WaitingRoomCard key={room.id} room={room} onJoin={onJoin} />
       ))}
     </div>
   )
@@ -346,7 +369,7 @@ function LobbyScreen() {
 
           {wsError && <ErrorBanner message={wsError} onRetry={() => {}} />}
           {error && <ErrorBanner message={error} onRetry={loadRooms} />}
-          <RoomList rooms={rooms} />
+          <RoomList rooms={rooms} onJoin={handleJoin} />
         </main>
 
         <aside className="pd-card lobby-side">

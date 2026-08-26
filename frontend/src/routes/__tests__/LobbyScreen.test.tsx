@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
@@ -132,6 +132,41 @@ describe('LobbyScreen', () => {
     )
     expect(joinCall).toBeDefined()
     expect(JSON.parse(joinCall![1].body)).toEqual({ nickname: '' })
+  })
+
+  it('joins a listed waiting room via its UNIRSE button', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, waitingRooms))
+      .mockResolvedValueOnce(
+        jsonResponse(201, { id: 'r1', code: 'AB12', max_players: 2, status: 'waiting' }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLobby()
+    await screen.findByText('#AB12')
+
+    const card = screen.getByText('#AB12').closest('.room-card') as HTMLElement
+    await user.click(within(card).getByRole('button', { name: /unirse a la sala/i }))
+
+    expect(await screen.findByText('TEAM-SELECT-LANDED')).toBeInTheDocument()
+    const joinCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes('/api/rooms/AB12/join'),
+    )
+    expect(joinCall).toBeDefined()
+  })
+
+  it('disables the join button on a full listed room', async () => {
+    const fullRooms = [
+      { id: 'r1', code: 'AB12', max_players: 2, status: 'waiting', player_count: 2 },
+    ]
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, fullRooms))
+
+    renderLobby()
+    await screen.findByText('#AB12')
+
+    expect(screen.getByRole('button', { name: /sala llena/i })).toBeDisabled()
   })
 
   it('renders an error banner with retry when the room list fails to load', async () => {
