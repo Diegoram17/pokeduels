@@ -267,12 +267,15 @@ function LobbyScreen() {
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [error, setError] = useState<string | null>(null)
   const [wsError, setWsError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
   const loadRooms = useCallback(() => {
     setError(null)
+    setIsLoading(true)
     listRooms()
       .then(setRooms)
       .catch((err: unknown) => setError(describeApiError(err)))
+      .finally(() => setIsLoading(false))
   }, [])
 
   useEffect(() => {
@@ -369,7 +372,15 @@ function LobbyScreen() {
 
           {wsError && <ErrorBanner message={wsError} onRetry={() => {}} />}
           {error && <ErrorBanner message={error} onRetry={loadRooms} />}
-          <RoomList rooms={rooms} onJoin={handleJoin} />
+          {isLoading && !error ? (
+            <div className="room-grid" role="status" aria-label="Cargando salas" aria-busy="true">
+              {Array.from({ length: 5 }, (_, index) => (
+                <div key={index} className="pd-sprite-slot" aria-hidden="true" />
+              ))}
+            </div>
+          ) : !error ? (
+            <RoomList rooms={rooms} onJoin={handleJoin} />
+          ) : null}
         </main>
 
         <aside className="pd-card lobby-side">

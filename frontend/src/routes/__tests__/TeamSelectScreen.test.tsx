@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { act, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
@@ -197,5 +197,83 @@ describe('TeamSelectScreen', () => {
     await user.click(screen.getByRole('button', { name: /reintentar/i }))
     await waitFor(() => expect(screen.getByText('Pikachu')).toBeInTheDocument())
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('TeamSelectScreen — catalog loading state', () => {
+  it('renders skeleton placeholders in both grids while the catalog request is pending', async () => {
+    let resolveFetch!: (value: Response) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve
+          }),
+      ),
+    )
+
+    renderTeamSelect()
+
+    const starterStatus = screen.getByRole('status', { name: /cargando iniciales/i })
+    const catalogStatus = screen.getByRole('status', { name: /cargando catálogo/i })
+    expect(starterStatus.querySelectorAll('.pd-sprite-slot').length).toBeGreaterThanOrEqual(3)
+    expect(catalogStatus.querySelectorAll('.pd-sprite-slot').length).toBeGreaterThanOrEqual(8)
+    expect(screen.queryByText('Pikachu')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveFetch(jsonResponse(200, pokemonFixture))
+    })
+    expect(await screen.findByText('Pikachu')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('clears the skeleton and renders both grids once the catalog resolves', async () => {
+    renderTeamSelect()
+
+    expect(await screen.findByText('Pikachu')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(within(catalogSection()).getByText('Snorlax')).toBeInTheDocument()
+  })
+
+  it('clears the skeleton and renders the error banner when the catalog fetch fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(500, { message: 'boom' })))
+
+    renderTeamSelect()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/servidor/i)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    // No skeleton and no catalog content render together with the banner.
+    expect(screen.queryByText('Pikachu')).not.toBeInTheDocument()
+  })
+
+  it('reappears the skeleton on manual retry before the retried request settles', async () => {
+    const user = userEvent.setup()
+    let resolveRetry!: (value: Response) => void
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(500, { message: 'boom' }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveRetry = resolve
+          }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderTeamSelect()
+    await screen.findByRole('alert')
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }))
+
+    expect(screen.getByRole('status', { name: /cargando iniciales/i })).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: /cargando catálogo/i })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveRetry(jsonResponse(200, pokemonFixture))
+    })
+    expect(await screen.findByText('Pikachu')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })

@@ -357,12 +357,15 @@ function TeamSelectScreen() {
   const [state] = useMockState()
   const [catalog, setCatalog] = useState<Pokemon[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
   const loadCatalog = useCallback(() => {
     setError(null)
+    setIsLoading(true)
     fetchCatalog()
       .then(setCatalog)
       .catch((err: unknown) => setError(describeApiError(err)))
+      .finally(() => setIsLoading(false))
   }, [])
 
   useEffect(() => {
@@ -417,8 +420,25 @@ function TeamSelectScreen() {
 
           {error && <ErrorBanner message={error} onRetry={loadCatalog} />}
 
-          <StarterPicker catalog={catalog} />
-          <RosterPicker catalog={catalog} />
+          {isLoading && !error ? (
+            <>
+              <div className="starter-grid" role="status" aria-label="Cargando iniciales" aria-busy="true">
+                {Array.from({ length: 3 }, (_, index) => (
+                  <div key={index} className="pd-sprite-slot" aria-hidden="true" />
+                ))}
+              </div>
+              <div className="catalog-grid" role="status" aria-label="Cargando catálogo" aria-busy="true">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <div key={index} className="pd-sprite-slot" aria-hidden="true" />
+                ))}
+              </div>
+            </>
+          ) : !error ? (
+            <>
+              <StarterPicker catalog={catalog} />
+              <RosterPicker catalog={catalog} />
+            </>
+          ) : null}
         </div>
 
         <TeamPanel catalog={catalog} />

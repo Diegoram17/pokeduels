@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
@@ -211,5 +211,84 @@ describe('LobbyScreen', () => {
 
     expect(await screen.findByText('#AB12')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('LobbyScreen — room list loading state', () => {
+  it('renders skeleton placeholders while the room list request is pending and keeps lobby controls interactive', async () => {
+    let resolveFetch!: (value: Response) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve
+          }),
+      ),
+    )
+
+    renderLobby()
+
+    const status = screen.getByRole('status', { name: /cargando salas/i })
+    expect(status).toHaveAttribute('aria-busy', 'true')
+    expect(status.querySelectorAll('.pd-sprite-slot').length).toBeGreaterThanOrEqual(4)
+    // Only the room-list area is gated; create/join controls stay interactive.
+    expect(screen.getByRole('button', { name: /duelo individual/i })).toBeEnabled()
+    expect(screen.getByPlaceholderText(/código de sala/i)).toBeEnabled()
+
+    await act(async () => {
+      resolveFetch(jsonResponse(200, waitingRooms))
+    })
+    expect(await screen.findByText('#AB12')).toBeInTheDocument()
+    expect(screen.queryByRole('status', { name: /cargando salas/i })).not.toBeInTheDocument()
+  })
+
+  it('clears the skeleton and renders the room list once the request resolves', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, waitingRooms))
+
+    renderLobby()
+
+    expect(await screen.findByText('#AB12')).toBeInTheDocument()
+    expect(screen.queryByRole('status', { name: /cargando salas/i })).not.toBeInTheDocument()
+  })
+
+  it('clears the skeleton and renders the error banner when the request fails', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(500, { message: 'boom' }))
+
+    renderLobby()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/servidor/i)
+    expect(screen.queryByRole('status', { name: /cargando salas/i })).not.toBeInTheDocument()
+    // No skeleton and no room grid (nor its empty state) render with the banner.
+    expect(screen.queryByText('No hay salas esperando entrenadores')).not.toBeInTheDocument()
+  })
+
+  it('reappears the skeleton on manual retry before the retried request settles', async () => {
+    const user = userEvent.setup()
+    let resolveRetry!: (value: Response) => void
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(500, { message: 'boom' }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveRetry = resolve
+          }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLobby()
+    await screen.findByRole('alert')
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }))
+
+    expect(screen.getByRole('status', { name: /cargando salas/i })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveRetry(jsonResponse(200, waitingRooms))
+    })
+    expect(await screen.findByText('#AB12')).toBeInTheDocument()
+    expect(screen.queryByRole('status', { name: /cargando salas/i })).not.toBeInTheDocument()
   })
 })
