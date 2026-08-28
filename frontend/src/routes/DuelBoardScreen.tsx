@@ -342,6 +342,38 @@ function SurrenderConfirmModal({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  // Hand-rolled focus trap for a 2-button dialog (design UX4): initial focus
+  // on the safe action, Tab/Shift+Tab toggle between the two buttons (the
+  // transition is identical in both directions with exactly 2 focusables),
+  // Escape acts as cancel, and the scoped keydown listener is removed on
+  // unmount so it cannot fire for keys pressed afterward.
+  const cancelBtnRef = useRef<HTMLButtonElement>(null)
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    cancelBtnRef.current?.focus()
+
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onCancel()
+        return
+      }
+      if (event.key === 'Tab') {
+        event.preventDefault()
+        const next =
+          document.activeElement === confirmBtnRef.current
+            ? cancelBtnRef.current
+            : confirmBtnRef.current
+        next?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeydown)
+    return () => {
+      document.removeEventListener('keydown', handleKeydown)
+    }
+  }, [onCancel])
+
   return (
     <div
       style={{
@@ -370,13 +402,13 @@ function SurrenderConfirmModal({
           Si te rindes, el duelo termina y pierdes el combate.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button type="button" className="pd-btn pd-btn--danger" onClick={onConfirm}>
+          <button type="button" ref={confirmBtnRef} className="pd-btn pd-btn--danger" onClick={onConfirm}>
             <span className="material-symbols-outlined" aria-hidden="true">
               logout
             </span>
             RENDIRSE
           </button>
-          <button type="button" className="pd-btn pd-btn--secondary" onClick={onCancel}>
+          <button type="button" ref={cancelBtnRef} className="pd-btn pd-btn--secondary" onClick={onCancel}>
             SEGUIR LUCHANDO
           </button>
         </div>

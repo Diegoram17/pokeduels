@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { act, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useSearchParams } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
@@ -14,7 +15,7 @@ import { STORAGE_KEY, serializeMockState } from '../../state/store'
 import { setCachedCatalog } from '../../lib/catalog'
 import type { Pokemon } from '../../lib/catalog'
 import type { DuelPokemonState, DuelState, MockState } from '../../state/schema'
-import DuelBoardScreen from '../DuelBoardScreen'
+import DuelBoardScreen, { SurrenderConfirmModal } from '../DuelBoardScreen'
 import { io } from 'socket.io-client'
 import type { Socket } from 'socket.io-client'
 
@@ -268,6 +269,58 @@ describe('DuelBoardScreen — surrender', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     // The server owns the finish — no local phase flip.
     expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
+  })
+})
+
+describe('DuelBoardScreen — surrender modal focus trap', () => {
+  it('places initial focus on the safe SEGUIR LUCHANDO button on mount', () => {
+    render(<SurrenderConfirmModal onConfirm={vi.fn()} onCancel={vi.fn()} />)
+    const dialog = screen.getByRole('dialog', { name: /rendirse/i })
+    expect(within(dialog).getByRole('button', { name: /seguir luchando/i })).toHaveFocus()
+  })
+
+  it('cycles Tab and Shift+Tab only between the two buttons, never reaching elements behind the modal', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <button type="button">BEHIND-MODAL-ELEMENT</button>
+        <SurrenderConfirmModal onConfirm={vi.fn()} onCancel={vi.fn()} />
+      </>,
+    )
+    const confirm = screen.getByRole('button', { name: /rendirse/i })
+    const cancel = screen.getByRole('button', { name: /seguir luchando/i })
+    const behind = screen.getByRole('button', { name: /behind-modal-element/i })
+
+    expect(cancel).toHaveFocus()
+    await user.tab()
+    expect(confirm).toHaveFocus()
+    await user.tab()
+    expect(cancel).toHaveFocus()
+    await user.tab()
+    expect(confirm).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(cancel).toHaveFocus()
+    expect(behind).not.toHaveFocus()
+  })
+
+  it('calls onCancel exactly once when Escape is pressed', async () => {
+    const user = userEvent.setup()
+    const onCancel = vi.fn()
+    render(<SurrenderConfirmModal onConfirm={vi.fn()} onCancel={onCancel} />)
+    await user.keyboard('{Escape}')
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('detaches the keydown listener on unmount so later keys do not fire', async () => {
+    const user = userEvent.setup()
+    const onCancel = vi.fn()
+    const { unmount } = render(<SurrenderConfirmModal onConfirm={vi.fn()} onCancel={onCancel} />)
+    unmount()
+    // Focus a live document element so the press actually bubbles to document —
+    // a leaked listener would still fire and fail this test.
+    document.body.focus()
+    await user.keyboard('{Escape}')
+    expect(onCancel).not.toHaveBeenCalled()
   })
 })
 
