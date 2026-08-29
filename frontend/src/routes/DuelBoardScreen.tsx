@@ -55,7 +55,6 @@ function HudCard({ pokemon, side }: { pokemon: DuelPokemonState; side: 'human' |
       }}
     >
       <div
-        className="hud-sprite"
         style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}
       >
         <img
@@ -71,31 +70,26 @@ function HudCard({ pokemon, side }: { pokemon: DuelPokemonState; side: 'human' |
         />
       </div>
       <div
-        className="hud-top"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}
       >
         <span
-          className="hud-name"
           style={{ font: '800 18px/1.2 var(--pd-font-display)', color: '#fff', textTransform: 'uppercase' }}
         >
           {pokemon.name.toUpperCase()}
         </span>
         <span
-          className="hud-lvl"
           style={{ font: '700 14px/1 var(--pd-font-mono)', color: isRival ? 'var(--pd-danger)' : 'var(--pd-yellow)' }}
         >
           Lv.50
         </span>
       </div>
       <div
-        className="hud-badges"
         style={{ display: 'flex', gap: 4, marginBottom: 8, ...(isRival ? { justifyContent: 'flex-end' } : {}) }}
       >
         <span className={`pd-badge pd-badge--${pokemon.type}`}>{pokemon.type.toUpperCase()}</span>
       </div>
       <HpBar hp={pokemon.currentHp} />
       <div
-        className="hud-hp-foot"
         style={{ display: 'flex', justifyContent: isRival ? 'flex-start' : 'flex-end', marginTop: 4 }}
       >
         <span className="pd-stat" style={{ fontSize: 13 }}>
@@ -135,7 +129,6 @@ function TimerRing({
 
   return (
     <div
-      className="duel-timer"
       data-testid="timer-ring"
       style={{
         position: 'absolute',
@@ -177,7 +170,7 @@ function MoveButton({
   return (
     <button
       type="button"
-      className="pd-card move-btn"
+      className="pd-card"
       disabled={disabled}
       onClick={() => onAttack(index)}
       style={{
@@ -192,10 +185,10 @@ function MoveButton({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <span className="move-name" style={{ font: '800 16px/1.2 var(--pd-font-display)', color: '#fff', textTransform: 'uppercase' }}>
+        <span style={{ font: '800 16px/1.2 var(--pd-font-display)', color: '#fff', textTransform: 'uppercase' }}>
           {slot.name}
         </span>
-        <span className="move-dmg" style={{ font: '700 13px/1 var(--pd-font-mono)', color: basic ? 'var(--pd-text-meta)' : 'var(--pd-blue-light)' }}>
+        <span style={{ font: '700 13px/1 var(--pd-font-mono)', color: basic ? 'var(--pd-text-meta)' : 'var(--pd-blue-light)' }}>
           {moveDamageLabel(index)}
         </span>
       </div>
@@ -227,7 +220,7 @@ function MoveButtonGrid({
     return active.ppMove3
   }
   return (
-    <div className="move-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+    <div className="move-grid">
       {MOVE_SLOTS.map((_, i) => (
         <MoveButton
           key={i}
@@ -258,7 +251,7 @@ function LeadPicker({
   }, [])
 
   return (
-    <div className="lead-picker" data-testid="lead-picker">
+    <div data-testid="lead-picker">
       <h2 className="pd-title" style={{ margin: 0 }}>
         ELIGE TU PRIMER POKÉMON
       </h2>
@@ -501,23 +494,9 @@ function DuelBoardScreen() {
 
   return (
     <div className="pd-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <header
-        className="duel-topbar"
-        style={{
-          flex: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 32px',
-          height: 64,
-          background: 'rgba(5,8,20,.82)',
-          backdropFilter: 'blur(14px)',
-          borderBottom: '1px solid var(--pd-border-blue-dim)',
-          zIndex: 30,
-        }}
-      >
+      <header className="pd-topbar">
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="pd-topbar__end">
           <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
           <SurrenderButton onClick={() => setShowSurrender(true)} />
         </div>
@@ -533,7 +512,7 @@ function DuelBoardScreen() {
         />
       )}
 
-      <div className="duel-arena" style={{ position: 'relative', height: '55vh', flex: 'none', overflow: 'hidden' }}>
+      <div className="duel-arena">
         <div className="pd-scrim-v" />
         <div className="pd-scrim-d" />
 
@@ -545,16 +524,6 @@ function DuelBoardScreen() {
 
         <div
           className="duel-hud"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            padding: 24,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            pointerEvents: 'none',
-            zIndex: 10,
-          }}
         >
           {humanActive && <HudCard pokemon={humanActive} side="human" />}
           {rivalActive && <HudCard pokemon={rivalActive} side="rival" />}
@@ -563,18 +532,6 @@ function DuelBoardScreen() {
 
       <div
         className="duel-command"
-        style={{
-          flex: 1,
-          background: 'rgba(5,8,20,.9)',
-          borderTop: '1px solid var(--pd-border-blue-dim)',
-          padding: '24px 32px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-          position: 'relative',
-          zIndex: 20,
-          overflowY: 'auto',
-        }}
       >
         {duel.opponentDisconnected && (
           <p role="status" className="pd-label" style={{ color: 'var(--pd-danger)', margin: 0 }}>

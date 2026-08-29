@@ -32,7 +32,6 @@ function PodiumRow({ entry }: { entry: RankingEntry }) {
       }}
     >
       <span
-        className="rank-chip"
         style={{
           position: 'absolute',
           top: -14,
@@ -49,7 +48,6 @@ function PodiumRow({ entry }: { entry: RankingEntry }) {
 
       {isFirst && (
         <span
-          className="champion-badge"
           style={{
             padding: '4px 8px',
             borderRadius: 'var(--pd-radius-sm)',
@@ -76,7 +74,6 @@ function PodiumRow({ entry }: { entry: RankingEntry }) {
       </span>
 
       <h3
-        className="podium-name"
         style={{
           margin: 0,
           font: '800 18px/1.2 var(--pd-font-display)',
@@ -89,7 +86,6 @@ function PodiumRow({ entry }: { entry: RankingEntry }) {
       </h3>
 
       <div
-        className="podium-base"
         style={{
           width: '100%',
           marginTop: 16,
@@ -111,15 +107,6 @@ function Podium({ entries }: { entries: RankingEntry[] }) {
     <div
       className="podium"
       data-testid="podium"
-      style={{
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
-        gap: 16,
-        width: '100%',
-        maxWidth: 1100,
-        flexWrap: 'wrap',
-      }}
     >
       {entries.map((entry) => (
         <PodiumRow key={entry.rank} entry={entry} />
@@ -156,42 +143,15 @@ function RankingScreen() {
       <div className="pd-glow-blob" style={{ left: '50%', top: '10%', width: 800, height: 600, transform: 'translateX(-50%)' }} />
       <div className="pd-grid-perspective" />
 
-      <header
-        className="rank-topbar"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 30,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 32px',
-          height: 64,
-          background: 'rgba(5,8,20,.82)',
-          backdropFilter: 'blur(14px)',
-          borderBottom: '1px solid var(--pd-border-blue-dim)',
-        }}
-      >
+      <header className="pd-topbar">
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
         <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
       </header>
 
-      <main
-        className="rank-main"
-        style={{
-          position: 'relative',
-          minHeight: 'calc(100vh - 64px)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '48px 32px',
-          overflow: 'hidden',
-        }}
-      >
+      <main className="rank-main">
         <div style={{ textAlign: 'center', zIndex: 20, marginBottom: 24, maxWidth: 560 }}>
           <span
-            className="rank-eyebrow pd-label"
+            className="pd-label"
             style={{
               display: 'inline-block',
               padding: '4px 12px',

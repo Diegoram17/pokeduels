@@ -147,7 +147,7 @@ describe('LobbyScreen', () => {
     renderLobby()
     await screen.findByText('#AB12')
 
-    const card = screen.getByText('#AB12').closest('.room-card') as HTMLElement
+    const card = screen.getByText('#AB12').closest('[data-testid="room-card"]') as HTMLElement
     await user.click(within(card).getByRole('button', { name: /unirse a la sala/i }))
 
     expect(await screen.findByText('TEAM-SELECT-LANDED')).toBeInTheDocument()

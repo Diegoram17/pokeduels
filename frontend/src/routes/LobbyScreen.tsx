@@ -38,21 +38,21 @@ function WaitingRoomCard({
   const full = room.player_count >= room.max_players
   const joinable = room.status === 'waiting' && !full
   return (
-    <div className="pd-card room-card">
-      <div className="room-card-top">
+    <div className="pd-card" data-testid="room-card">
+      <div>
         <div>
-          <span className="room-code" data-testid="room-code">
+          <span data-testid="room-code">
             #{room.code}
           </span>
-          <span className="pd-meta room-mode-label">{roomModeLabel(mode)}</span>
+          <span className="pd-meta">{roomModeLabel(mode)}</span>
         </div>
         <span className={`pd-badge pd-badge--${room.status}`}>
           {roomStatusLabel(room.status)}
         </span>
       </div>
       <div className="pd-divider" />
-      <div className="room-card-foot">
-        <div className="avatar-stack">
+      <div>
+        <div>
           {Array.from({ length: room.player_count }).map((_, i) => (
             <span className="pd-avatar" key={i}>
               <span className="material-symbols-outlined" aria-hidden="true">
@@ -61,7 +61,7 @@ function WaitingRoomCard({
             </span>
           ))}
           {Array.from({ length: Math.max(0, room.max_players - room.player_count) }).map((_, i) => (
-            <span className="avatar-slot-empty" key={i}>
+            <span key={i}>
               <span className="material-symbols-outlined" aria-hidden="true">
                 add
               </span>
@@ -97,13 +97,13 @@ function RoomList({
 }) {
   if (rooms.length === 0) {
     return (
-      <div className="pd-card room-card room-card--empty">
+      <div className="pd-card">
         <span className="pd-meta">No hay salas esperando entrenadores</span>
       </div>
     )
   }
   return (
-    <div className="room-grid">
+    <div>
       {rooms.map((room) => (
         <WaitingRoomCard key={room.id} room={room} onJoin={onJoin} />
       ))}
@@ -127,17 +127,15 @@ function CreateRoomForm({ onCreated }: { onCreated: (maxPlayers: 2 | 4) => Promi
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pd-space-3)' }}>
       <button
         type="button"
-        className="create-room-btn"
         style={{ border: '1px solid var(--pd-border-blue-soft)' }}
         onClick={() => create(2)}
         disabled={pending}
       >
         <span>
-          <span className="create-room-btn__title">Duelo Individual (1v1)</span>
-          <span className="create-room-btn__desc">Duelo directo a 1 ronda</span>
+          <span>Duelo Individual (1v1)</span>
+          <span>Duelo directo a 1 ronda</span>
         </span>
         <span
-          className="create-room-btn__icon"
           style={{ background: 'rgba(90,170,255,.14)', border: '1px solid var(--pd-border-blue-soft)', color: 'var(--pd-blue-light)' }}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
@@ -147,17 +145,15 @@ function CreateRoomForm({ onCreated }: { onCreated: (maxPlayers: 2 | 4) => Promi
       </button>
       <button
         type="button"
-        className="create-room-btn"
         style={{ border: '1px solid rgba(238,21,21,.35)' }}
         onClick={() => create(4)}
         disabled={pending}
       >
         <span>
-          <span className="create-room-btn__title">Torneo de Entrenadores (4 Jugadores)</span>
-          <span className="create-room-btn__desc">Torneo eliminatorio con semifinal y final</span>
+          <span>Torneo de Entrenadores (4 Jugadores)</span>
+          <span>Torneo eliminatorio con semifinal y final</span>
         </span>
         <span
-          className="create-room-btn__icon"
           style={{ background: 'rgba(238,21,21,.14)', border: '1px solid rgba(238,21,21,.35)', color: 'var(--pd-danger)' }}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
@@ -186,7 +182,7 @@ function JoinByCodeForm({ onJoin }: { onJoin: (code: string) => Promise<void> })
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="quick-join-wrap">
+      <div>
         <input
           type="text"
           className="pd-input"
@@ -194,7 +190,7 @@ function JoinByCodeForm({ onJoin }: { onJoin: (code: string) => Promise<void> })
           value={code}
           onChange={(event) => setCode(event.target.value)}
         />
-        <button type="submit" className="quick-join-submit" aria-label="Unirse" disabled={pending}>
+        <button type="submit" aria-label="Unirse" disabled={pending}>
           <span className="material-symbols-outlined" aria-hidden="true">
             arrow_forward
           </span>
@@ -340,11 +336,11 @@ function LobbyScreen() {
   }
 
   return (
-    <div className="pd-page lobby-shell">
+    <div className="pd-page">
       <div className="pd-glow-blob" style={{ right: '-8%', top: '10%', width: 600, height: 600 }} />
       <div className="pd-grid-perspective" />
 
-      <header className="lobby-topbar">
+      <header>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--pd-space-2)' }}>
           <span className="pd-pokeball" />
           <span className="pd-logo pd-logo--sm">Poke-duels</span>
@@ -357,9 +353,9 @@ function LobbyScreen() {
         </div>
       </header>
 
-      <div className="lobby-body">
-        <main className="lobby-main">
-          <div className="lobby-header-row">
+      <div>
+        <main>
+          <div>
             <div>
               <h1 className="pd-title pd-title--lg" style={{ textTransform: 'uppercase' }}>
                 SALAS DE BATALLA
@@ -373,7 +369,7 @@ function LobbyScreen() {
           {wsError && <ErrorBanner message={wsError} onRetry={() => {}} />}
           {error && <ErrorBanner message={error} onRetry={loadRooms} />}
           {isLoading && !error ? (
-            <div className="room-grid" role="status" aria-label="Cargando salas" aria-busy="true">
+            <div role="status" aria-label="Cargando salas" aria-busy="true">
               {Array.from({ length: 5 }, (_, index) => (
                 <div key={index} className="pd-sprite-slot" aria-hidden="true" />
               ))}
@@ -383,9 +379,9 @@ function LobbyScreen() {
           ) : null}
         </main>
 
-        <aside className="pd-card lobby-side">
+        <aside className="pd-card">
           <div>
-            <h3 className="pd-title side-heading">
+            <h3 className="pd-title">
               <span className="material-symbols-outlined" aria-hidden="true" style={{ color: 'var(--pd-yellow)' }}>
                 bolt
               </span>

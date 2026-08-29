@@ -67,39 +67,38 @@ function StarterPicker({
 
   return (
     <section aria-label="ELEGIR INICIAL">
-      <h3 className="pd-title section-heading">
+      <h3 className="pd-title">
         <span className="material-symbols-outlined" aria-hidden="true" style={{ color: 'var(--pd-yellow)' }}>
           star
         </span>
         ELEGIR INICIAL
       </h3>
-      <div className="starter-grid">
+      <div>
         {starters.map((pokemon) => {
           const selected = current === pokemon.id
-          const blocked = current !== null && current !== pokemon.id
           return (
             <button
               type="button"
               key={pokemon.id}
-              className={`pd-card pd-card--flush mon-card${selected ? ' mon-card--selected' : ''}${blocked ? ' mon-card--taken' : ''}`}
+              className="pd-card pd-card--flush"
               onClick={() => handlePick(pokemon.id)}
               aria-pressed={selected}
               disabled={catalog === null}
             >
-              <div className="art">
+              <div>
                 <img src={pokemon.sprite_url} alt="" />
-                <span className={`pd-badge pd-badge--${pokemon.type} type-tag`}>
+                <span className={`pd-badge pd-badge--${pokemon.type}`}>
                   {typeLabel(pokemon.type)}
                 </span>
                 {selected && (
-                  <span className="check">
+                  <span>
                     <span className="material-symbols-outlined pd-icon--fill" aria-hidden="true">
                       check
                     </span>
                   </span>
                 )}
               </div>
-              <div className="meta">
+              <div>
                 <h4>{pokemon.name}</h4>
                 <span>TIPO: {typeLabel(pokemon.type)}</span>
               </div>
@@ -176,31 +175,31 @@ function PokemonCatalogGrid({
   onToggle: (id: number) => void
 }) {
   return (
-    <div className="catalog-grid">
+    <div>
       {pokemon.map((mon) => {
         const selected = selectedIds.includes(mon.id)
         return (
           <button
             type="button"
             key={mon.id}
-            className={`pd-card pd-card--flush catalog-card${selected ? ' mon-card--selected' : ''}`}
+            className="pd-card pd-card--flush"
             onClick={() => onToggle(mon.id)}
             aria-pressed={selected}
           >
-            <div className="art">
+            <div>
               <img src={mon.sprite_url} alt="" />
-              <span className={`pd-badge pd-badge--${mon.type} type-tag`}>
+              <span className={`pd-badge pd-badge--${mon.type}`}>
                 {typeLabel(mon.type)}
               </span>
               {selected && (
-                <span className="check">
+                <span>
                   <span className="material-symbols-outlined pd-icon--fill" aria-hidden="true">
                     check
                   </span>
                 </span>
               )}
             </div>
-            <div className="meta">
+            <div>
               <h4>{mon.name}</h4>
             </div>
           </button>
@@ -231,7 +230,7 @@ function RosterPicker({
 
   return (
     <section aria-label="CATÁLOGO">
-      <h3 className="pd-title section-heading">
+      <h3 className="pd-title">
         <span className="material-symbols-outlined" aria-hidden="true" style={{ color: 'var(--pd-blue-light)' }}>
           view_cozy
         </span>
@@ -272,8 +271,8 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
   const rosterNames = rosterIds.map((id) => pokemonById(catalog, id)?.name ?? String(id))
 
   return (
-    <aside className="pd-card draft-side" aria-label="TU EQUIPO">
-      <div className="draft-side-head">
+    <aside className="pd-card" aria-label="TU EQUIPO">
+      <div>
         <h3 className="pd-title" style={{ letterSpacing: '-.01em' }}>
           TU EQUIPO
         </h3>
@@ -282,8 +281,8 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
         </p>
       </div>
 
-      <div className="squad-list pd-scroll">
-        <div className={`squad-slot${!starterId ? ' squad-slot--empty' : ''}`}>
+      <div className="pd-scroll">
+        <div>
           {starterName ? (
             <>
               <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 44, color: 'var(--pd-yellow)' }}>
@@ -298,7 +297,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
             </>
           ) : (
             <>
-              <span className="num">★</span>
+              <span>★</span>
               <span className="pd-label">ELIGE TU INICIAL</span>
             </>
           )}
@@ -307,7 +306,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
         {Array.from({ length: 5 }).map((_, index) => {
           const picked = rosterNames[index]
           return (
-            <div key={index} className={`squad-slot${!picked ? ' squad-slot--empty' : ''}`}>
+            <div key={index}>
               {picked ? (
                 <div>
                   <h4>{picked}</h4>
@@ -317,7 +316,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
                 </div>
               ) : (
                 <>
-                  <span className="num">{index + 1}</span>
+                  <span>{index + 1}</span>
                   <span className="pd-label">SLOT DISPONIBLE</span>
                 </>
               )}
@@ -326,7 +325,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
         })}
       </div>
 
-      <div className="draft-side-foot">
+      <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--pd-space-2)' }}>
           <span className="pd-stat pd-stat--xl" style={{ color: 'var(--pd-yellow)', display: 'block' }}>
             {total}/6
@@ -388,25 +387,25 @@ function TeamSelectScreen() {
   }, [])
 
   return (
-    <div className="pd-page draft-shell">
+    <div className="pd-page">
       <div className="pd-glow-blob" style={{ left: '-10%', bottom: '-10%', width: 520, height: 520 }} />
 
-      <header className="draft-topbar">
-        <div className="draft-profile">
-          <span className="avatar-sm">
+      <header>
+        <div>
+          <span>
             <span className="material-symbols-outlined" aria-label="Perfil de Jugador" style={{ fontSize: 16 }}>
               person
             </span>
           </span>
           <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
         </div>
-        <span className="pd-logo pd-logo--sm center-logo">Poke-duels</span>
+        <span className="pd-logo pd-logo--sm">Poke-duels</span>
       </header>
 
-      <div className="draft-main">
-        <div className="draft-left pd-scroll">
+      <div>
+        <div className="pd-scroll">
           <section className="pd-card">
-            <div className="draft-progress-head">
+            <div>
               <div>
                 <h2 className="pd-title pd-title--lg" style={{ textTransform: 'uppercase' }}>
                   ELIGE TU EQUIPO
@@ -422,12 +421,12 @@ function TeamSelectScreen() {
 
           {isLoading && !error ? (
             <>
-              <div className="starter-grid" role="status" aria-label="Cargando iniciales" aria-busy="true">
+              <div role="status" aria-label="Cargando iniciales" aria-busy="true">
                 {Array.from({ length: 3 }, (_, index) => (
                   <div key={index} className="pd-sprite-slot" aria-hidden="true" />
                 ))}
               </div>
-              <div className="catalog-grid" role="status" aria-label="Cargando catálogo" aria-busy="true">
+              <div role="status" aria-label="Cargando catálogo" aria-busy="true">
                 {Array.from({ length: 8 }, (_, index) => (
                   <div key={index} className="pd-sprite-slot" aria-hidden="true" />
                 ))}

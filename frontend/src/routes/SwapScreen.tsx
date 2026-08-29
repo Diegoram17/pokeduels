@@ -34,7 +34,6 @@ function BenchPokemonCard({
     >
       {isActive && (
         <span
-          className="flag"
           style={{
             position: 'absolute',
             top: 10,
@@ -52,7 +51,7 @@ function BenchPokemonCard({
           EN CAMPO
         </span>
       )}
-      <div className="art" style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(6,12,30,.5)' }}>
+      <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(6,12,30,.5)' }}>
         {pokemon.spriteUrl ? (
           <img
             src={pokemon.spriteUrl}
@@ -65,7 +64,7 @@ function BenchPokemonCard({
           </span>
         )}
       </div>
-      <div className="body" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <h2 style={{ margin: 0, font: '800 19px/1.2 var(--pd-font-display)', color: '#fff', textTransform: 'uppercase' }}>
             {pokemon.name.toUpperCase()}
@@ -120,9 +119,8 @@ function BenchList({
 }) {
   return (
     <div
-      className="roster-grid"
+      className="bench-grid"
       data-testid="bench-list"
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}
     >
       {pokemon.map((p) => (
         <BenchPokemonCard
@@ -227,24 +225,9 @@ function SwapScreen() {
     <div className="pd-page">
       <div className="pd-glow-blob" style={{ left: '50%', top: '-10%', width: 700, height: 700, transform: 'translateX(-50%)' }} />
 
-      <header
-        className="switch-topbar"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 32px',
-          height: 64,
-          background: 'rgba(5,8,20,.82)',
-          backdropFilter: 'blur(14px)',
-          borderBottom: '1px solid var(--pd-border-blue-dim)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 20,
-        }}
-      >
+      <header className="pd-topbar">
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="pd-topbar__end">
           <span className="pd-meta">{player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
           {mode === 'voluntary' && <CancelSwapButton onClick={() => navigate('/duel')} />}
         </div>

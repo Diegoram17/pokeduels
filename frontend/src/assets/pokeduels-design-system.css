@@ -222,6 +222,7 @@ img{max-width:100%;display:block}
 
 .pd-btn--block{display:flex;width:100%}
 .pd-btn--lg{padding:17px 20px;font-size:19px}
+.pd-btn--sm{padding:9px 14px;font-size:11px}
 
 /* ============ Card / panel ============ */
 .pd-card{
@@ -275,6 +276,9 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .pd-badge--waiting{background:rgba(255,203,5,.14);color:var(--pd-yellow);border:1px solid rgba(255,203,5,.4)}
 .pd-badge--live{background:rgba(238,21,21,.16);color:var(--pd-danger);border:1px solid rgba(238,21,21,.4)}
 .pd-badge--full{background:rgba(120,180,255,.12);color:var(--pd-text-meta);border:1px solid var(--pd-border-blue)}
+.pd-badge--in_progress{background:rgba(238,21,21,.16);color:var(--pd-danger);border:1px solid rgba(238,21,21,.4)}
+.pd-badge--finished{background:rgba(120,180,255,.12);color:var(--pd-text-meta);border:1px solid var(--pd-border-blue)}
+.pd-badge--aborted{background:rgba(255,143,135,.12);color:var(--pd-danger);border:1px solid rgba(255,143,135,.4)}
 
 /* Type badges: classic Pokémon type palette, reused everywhere for consistency */
 .pd-badge--normal{background:var(--pd-type-normal);color:#1a1a10}
@@ -328,3 +332,28 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .pd-pokeball{width:22px;height:22px;border-radius:50%;flex:none;
   background:linear-gradient(var(--pd-red) 0 44%, #ffffff 44% 56%, #f2f4fb 56% 100%);
   border:2px solid #0b1024;box-shadow:0 0 14px rgba(238,21,21,.7)}
+
+/* ============ Layout / structural containers ============
+   Verbatim static hoists from screen inline styles (DuelBoard/Ranking/Swap/WaitRoom).
+   Class-invisible refactor: each rule is byte-identical to the inline object it
+   replaces, so computed style never changes. */
+.pd-topbar{
+  flex:none;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:64px;
+  background:rgba(5,8,20,.82);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--pd-border-blue-dim);
+  position:sticky;top:0;z-index:30;
+}
+.pd-topbar__end{display:flex;align-items:center;gap:16px}
+.duel-arena{position:relative;height:55vh;flex:none;overflow:hidden}
+.duel-hud{position:absolute;inset:0;padding:24px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:10}
+.duel-command{flex:1;background:rgba(5,8,20,.9);border-top:1px solid var(--pd-border-blue-dim);padding:24px 32px;display:flex;flex-direction:column;gap:16px;position:relative;z-index:20;overflow-y:auto}
+.move-grid{flex:1;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.rank-main{position:relative;min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 32px;overflow:hidden}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:16px;width:100%;max-width:1100px;flex-wrap:wrap}
+.bench-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.bracket-wrap{display:flex;flex-direction:column;gap:8px}
+
+/* ============ Modal overlay (shared by the A4 Modal component) ============ */
+.pd-modal-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(4,7,18,.78);backdrop-filter:blur(4px);padding:24px}

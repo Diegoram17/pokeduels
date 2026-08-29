@@ -54,14 +54,14 @@ function PlayerRow({
   }
 
   return (
-    <div className={`player-row${ready ? ' player-row--ready' : ' player-row--pending'}`}>
-      <span className="avatar-fallback">
+    <div>
+      <span>
         <span className="material-symbols-outlined" aria-hidden="true">
           {isBot ? 'smart_toy' : 'person'}
         </span>
       </span>
-      <div className="info">
-        <div className="name">{name}</div>
+      <div>
+        <div>{name}</div>
       </div>
       {isBot && roomCode && playerId ? (
         <button
@@ -109,7 +109,7 @@ function PlayerList({
   onBotRemoved?: () => void
 }) {
   return (
-    <div className="player-list" data-testid="player-list">
+    <div data-testid="player-list">
       {players.map((entry) => (
         <PlayerRow 
           key={entry.playerId || entry.name} 
@@ -142,8 +142,8 @@ function BracketMini({
   const nameOf = (id: string): string =>
     room.players.find((p) => p.playerId === id)?.nickname ?? id
   return (
-    <section className="pd-card bracket-section" aria-label="CUADRO / LLAVES">
-      <div className="bracket-head">
+    <section className="pd-card" aria-label="CUADRO / LLAVES">
+      <div>
         <h2 className="pd-title" style={{ color: 'var(--pd-blue-light)' }}>
           CUADRO / LLAVES
         </h2>
@@ -154,12 +154,12 @@ function BracketMini({
           RONDA DE 4
         </span>
       </div>
-      <div className="bracket-wrap" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="bracket-wrap">
         {SLOT_ORDER.map((slot) => {
           const pairing = bracket[slot]
           return (
-            <div key={slot} className="pd-card pd-card--tight bracket-slot">
-              <span className="pid" style={{ color: 'var(--pd-yellow)' }}>
+            <div key={slot} className="pd-card pd-card--tight">
+              <span style={{ color: 'var(--pd-yellow)' }}>
                 {slotLabel(slot)}
               </span>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -345,13 +345,13 @@ function WaitRoomScreen() {
   }
 
   return (
-    <div className="pd-page wait-shell">
+    <div className="pd-page">
       <div className="pd-glow-blob" style={{ right: '-6%', top: '20%', width: 520, height: 520 }} />
 
-      <header className="wait-topbar">
+      <header>
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
         <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
-        <span className="pd-meta wifi-status">
+        <span className="pd-meta">
           <span
             className="material-symbols-outlined pd-icon--fill"
             aria-hidden="true"
@@ -363,9 +363,9 @@ function WaitRoomScreen() {
         </span>
       </header>
 
-      <main className="wait-main">
-        <aside className="pd-card wait-side">
-          <div className="wait-side-head">
+      <main>
+        <aside className="pd-card">
+          <div>
             <h2 className="pd-title" style={{ color: 'var(--pd-blue-light)' }}>
               SALA DE ESPERA
             </h2>
