@@ -1,4 +1,4 @@
-import type { MoveIndex } from '../engine/damage'
+export type MoveIndex = 0 | 1 | 2 | 3
 
 /**
  * Wire boundary for move indices: the client model stays 0-based (engine

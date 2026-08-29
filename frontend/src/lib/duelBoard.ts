@@ -1,4 +1,4 @@
-import type { MoveIndex } from '../engine/damage'
+import type { MoveIndex } from './moveIndex'
 
 // Duel-board presentation constants: the four fixed-damage move slots shown on
 // the move grid, the per-turn countdown, and the basic attack used when the
@@ -18,7 +18,7 @@ export interface MoveSlot {
   damage: number
 }
 
-// Index-aligned with engine/damage.ts: {0:25, 1:20, 2:15, 3:10}.
+// Index-aligned move-damage values: {0:25, 1:20, 2:15, 3:10}.
 export const MOVE_SLOTS: MoveSlot[] = [
   { name: 'GOLPE FUERTE', damage: 25 },
   { name: 'ATAQUE VELOZ', damage: 20 },

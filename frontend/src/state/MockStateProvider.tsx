@@ -4,7 +4,7 @@ import { loadMockState, reduceMockState } from './store'
 import type { MockState, RoomPlayer, RoomStatus, TeamSelectionState } from './schema'
 import { disconnectSocket } from '../lib/socket'
 import { toWireMoveIndex } from '../lib/moveIndex'
-import type { MoveIndex } from '../engine/damage'
+import type { MoveIndex } from '../lib/moveIndex'
 import { useMockPersistence } from './hooks/useMockPersistence'
 import { useDuelSocket } from './hooks/useDuelSocket'
 

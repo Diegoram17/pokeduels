@@ -1,9 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { fromWireMoveIndex, toWireMoveIndex } from '../moveIndex'
+import type { MoveIndex } from '../moveIndex'
 import { BASIC_ATTACK_INDEX } from '../duelBoard'
+import { existsSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const CLIENT_INDICES = [0, 1, 2, 3] as const
 const WIRE_INDICES = [1, 2, 3, 4] as const
+
+// A6 (relocation): the wire-boundary module owns the client MoveIndex type and
+// the vestigial engine/damage.ts must be gone so no stale import path resolves.
+const engineDamagePath = resolve(dirname(fileURLToPath(import.meta.url)), '../../engine/damage.ts')
 
 describe('toWireMoveIndex', () => {
   it('maps every 0-based client move to its 1-based wire form', () => {
@@ -44,5 +52,16 @@ describe('wire-index round-trip', () => {
     for (const n of WIRE_INDICES) {
       expect(toWireMoveIndex(fromWireMoveIndex(n))).toBe(n)
     }
+  })
+})
+
+describe('MoveIndex type ownership (A6)', () => {
+  it('exports the client MoveIndex type from lib/moveIndex', () => {
+    const _m: MoveIndex = 0
+    expect(_m).toBe(0)
+  })
+
+  it('no longer resolves the vestigial engine/damage module', () => {
+    expect(existsSync(engineDamagePath)).toBe(false)
   })
 })

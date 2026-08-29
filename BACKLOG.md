@@ -7,9 +7,9 @@
 > descrito en `TECH-DESIGN.md` — no repite el motor ni las pantallas ya construidos.
 >
 > Nota: existió una carpeta `poke-duel-engine/` (motor de combate copiado de otro proyecto) que
-> resultó estar rota y sin usar en ningún lado del repo (`package.json` con JSON inválido,
-> `duel.js` sin las funciones que su propio test suite esperaba) — se eliminó del repo. La única
-> implementación real y vigente del motor es `frontend/src/engine/`.
+> quedó rota y sin uso en ningún lado del repo — se eliminó en la Fase 5 (BACKLOG #16, F9). La
+> única implementación real y vigente del motor corre server-side en `backend/engine/`; el vestigial
+> `frontend/src/engine/` también se eliminó en esa fase (A6 — `MoveIndex` vive en `frontend/src/lib/moveIndex.ts`).
 
 | # | Item | Alcance | Depende de | Contexto extra requerido | Estado |
 |---|---|---|---|---|---|

@@ -33,8 +33,6 @@ de GitHub, CI/CD, Dockerfile, `vercel.json`/`render.yaml`, ni conexión real a V
 - **Migraciones:** `node-pg-migrate`, 3 archivos en `backend/migrations/`, scripts `migrate:up`/
   `migrate:down` ya probados (incluye el fix `f4437be` — revierte la cadena completa en
   `migrate:down`).
-- `poke-duel-engine/` (paquete legacy roto) sigue en el repo pero confirmado sin uso real en
-  ningún lado — no participa del build. Limpieza pendiente, no bloquea deploy.
 
 ### Artifact
 
