@@ -109,6 +109,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.clearAllMocks()
   disconnectSocket()
+  document.documentElement.removeAttribute('lang')
 })
 
 describe('App — room:aborted global recovery banner (F3)', () => {
@@ -134,6 +135,19 @@ describe('App — room:aborted global recovery banner (F3)', () => {
     // The recovery banner is gone — state.roomAborted was acknowledged.
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'VOLVER AL LOBBY' })).not.toBeInTheDocument()
+  })
+
+  it('preserves the document locale during client-side navigation', async () => {
+    const user = userEvent.setup()
+    document.documentElement.setAttribute('lang', 'es')
+    renderApp()
+
+    expect(document.documentElement).toHaveAttribute('lang', 'es')
+
+    await user.click(screen.getByRole('button', { name: 'VOLVER AL LOBBY' }))
+
+    expect(await screen.findByText('SALAS DE BATALLA')).toBeInTheDocument()
+    expect(document.documentElement).toHaveAttribute('lang', 'es')
   })
 
   it('does not render the banner when no abort is recorded', () => {
