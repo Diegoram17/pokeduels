@@ -59,6 +59,13 @@ afterEach(() => {
 })
 
 describe('LoginScreen', () => {
+  it('exposes exactly one main landmark with id="main-content" (UX7)', () => {
+    renderLogin()
+    const mains = screen.getAllByRole('main')
+    expect(mains).toHaveLength(1)
+    expect(mains[0]).toHaveAttribute('id', 'main-content')
+  })
+
   it('renders the arena background as a static image', () => {
     renderLogin()
     const img = screen.getByRole('img', { name: /fondo de la arena/i })

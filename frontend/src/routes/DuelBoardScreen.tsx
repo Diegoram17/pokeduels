@@ -390,7 +390,7 @@ function DuelBoardScreen() {
         />
       )}
 
-      <div className="duel-arena">
+      <main id="main-content" className="duel-arena">
         <div className="pd-scrim-v" />
         <div className="pd-scrim-d" />
 
@@ -406,7 +406,7 @@ function DuelBoardScreen() {
           {humanActive && <HudCard pokemon={humanActive} side="human" />}
           {rivalActive && <HudCard pokemon={rivalActive} side="rival" />}
         </div>
-      </div>
+      </main>
 
       <div
         className="duel-command"

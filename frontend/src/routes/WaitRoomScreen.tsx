@@ -365,7 +365,7 @@ function WaitRoomScreen() {
         </span>
       </header>
 
-      <main>
+      <main id="main-content">
         <aside className="pd-card">
           <div>
             <h2 className="pd-title" style={{ color: 'var(--pd-blue-light)' }}>

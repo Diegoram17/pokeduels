@@ -150,7 +150,7 @@ describe('App — room:aborted global recovery banner (F3)', () => {
     expect(document.documentElement).toHaveAttribute('lang', 'es')
   })
 
-  it('does not render the banner when no abort is recorded', () => {
+it('does not render the banner when no abort is recorded', () => {
     const clean = abortedMidDuelState()
     clean.roomAborted = null
     localStorage.setItem(STORAGE_KEY, serializeMockState(clean))
@@ -163,5 +163,18 @@ describe('App — room:aborted global recovery banner (F3)', () => {
     )
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByTestId('hud-human')).toBeInTheDocument()
+  })
+})
+
+describe('App — skip link (UX7)', () => {
+  it('focuses the skip link on the first Tab press and points it at the main content region', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.tab()
+
+    const skipLink = screen.getByRole('link', { name: /saltar al contenido/i })
+    expect(skipLink).toHaveFocus()
+    expect(skipLink).toHaveAttribute('href', '#main-content')
   })
 })

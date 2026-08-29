@@ -114,6 +114,7 @@ function LoginScreen() {
       <div className="pd-grid-perspective" />
 
       <main
+        id="main-content"
         style={{
           position: 'relative',
           zIndex: 5,

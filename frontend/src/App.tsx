@@ -34,6 +34,10 @@ function App() {
 
   return (
     <>
+      {/* UX7: keyboard users jump past the topbar/banner straight to the main content. */}
+      <a className="pd-skip-link" href="#main-content">
+        Saltar al contenido
+      </a>
       {recovery && (
         <div
           style={{

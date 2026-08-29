@@ -404,7 +404,7 @@ function TeamSelectScreen() {
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
       </header>
 
-      <div>
+      <main id="main-content">
         <div className="pd-scroll">
           <section className="pd-card">
             <div>
@@ -443,7 +443,7 @@ function TeamSelectScreen() {
         </div>
 
         <TeamPanel catalog={catalog} />
-      </div>
+      </main>
     </div>
   )
 }

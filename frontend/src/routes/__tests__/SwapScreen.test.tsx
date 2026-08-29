@@ -195,6 +195,13 @@ function renderSwapFromState(state: MockState, initialPath: string) {
 }
 
 describe('SwapScreen — forced mode', () => {
+  it('exposes exactly one main landmark with id="main-content" (UX7)', () => {
+    renderSwapFromState(buildForcedSwapState(), '/swap?mode=forced')
+    const mains = screen.getAllByRole('main')
+    expect(mains).toHaveLength(1)
+    expect(mains[0]).toHaveAttribute('id', 'main-content')
+  })
+
   it('does not offer a cancel control when opened after a KO', () => {
     renderSwapFromState(buildForcedSwapState(), '/swap?mode=forced')
 

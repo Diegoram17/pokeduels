@@ -113,6 +113,32 @@ a:hover{color:#fff;text-decoration:underline}
 img{max-width:100%;display:block}
 :focus-visible{outline:2px solid var(--pd-yellow);outline-offset:2px}
 
+/* UX7: skip link — visually hidden until focused; on focus it appears top-left
+   over everything so keyboard users can jump straight to #main-content. */
+.pd-skip-link{
+  position:absolute;
+  left:-9999px;
+  top:auto;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+}
+.pd-skip-link:focus,
+.pd-skip-link:focus-visible{
+  left:8px;
+  top:8px;
+  z-index:1000;
+  width:auto;
+  height:auto;
+  padding:var(--pd-space-1) var(--pd-space-2);
+  background:var(--pd-bg-card);
+  color:var(--pd-text-title);
+  border:2px solid var(--pd-yellow);
+  border-radius:var(--pd-radius-sm);
+  text-decoration:none;
+  font-weight:600;
+}
+
 /* ============ Keyframes (verbatim from screen 1) ============ */
 @keyframes pd-pulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
 @keyframes pd-spin{to{transform:rotate(360deg)}}
@@ -123,8 +149,12 @@ img{max-width:100%;display:block}
 @keyframes pd-blink{0%,100%{opacity:1}50%{opacity:.25}}
 
 @media (prefers-reduced-motion: reduce){
-  .pd-glow-blob,.pd-grid-perspective,.pd-logo,.pd-btn--primary::after,
-  .pd-card--float,.pd-blink,.pd-flicker,.pd-spin{animation:none !important}
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
 }
 
 /* ============ Page background + scrim (arena backdrop) ============ */

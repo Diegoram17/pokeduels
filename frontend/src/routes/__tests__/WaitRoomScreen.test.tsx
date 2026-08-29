@@ -73,6 +73,13 @@ function seedRoom(maxPlayers: 2 | 4, players: { playerId: string; nickname: stri
 }
 
 describe('WaitRoomScreen', () => {
+  it('exposes exactly one main landmark with id="main-content" (UX7)', () => {
+    renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
+    const mains = screen.getAllByRole('main')
+    expect(mains).toHaveLength(1)
+    expect(mains[0]).toHaveAttribute('id', 'main-content')
+  })
+
   it('shows the player list with real players for a 1v1 room', () => {
     renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
 

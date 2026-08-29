@@ -220,7 +220,7 @@ function SwapScreen() {
         {mode === 'voluntary' && <CancelSwapButton onClick={() => navigate('/duel')} />}
       </ScreenTopbar>
 
-      <main style={{ position: 'relative', zIndex: 2, padding: 32, maxWidth: 1200, margin: '0 auto' }}>
+      <main id="main-content" style={{ position: 'relative', zIndex: 2, padding: 32, maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <h1
             className="pd-title pd-title--lg"

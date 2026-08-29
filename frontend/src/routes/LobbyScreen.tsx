@@ -189,6 +189,7 @@ function JoinByCodeForm({ onJoin }: { onJoin: (code: string) => Promise<void> })
           type="text"
           className="pd-input"
           placeholder="Código de Sala..."
+          aria-label="Código de sala"
           value={code}
           onChange={(event) => setCode(event.target.value)}
         />
@@ -239,6 +240,7 @@ function ChangeNicknameControl() {
         type="text"
         className="pd-input"
         placeholder="Nuevo apodo"
+        aria-label="Nuevo apodo"
         value={value}
         autoFocus
         onChange={(event) => {
@@ -354,7 +356,7 @@ function LobbyScreen() {
       </header>
 
       <div>
-        <main>
+        <main id="main-content">
           <div>
             <div>
               <h1 className="pd-title pd-title--lg" style={{ textTransform: 'uppercase' }}>

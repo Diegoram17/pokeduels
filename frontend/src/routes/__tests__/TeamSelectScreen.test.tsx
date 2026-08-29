@@ -84,6 +84,13 @@ afterEach(() => {
 })
 
 describe('TeamSelectScreen', () => {
+  it('exposes exactly one main landmark with id="main-content" (UX7)', () => {
+    renderTeamSelect()
+    const mains = screen.getAllByRole('main')
+    expect(mains).toHaveLength(1)
+    expect(mains[0]).toHaveAttribute('id', 'main-content')
+  })
+
   it('fetches the catalog from GET /api/pokemons and renders starters and roster', async () => {
     renderTeamSelect()
     expect(await screen.findByText('Pikachu')).toBeInTheDocument()

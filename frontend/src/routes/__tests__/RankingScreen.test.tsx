@@ -150,6 +150,13 @@ const FINAL_RANKING = [
 ]
 
 describe('RankingScreen — authoritative ranking', () => {
+  it('exposes exactly one main landmark with id="main-content" (UX7)', () => {
+    renderRanking(makeRankingState())
+    const mains = screen.getAllByRole('main')
+    expect(mains).toHaveLength(1)
+    expect(mains[0]).toHaveAttribute('id', 'main-content')
+  })
+
   it('renders the podium from state.finalRanking verbatim', () => {
     renderRanking(makeRankingState({ finalRanking: FINAL_RANKING }))
 

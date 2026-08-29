@@ -147,7 +147,7 @@ function RankingScreen() {
 
       <ScreenTopbar nickname={state.player.nickname} />
 
-      <main className="rank-main">
+      <main id="main-content" className="rank-main">
         <div style={{ textAlign: 'center', zIndex: 20, marginBottom: 24, maxWidth: 560 }}>
           <span
             className="pd-label"

@@ -185,6 +185,13 @@ afterEach(() => {
 })
 
 describe('DuelBoardScreen — HUD', () => {
+  it('exposes exactly one main landmark with id="main-content" (UX7)', () => {
+    renderBoardFromState(buildLiveState())
+    const mains = screen.getAllByRole('main')
+    expect(mains).toHaveLength(1)
+    expect(mains[0]).toHaveAttribute('id', 'main-content')
+  })
+
   it('renders the player and rival HUDs with active pokemon names and full HP', () => {
     renderBoardFromState(buildLiveState())
     const humanHud = screen.getByTestId('hud-human')

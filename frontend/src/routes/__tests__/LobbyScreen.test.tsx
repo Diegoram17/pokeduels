@@ -52,6 +52,27 @@ afterEach(() => {
 })
 
 describe('LobbyScreen', () => {
+  it('exposes exactly one main landmark with id="main-content" (UX7)', () => {
+    renderLobby()
+    const mains = screen.getAllByRole('main')
+    expect(mains).toHaveLength(1)
+    expect(mains[0]).toHaveAttribute('id', 'main-content')
+  })
+
+  it('gives the join-by-code input an accessible label (UX8)', () => {
+    renderLobby()
+    expect(screen.getByLabelText('Código de sala')).toBeInTheDocument()
+  })
+
+  it('gives the change-nickname input an accessible label (UX9)', async () => {
+    const user = userEvent.setup()
+    renderLobby()
+
+    await user.click(screen.getByRole('button', { name: 'CAMBIAR APODO' }))
+
+    expect(screen.getByLabelText('Nuevo apodo')).toBeInTheDocument()
+  })
+
   it('lists the waiting rooms from GET /api/rooms with their derived mode label', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, waitingRooms))
 
