@@ -390,69 +390,71 @@ function DuelBoardScreen() {
         />
       )}
 
-      <main id="main-content" className="duel-arena">
-        <div className="pd-scrim-v" />
-        <div className="pd-scrim-d" />
+      <main id="main-content" className="duel-main">
+        <div className="duel-arena">
+          <div className="pd-scrim-v" />
+          <div className="pd-scrim-d" />
 
-        <TimerRing
-          seconds={TURN_TIMEOUT_SECONDS}
-          active={duel.phase === 'awaiting_actions' && canAct}
-          turnKey={duel.turnNumber}
-        />
+          <TimerRing
+            seconds={TURN_TIMEOUT_SECONDS}
+            active={duel.phase === 'awaiting_actions' && canAct}
+            turnKey={duel.turnNumber}
+          />
+
+          <div
+            className="duel-hud"
+          >
+            {humanActive && <HudCard pokemon={humanActive} side="human" />}
+            {rivalActive && <HudCard pokemon={rivalActive} side="rival" />}
+          </div>
+        </div>
 
         <div
-          className="duel-hud"
+          className="duel-command"
         >
-          {humanActive && <HudCard pokemon={humanActive} side="human" />}
-          {rivalActive && <HudCard pokemon={rivalActive} side="rival" />}
+          {duel.opponentDisconnected && (
+            <p role="status" className="pd-label" style={{ color: 'var(--pd-danger)', margin: 0 }}>
+              TU RIVAL SE DESCONECTÓ
+            </p>
+          )}
+          {duel.lastRejection && (
+            <p role="status" className="pd-label" style={{ color: 'var(--pd-yellow)', margin: 0 }}>
+              MOVIMIENTO RECHAZADO — {duel.lastRejection.reason}
+            </p>
+          )}
+          {duel.phase === 'lead_selection' ? (
+            <LeadPicker
+              roster={state.duelPokemonState.filter(
+                (p) => p.ownerId === Number(state.player.playerId),
+              )}
+              onPick={(pokemonId) => actions.selectLead(pokemonId)}
+            />
+          ) : showPostDuelChoice ? (
+            <PostDuelChoice
+              waiting={waitingForFinal}
+              onWait={() => setWaitingForFinal(true)}
+              onGoNow={() => navigate('/ranking')}
+            />
+          ) : (
+            <div style={{ display: 'flex', gap: 16, flex: 1, flexDirection: 'column' }}>
+              <MoveButtonGrid disabled={!canAct} active={humanActive} onAttack={handleAttack} />
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="pd-btn pd-btn--secondary"
+                  disabled={!canAct}
+                  onClick={() => navigate('/swap?mode=voluntary')}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    swap_horiz
+                  </span>
+                  CAMBIAR POKÉMON
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
-
-      <div
-        className="duel-command"
-      >
-        {duel.opponentDisconnected && (
-          <p role="status" className="pd-label" style={{ color: 'var(--pd-danger)', margin: 0 }}>
-            TU RIVAL SE DESCONECTÓ
-          </p>
-        )}
-        {duel.lastRejection && (
-          <p role="status" className="pd-label" style={{ color: 'var(--pd-yellow)', margin: 0 }}>
-            MOVIMIENTO RECHAZADO — {duel.lastRejection.reason}
-          </p>
-        )}
-        {duel.phase === 'lead_selection' ? (
-          <LeadPicker
-            roster={state.duelPokemonState.filter(
-              (p) => p.ownerId === Number(state.player.playerId),
-            )}
-            onPick={(pokemonId) => actions.selectLead(pokemonId)}
-          />
-        ) : showPostDuelChoice ? (
-          <PostDuelChoice
-            waiting={waitingForFinal}
-            onWait={() => setWaitingForFinal(true)}
-            onGoNow={() => navigate('/ranking')}
-          />
-        ) : (
-          <div style={{ display: 'flex', gap: 16, flex: 1, flexDirection: 'column' }}>
-            <MoveButtonGrid disabled={!canAct} active={humanActive} onAttack={handleAttack} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                className="pd-btn pd-btn--secondary"
-                disabled={!canAct}
-                onClick={() => navigate('/swap?mode=voluntary')}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  swap_horiz
-                </span>
-                CAMBIAR POKÉMON
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   )
 }

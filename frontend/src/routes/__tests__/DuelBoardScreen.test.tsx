@@ -192,6 +192,14 @@ describe('DuelBoardScreen — HUD', () => {
     expect(mains[0]).toHaveAttribute('id', 'main-content')
   })
 
+  it('keeps the duel command controls inside the main landmark (UX7 a11y)', () => {
+    renderBoardFromState(buildLiveState())
+    const main = screen.getByRole('main')
+    // the skip-link jumps to #main-content, so the primary controls (move grid +
+    // switch) must live inside it, not only the HUD/arena.
+    expect(within(main).getByRole('button', { name: /cambiar pokémon/i })).toBeInTheDocument()
+  })
+
   it('renders the player and rival HUDs with active pokemon names and full HP', () => {
     renderBoardFromState(buildLiveState())
     const humanHud = screen.getByTestId('hud-human')

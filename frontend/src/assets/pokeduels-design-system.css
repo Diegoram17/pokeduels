@@ -376,6 +376,7 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
   position:sticky;top:0;z-index:30;
 }
 .pd-topbar__end{display:flex;align-items:center;gap:16px}
+.duel-main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .duel-arena{position:relative;height:55vh;flex:none;overflow:hidden}
 .duel-hud{position:absolute;inset:0;padding:24px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:10}
 .duel-command{flex:1;background:rgba(5,8,20,.9);border-top:1px solid var(--pd-border-blue-dim);padding:24px 32px;display:flex;flex-direction:column;gap:16px;position:relative;z-index:20;overflow-y:auto}
