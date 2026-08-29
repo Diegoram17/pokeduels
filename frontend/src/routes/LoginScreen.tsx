@@ -5,6 +5,7 @@ import { useMockState } from '../state/useMockState'
 import { validateNickname } from '../lib/validation'
 import { createSession, setSessionToken, describeApiError } from '../lib/api'
 import ErrorBanner from '../components/ErrorBanner'
+import GlowBlob from '../components/GlowBlob'
 import loginBg from '../assets/login-bg.jpg'
 
 /**
@@ -109,7 +110,7 @@ function LoginScreen() {
       <LoginBackground />
       <div className="pd-scrim-v" />
       <div className="pd-scrim-d" />
-      <div className="pd-glow-blob" style={{ right: '-8%', top: '16%', width: 700, height: 700 }} />
+      <GlowBlob style={{ right: '-8%', top: '16%', width: 700, height: 700 }} />
       <div className="pd-grid-perspective" />
 
       <main

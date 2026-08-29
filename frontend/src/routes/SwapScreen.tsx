@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import ScreenTopbar from '../components/ScreenTopbar'
+import HpBar from '../components/HpBar'
+import GlowBlob from '../components/GlowBlob'
 import type { DuelPokemonState, DuelState } from '../state/schema'
 import { MAX_HP } from '../lib/duelBoard'
 
@@ -79,19 +81,7 @@ function BenchPokemonCard({
               {pokemon.currentHp} / {MAX_HP}
             </span>
           </div>
-          <div
-            className="pd-hp-bar"
-            role="progressbar"
-            aria-label={`HP de ${pokemon.name}`}
-            aria-valuenow={pokemon.currentHp}
-            aria-valuemin={0}
-            aria-valuemax={MAX_HP}
-          >
-            <div
-              className={`pd-hp-fill ${pokemon.currentHp > 50 ? 'pd-hp-fill--high' : pokemon.currentHp > 20 ? 'pd-hp-fill--mid' : 'pd-hp-fill--low'}`}
-              style={{ width: `${Math.max(0, Math.min(100, pokemon.currentHp))}%` }}
-            />
-          </div>
+          <HpBar hp={pokemon.currentHp} ariaLabel={`HP de ${pokemon.name}`} />
         </div>
         <button
           type="button"
@@ -224,7 +214,7 @@ function SwapScreen() {
 
   return (
     <div className="pd-page">
-      <div className="pd-glow-blob" style={{ left: '50%', top: '-10%', width: 700, height: 700, transform: 'translateX(-50%)' }} />
+      <GlowBlob style={{ left: '50%', top: '-10%', width: 700, height: 700, transform: 'translateX(-50%)' }} />
 
       <ScreenTopbar nickname={player.nickname}>
         {mode === 'voluntary' && <CancelSwapButton onClick={() => navigate('/duel')} />}

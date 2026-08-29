@@ -2,6 +2,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useMockState } from '../state/useMockState'
 import NicknameBadge from '../components/NicknameBadge'
+import GlowBlob from '../components/GlowBlob'
 import type { DuelSlot, RoomState, TournamentSlot, TournamentState } from '../state/schema'
 import { deriveDuelSlot } from '../state/store'
 import { buildPlayerList, slotLabel } from '../lib/waitRoom'
@@ -347,7 +348,7 @@ function WaitRoomScreen() {
 
   return (
     <div className="pd-page">
-      <div className="pd-glow-blob" style={{ right: '-6%', top: '20%', width: 520, height: 520 }} />
+      <GlowBlob style={{ right: '-6%', top: '20%', width: 520, height: 520 }} />
 
       <header>
         <span className="pd-logo pd-logo--sm">Poke-duels</span>

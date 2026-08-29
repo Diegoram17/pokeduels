@@ -7,6 +7,7 @@ import { onSocketEvent } from '../lib/socket'
 import { isTeamComplete, toggleRoster, toggleStarter, ROSTER_SIZE } from '../lib/teamSelection'
 import ErrorBanner from '../components/ErrorBanner'
 import NicknameBadge from '../components/NicknameBadge'
+import GlowBlob from '../components/GlowBlob'
 
 /**
  * Screen 3: Team Select. Exclusive starter picker (deselect-first), a
@@ -389,7 +390,7 @@ function TeamSelectScreen() {
 
   return (
     <div className="pd-page">
-      <div className="pd-glow-blob" style={{ left: '-10%', bottom: '-10%', width: 520, height: 520 }} />
+      <GlowBlob style={{ left: '-10%', bottom: '-10%', width: 520, height: 520 }} />
 
       <header>
         <div>

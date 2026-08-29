@@ -1,6 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import ScreenTopbar from '../components/ScreenTopbar'
+import GlowBlob from '../components/GlowBlob'
 import { buildProvisionalRanking, type RankingEntry } from '../lib/ranking'
 
 /**
@@ -141,7 +142,7 @@ function RankingScreen() {
 
   return (
     <div className="pd-page">
-      <div className="pd-glow-blob" style={{ left: '50%', top: '10%', width: 800, height: 600, transform: 'translateX(-50%)' }} />
+      <GlowBlob style={{ left: '50%', top: '10%', width: 800, height: 600, transform: 'translateX(-50%)' }} />
       <div className="pd-grid-perspective" />
 
       <ScreenTopbar nickname={state.player.nickname} />

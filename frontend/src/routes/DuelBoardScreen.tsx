@@ -5,11 +5,11 @@ import type { DuelPokemonState } from '../state/schema'
 import type { MoveIndex } from '../engine/damage'
 import Modal from '../components/Modal'
 import ScreenTopbar from '../components/ScreenTopbar'
+import { HudCard } from '../components/PokemonCard'
 import { humanActivePokemon, rivalActivePokemon, computePostDuelRoute } from '../lib/duelFlow'
 import {
   BASIC_ATTACK_INDEX,
   LEAD_SELECTION_TIMEOUT_SECONDS,
-  MAX_HP,
   MOVE_SLOTS,
   TURN_TIMEOUT_SECONDS,
   isBasicAttack,
@@ -24,83 +24,6 @@ import {
  * 1v1 -> wait-room rematch, bracket+finalRanking -> ranking,
  * bracket+noFinalRanking -> wait/go-now choice.
  */
-
-function HpBar({ hp }: { hp: number }) {
-  const pct = Math.max(0, Math.min(100, (hp / MAX_HP) * 100))
-  const tone =
-    pct > 50 ? 'pd-hp-fill--high' : pct > 20 ? 'pd-hp-fill--mid' : 'pd-hp-fill--low'
-  return (
-    <div
-      className="pd-hp-bar"
-      role="progressbar"
-      aria-label="HP"
-      aria-valuenow={hp}
-      aria-valuemin={0}
-      aria-valuemax={MAX_HP}
-    >
-      <div className={`pd-hp-fill ${tone}`} style={{ width: `${pct}%` }} />
-    </div>
-  )
-}
-
-function HudCard({ pokemon, side }: { pokemon: DuelPokemonState; side: 'human' | 'rival' }) {
-  const isRival = side === 'rival'
-  return (
-    <div
-      className="pd-card"
-      data-testid={`hud-${side}`}
-      style={{
-        width: 280,
-        padding: 12,
-        pointerEvents: 'auto',
-        ...(isRival ? { borderRight: '4px solid var(--pd-red)' } : {}),
-      }}
-    >
-      <div
-        style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}
-      >
-        <img
-          src={isRival ? pokemon.spriteUrl : pokemon.backSpriteUrl}
-          alt={pokemon.name}
-          style={{
-            width: isRival ? 120 : 110,
-            height: isRival ? 120 : 110,
-            objectFit: 'contain',
-            imageRendering: 'pixelated',
-            filter: 'drop-shadow(0 10px 20px rgba(90,170,255,.35))',
-          }}
-        />
-      </div>
-      <div
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}
-      >
-        <span
-          style={{ font: '800 18px/1.2 var(--pd-font-display)', color: '#fff', textTransform: 'uppercase' }}
-        >
-          {pokemon.name.toUpperCase()}
-        </span>
-        <span
-          style={{ font: '700 14px/1 var(--pd-font-mono)', color: isRival ? 'var(--pd-danger)' : 'var(--pd-yellow)' }}
-        >
-          Lv.50
-        </span>
-      </div>
-      <div
-        style={{ display: 'flex', gap: 4, marginBottom: 8, ...(isRival ? { justifyContent: 'flex-end' } : {}) }}
-      >
-        <span className={`pd-badge pd-badge--${pokemon.type}`}>{pokemon.type.toUpperCase()}</span>
-      </div>
-      <HpBar hp={pokemon.currentHp} />
-      <div
-        style={{ display: 'flex', justifyContent: isRival ? 'flex-start' : 'flex-end', marginTop: 4 }}
-      >
-        <span className="pd-stat" style={{ fontSize: 13 }}>
-          {pokemon.currentHp}/{MAX_HP}
-        </span>
-      </div>
-    </div>
-  )
-}
 
 /**
  * Presentation-only countdown (#10): it ticks and resets per turn but NEVER
@@ -535,4 +458,4 @@ function DuelBoardScreen() {
 }
 
 export default DuelBoardScreen
-export { HudCard, HpBar, MoveButton, MoveButtonGrid, SurrenderButton, SurrenderConfirmModal, TimerRing }
+export { MoveButton, MoveButtonGrid, SurrenderButton, SurrenderConfirmModal, TimerRing }

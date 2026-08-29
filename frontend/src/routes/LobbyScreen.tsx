@@ -19,6 +19,7 @@ import { onSocketEvent } from '../lib/socket'
 import { validateNickname } from '../lib/validation'
 import ErrorBanner from '../components/ErrorBanner'
 import NicknameBadge from '../components/NicknameBadge'
+import GlowBlob from '../components/GlowBlob'
 
 /**
  * Screen 2: Lobby. Waiting rooms listed from GET /api/rooms, create room
@@ -338,7 +339,7 @@ function LobbyScreen() {
 
   return (
     <div className="pd-page">
-      <div className="pd-glow-blob" style={{ right: '-8%', top: '10%', width: 600, height: 600 }} />
+      <GlowBlob style={{ right: '-8%', top: '10%', width: 600, height: 600 }} />
       <div className="pd-grid-perspective" />
 
       <header>
