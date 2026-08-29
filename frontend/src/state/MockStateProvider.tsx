@@ -23,6 +23,7 @@ import { connectSocket, disconnectSocket } from '../lib/socket'
 import { setSessionToken } from '../lib/api'
 import { getCachedCatalog } from '../lib/catalog'
 import type { MoveIndex } from '../engine/damage'
+import { fromWireMoveIndex, toWireMoveIndex } from '../lib/moveIndex'
 
 export interface MockStateActions {
   setNickname(nickname: string): void
@@ -185,7 +186,7 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
     // duel:action_rejected — surface the rejection without touching the turn.
     socket.on('duel:action_rejected', (payload: unknown) => {
       const { moveIndex, reason } = payload as { moveIndex: number; reason: string }
-      send({ type: 'duelActionRejected', moveIndex: moveIndex - 1, reason })
+      send({ type: 'duelActionRejected', moveIndex: fromWireMoveIndex(moveIndex), reason })
     })
 
     // duel:switch_rejected — surface the rejection so the swap screen stays put
@@ -332,7 +333,7 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
         if (duelId == null) return
         socketRef.current?.emit('duel:select_action', {
           duelId: Number(duelId),
-          moveIndex: moveIndex + 1,
+          moveIndex: toWireMoveIndex(moveIndex),
         })
       },
       submitSwitch: (pokemonId) => {
