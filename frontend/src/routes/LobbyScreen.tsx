@@ -18,6 +18,7 @@ import {
 import { onSocketEvent } from '../lib/socket'
 import { validateNickname } from '../lib/validation'
 import ErrorBanner from '../components/ErrorBanner'
+import NicknameBadge from '../components/NicknameBadge'
 
 /**
  * Screen 2: Lobby. Waiting rooms listed from GET /api/rooms, create room
@@ -346,9 +347,7 @@ function LobbyScreen() {
           <span className="pd-logo pd-logo--sm">Poke-duels</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--pd-space-4)' }}>
-          <span className="pd-meta" data-testid="lobby-nickname">
-            {state.player.nickname.toUpperCase() || 'ENTRENADOR'}
-          </span>
+          <NicknameBadge nickname={state.player.nickname} data-testid="lobby-nickname" />
           <ChangeNicknameControl />
         </div>
       </header>

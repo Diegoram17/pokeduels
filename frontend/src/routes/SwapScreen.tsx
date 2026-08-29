@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
+import ScreenTopbar from '../components/ScreenTopbar'
 import type { DuelPokemonState, DuelState } from '../state/schema'
 import { MAX_HP } from '../lib/duelBoard'
 
@@ -225,13 +226,9 @@ function SwapScreen() {
     <div className="pd-page">
       <div className="pd-glow-blob" style={{ left: '50%', top: '-10%', width: 700, height: 700, transform: 'translateX(-50%)' }} />
 
-      <header className="pd-topbar">
-        <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        <div className="pd-topbar__end">
-          <span className="pd-meta">{player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
-          {mode === 'voluntary' && <CancelSwapButton onClick={() => navigate('/duel')} />}
-        </div>
-      </header>
+      <ScreenTopbar nickname={player.nickname}>
+        {mode === 'voluntary' && <CancelSwapButton onClick={() => navigate('/duel')} />}
+      </ScreenTopbar>
 
       <main style={{ position: 'relative', zIndex: 2, padding: 32, maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>

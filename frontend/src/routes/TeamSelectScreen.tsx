@@ -6,6 +6,7 @@ import { describeApiError } from '../lib/api'
 import { onSocketEvent } from '../lib/socket'
 import { isTeamComplete, toggleRoster, toggleStarter, ROSTER_SIZE } from '../lib/teamSelection'
 import ErrorBanner from '../components/ErrorBanner'
+import NicknameBadge from '../components/NicknameBadge'
 
 /**
  * Screen 3: Team Select. Exclusive starter picker (deselect-first), a
@@ -397,7 +398,7 @@ function TeamSelectScreen() {
               person
             </span>
           </span>
-          <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
+          <NicknameBadge nickname={state.player.nickname} />
         </div>
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
       </header>

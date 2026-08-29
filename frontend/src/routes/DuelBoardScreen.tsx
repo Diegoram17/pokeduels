@@ -3,6 +3,8 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
 import type { DuelPokemonState } from '../state/schema'
 import type { MoveIndex } from '../engine/damage'
+import Modal from '../components/Modal'
+import ScreenTopbar from '../components/ScreenTopbar'
 import { humanActivePokemon, rivalActivePokemon, computePostDuelRoute } from '../lib/duelFlow'
 import {
   BASIC_ATTACK_INDEX,
@@ -335,78 +337,35 @@ function SurrenderConfirmModal({
   onConfirm: () => void
   onCancel: () => void
 }) {
-  // Hand-rolled focus trap for a 2-button dialog (design UX4): initial focus
-  // on the safe action, Tab/Shift+Tab toggle between the two buttons (the
-  // transition is identical in both directions with exactly 2 focusables),
-  // Escape acts as cancel, and the scoped keydown listener is removed on
-  // unmount so it cannot fire for keys pressed afterward.
+  // Thin <Modal> consumer (design A4): the generic overlay + pd-card dialog
+  // shell + focus trap live in components/Modal. This screen-specific wrapper
+  // stays in-file so DuelBoardScreen.test.tsx keeps importing it from here
+  // (zero test edits). Initial focus lands on the safe action (SEGUIR
+  // LUCHANDO); Tab/Shift+Tab cycle between the two buttons and Escape acts as
+  // cancel.
   const cancelBtnRef = useRef<HTMLButtonElement>(null)
   const confirmBtnRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    cancelBtnRef.current?.focus()
-
-    function handleKeydown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onCancel()
-        return
-      }
-      if (event.key === 'Tab') {
-        event.preventDefault()
-        const next =
-          document.activeElement === confirmBtnRef.current
-            ? cancelBtnRef.current
-            : confirmBtnRef.current
-        next?.focus()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeydown)
-    return () => {
-      document.removeEventListener('keydown', handleKeydown)
-    }
-  }, [onCancel])
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 50,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(4,7,18,.78)',
-        backdropFilter: 'blur(4px)',
-        padding: 24,
-      }}
-    >
-      <div
-        className="pd-card"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Confirmar rendirse"
-        style={{ maxWidth: 420, width: '100%', textAlign: 'center', padding: 32 }}
-      >
-        <h2 className="pd-title" style={{ marginBottom: 8 }}>
-          ¿RENDIRSE?
-        </h2>
-        <p className="pd-body" style={{ marginBottom: 24 }}>
-          Si te rindes, el duelo termina y pierdes el combate.
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button type="button" ref={confirmBtnRef} className="pd-btn pd-btn--danger" onClick={onConfirm}>
-            <span className="material-symbols-outlined" aria-hidden="true">
-              logout
-            </span>
-            RENDIRSE
-          </button>
-          <button type="button" ref={cancelBtnRef} className="pd-btn pd-btn--secondary" onClick={onCancel}>
-            SEGUIR LUCHANDO
-          </button>
-        </div>
+    <Modal ariaLabel="Confirmar rendirse" onClose={onCancel} initialFocusRef={cancelBtnRef}>
+      <h2 className="pd-title" style={{ marginBottom: 8 }}>
+        ¿RENDIRSE?
+      </h2>
+      <p className="pd-body" style={{ marginBottom: 24 }}>
+        Si te rindes, el duelo termina y pierdes el combate.
+      </p>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+        <button type="button" ref={confirmBtnRef} className="pd-btn pd-btn--danger" onClick={onConfirm}>
+          <span className="material-symbols-outlined" aria-hidden="true">
+            logout
+          </span>
+          RENDIRSE
+        </button>
+        <button type="button" ref={cancelBtnRef} className="pd-btn pd-btn--secondary" onClick={onCancel}>
+          SEGUIR LUCHANDO
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -494,13 +453,9 @@ function DuelBoardScreen() {
 
   return (
     <div className="pd-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <header className="pd-topbar">
-        <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        <div className="pd-topbar__end">
-          <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
-          <SurrenderButton onClick={() => setShowSurrender(true)} />
-        </div>
-      </header>
+      <ScreenTopbar nickname={state.player.nickname}>
+        <SurrenderButton onClick={() => setShowSurrender(true)} />
+      </ScreenTopbar>
 
       {showSurrender && (
         <SurrenderConfirmModal

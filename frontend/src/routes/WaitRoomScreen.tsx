@@ -1,6 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useMockState } from '../state/useMockState'
+import NicknameBadge from '../components/NicknameBadge'
 import type { DuelSlot, RoomState, TournamentSlot, TournamentState } from '../state/schema'
 import { deriveDuelSlot } from '../state/store'
 import { buildPlayerList, slotLabel } from '../lib/waitRoom'
@@ -350,7 +351,7 @@ function WaitRoomScreen() {
 
       <header>
         <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
+        <NicknameBadge nickname={state.player.nickname} />
         <span className="pd-meta">
           <span
             className="material-symbols-outlined pd-icon--fill"

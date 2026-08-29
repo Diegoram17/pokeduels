@@ -1,5 +1,6 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMockState } from '../state/useMockState'
+import ScreenTopbar from '../components/ScreenTopbar'
 import { buildProvisionalRanking, type RankingEntry } from '../lib/ranking'
 
 /**
@@ -143,10 +144,7 @@ function RankingScreen() {
       <div className="pd-glow-blob" style={{ left: '50%', top: '10%', width: 800, height: 600, transform: 'translateX(-50%)' }} />
       <div className="pd-grid-perspective" />
 
-      <header className="pd-topbar">
-        <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        <span className="pd-meta">{state.player.nickname.toUpperCase() || 'ENTRENADOR'}</span>
-      </header>
+      <ScreenTopbar nickname={state.player.nickname} />
 
       <main className="rank-main">
         <div style={{ textAlign: 'center', zIndex: 20, marginBottom: 24, maxWidth: 560 }}>
