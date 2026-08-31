@@ -6,7 +6,7 @@ import { describeApiError } from '../lib/api'
 import { onSocketEvent } from '../lib/socket'
 import { isTeamComplete, toggleRoster, toggleStarter, ROSTER_SIZE } from '../lib/teamSelection'
 import ErrorBanner from '../components/ErrorBanner'
-import NicknameBadge from '../components/NicknameBadge'
+import ScreenTopbar from '../components/ScreenTopbar'
 import GlowBlob from '../components/GlowBlob'
 
 /**
@@ -392,17 +392,7 @@ function TeamSelectScreen() {
     <div className="pd-page">
       <GlowBlob style={{ left: '-10%', bottom: '-10%', width: 520, height: 520 }} />
 
-      <header>
-        <div>
-          <span>
-            <span className="material-symbols-outlined" aria-label="Perfil de Jugador" style={{ fontSize: 16 }}>
-              person
-            </span>
-          </span>
-          <NicknameBadge nickname={state.player.nickname} />
-        </div>
-        <span className="pd-logo pd-logo--sm">Poke-duels</span>
-      </header>
+      <ScreenTopbar nickname={state.player.nickname} />
 
       <main id="main-content">
         <div className="pd-scroll">

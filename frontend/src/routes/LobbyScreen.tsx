@@ -18,7 +18,7 @@ import {
 import { onSocketEvent } from '../lib/socket'
 import { validateNickname } from '../lib/validation'
 import ErrorBanner from '../components/ErrorBanner'
-import NicknameBadge from '../components/NicknameBadge'
+import ScreenTopbar from '../components/ScreenTopbar'
 import GlowBlob from '../components/GlowBlob'
 
 /**
@@ -344,16 +344,9 @@ function LobbyScreen() {
       <GlowBlob style={{ right: '-8%', top: '10%', width: 600, height: 600 }} />
       <div className="pd-grid-perspective" />
 
-      <header>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--pd-space-2)' }}>
-          <span className="pd-pokeball" />
-          <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--pd-space-4)' }}>
-          <NicknameBadge nickname={state.player.nickname} data-testid="lobby-nickname" />
-          <ChangeNicknameControl />
-        </div>
-      </header>
+      <ScreenTopbar nickname={state.player.nickname}>
+        <ChangeNicknameControl />
+      </ScreenTopbar>
 
       <div>
         <main id="main-content">

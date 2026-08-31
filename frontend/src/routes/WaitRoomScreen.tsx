@@ -1,7 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useMockState } from '../state/useMockState'
-import NicknameBadge from '../components/NicknameBadge'
+import ScreenTopbar from '../components/ScreenTopbar'
 import GlowBlob from '../components/GlowBlob'
 import type { DuelSlot, RoomState, TournamentSlot, TournamentState } from '../state/schema'
 import { deriveDuelSlot } from '../state/store'
@@ -350,9 +350,7 @@ function WaitRoomScreen() {
     <div className="pd-page">
       <GlowBlob style={{ right: '-6%', top: '20%', width: 520, height: 520 }} />
 
-      <header>
-        <span className="pd-logo pd-logo--sm">Poke-duels</span>
-        <NicknameBadge nickname={state.player.nickname} />
+      <ScreenTopbar nickname={state.player.nickname}>
         <span className="pd-meta">
           <span
             className="material-symbols-outlined pd-icon--fill"
@@ -363,7 +361,7 @@ function WaitRoomScreen() {
           </span>
           Conectado
         </span>
-      </header>
+      </ScreenTopbar>
 
       <main id="main-content">
         <aside className="pd-card">
