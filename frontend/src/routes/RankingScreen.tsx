@@ -17,89 +17,52 @@ function PodiumRow({ entry }: { entry: RankingEntry }) {
   const isFirst = entry.rank === 1
   return (
     <div
-      className="pd-card"
+      className={`podium-col${isFirst ? ' podium-col--first' : ''}`}
       data-testid="podium-row"
-      style={{
-        position: 'relative',
-        width: 260,
-        maxWidth: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        textAlign: 'center',
-        padding: '20px 16px 0',
-        ...(isFirst
-          ? { borderColor: 'var(--pd-yellow)', boxShadow: '0 0 20px rgba(255,203,5,.35), 0 26px 70px rgba(0,0,0,.72)' }
-          : {}),
-      }}
     >
-      <span
-        style={{
-          position: 'absolute',
-          top: -14,
-          padding: '4px 12px',
-          borderRadius: 'var(--pd-radius-sm)',
-          font: '700 16px/1 var(--pd-font-mono)',
-          ...(isFirst
-            ? { background: 'var(--pd-yellow)', color: '#1a1400' }
-            : { background: 'rgba(120,180,255,.14)', color: 'var(--pd-text-meta)', border: '1px solid var(--pd-border-blue)' }),
-        }}
-      >
-        #{entry.rank}
-      </span>
+      <div className="pd-card podium-card">
+        <span className={`rank-chip rank-chip--${isFirst ? 'first' : 'standard'}`}>
+          #{entry.rank}
+        </span>
 
-      {isFirst && (
         <span
+          className="pd-avatar podium-avatar"
           style={{
-            padding: '4px 8px',
-            borderRadius: 'var(--pd-radius-sm)',
-            marginBottom: 8,
-            background: 'rgba(255,203,5,.14)',
-            color: 'var(--pd-yellow)',
-            border: '1px solid rgba(255,203,5,.4)',
-            font: '700 11px/1 var(--pd-font-mono)',
-            letterSpacing: '.12em',
-            textTransform: 'uppercase',
+            width: isFirst ? 104 : 84,
+            height: isFirst ? 104 : 84,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            ...(isFirst ? { borderColor: 'var(--pd-yellow)' } : {}),
           }}
         >
-          CAMPEÓN
+          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 44, color: 'var(--pd-text-dim)' }}>
+            person
+          </span>
         </span>
-      )}
 
-      <span
-        className="pd-avatar"
-        style={{ width: isFirst ? 104 : 84, height: isFirst ? 104 : 84, margin: '12px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', ...(isFirst ? { borderColor: 'var(--pd-yellow)' } : {}) }}
-      >
-        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 44, color: 'var(--pd-text-dim)' }}>
-          person
-        </span>
-      </span>
+        {isFirst && <span className="champion-badge">CAMPEÓN</span>}
 
-      <h3
-        style={{
-          margin: 0,
-          font: '800 18px/1.2 var(--pd-font-display)',
-          color: '#fff',
-          textTransform: 'uppercase',
-          ...(isFirst ? { fontSize: 22, color: 'var(--pd-yellow)' } : {}),
-        }}
-      >
-        {entry.name.toUpperCase()}
-      </h3>
+        <h3
+          className="podium-name"
+          style={isFirst ? { fontSize: 22, color: 'var(--pd-yellow)' } : undefined}
+        >
+          {entry.name.toUpperCase()}
+        </h3>
 
-      <div
-        style={{
-          width: '100%',
-          marginTop: 16,
-          borderLeft: '1px solid var(--pd-border-blue-dim)',
-          borderRight: '1px solid var(--pd-border-blue-dim)',
-          borderTop: '1px solid var(--pd-border-blue-dim)',
-          height: isFirst ? 160 : 110,
-          ...(isFirst
-            ? { background: 'linear-gradient(180deg, rgba(255,203,5,.14), rgba(9,16,40,.4))', borderColor: 'rgba(255,203,5,.4)' }
-            : { background: 'linear-gradient(180deg, rgba(20,30,60,.6), rgba(9,16,40,.4))' }),
-        }}
-      />
+        <div className="stat-row">
+          <div className="stat-item">
+            <span>PUESTO</span>
+            <strong>#{entry.rank}</strong>
+          </div>
+          <div className="stat-item">
+            <span>TÍTULO</span>
+            <strong>{entry.champion ? 'CAMPEÓN' : 'FINALISTA'}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className={`podium-base podium-base--${Math.min(entry.rank, 3)}`} />
     </div>
   )
 }
@@ -148,23 +111,9 @@ function RankingScreen() {
       <ScreenTopbar nickname={state.player.nickname} />
 
       <main id="main-content" className="rank-main">
-        <div style={{ textAlign: 'center', zIndex: 20, marginBottom: 24, maxWidth: 560 }}>
-          <span
-            className="pd-label"
-            style={{
-              display: 'inline-block',
-              padding: '4px 12px',
-              borderRadius: 'var(--pd-radius-sm)',
-              background: 'rgba(255,203,5,.1)',
-              border: '1px solid rgba(255,203,5,.35)',
-              marginBottom: 12,
-            }}
-          >
-            TORNEO DE ENTRENADORES
-          </span>
-          <h2 className="pd-title pd-title--lg" style={{ marginTop: 4 }}>
-            HALL DE LA FAMA
-          </h2>
+        <div className="rank-intro">
+          <span className="rank-eyebrow pd-label">TORNEO DE ENTRENADORES</span>
+          <h2 className="pd-title pd-title--lg">HALL DE LA FAMA</h2>
           <p className="pd-body" style={{ marginTop: 8 }}>
             Presentamos a los mejores entrenadores de la temporada.
           </p>

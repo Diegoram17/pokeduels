@@ -383,9 +383,10 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .pd-topbar__logo{position:absolute;left:50%;transform:translateX(-50%);pointer-events:none}
 /* Fase 7 (PR6): the Phase-4 hoisted .duel-main/.duel-arena/.duel-hud/
    .duel-command/.move-grid rules were superseded by the verbatim ported
-   DuelBoard block at the bottom of this file (one source of truth). */
-.rank-main{position:relative;min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 32px;overflow:hidden}
-.podium{display:flex;align-items:flex-end;justify-content:center;gap:16px;width:100%;max-width:1100px;flex-wrap:wrap}
+   DuelBoard block at the bottom of this file (one source of truth).
+   Fase 7 (PR9): the Phase-4 hoisted .rank-main/.podium rules moved into the
+   verbatim ported Ranking block at the bottom of this file (one source of
+   truth). */
 .bench-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 /* Fase 7 (PR5): the Phase-4 hoisted stacked-list .bracket-wrap is gone —
    BracketMini was deleted. The name now belongs to the prototype's SVG
@@ -601,3 +602,44 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 @keyframes pd-lunge-rival{0%,100%{transform:translateX(50%)}30%{transform:translateX(0) translateY(-12px)}55%{transform:translateX(0)}}
 @keyframes pd-shake{0%,100%{transform:translateX(-50%)}15%{transform:translateX(calc(-50% - 12px))}30%{transform:translateX(calc(-50% + 10px))}45%{transform:translateX(calc(-50% - 8px))}60%{transform:translateX(calc(-50% + 5px))}75%{transform:translateX(calc(-50% - 3px))}}
 @keyframes pd-shake--rival{0%,100%{transform:translateX(50%)}15%{transform:translateX(calc(50% + 12px))}30%{transform:translateX(calc(50% - 10px))}45%{transform:translateX(calc(50% + 8px))}60%{transform:translateX(calc(50% - 5px))}75%{transform:translateX(calc(50% + 3px))}}
+
+/* ============ Screen: Ranking — ported from Prototipos/7 ============
+   Verbatim from Prototipos/7.Ranking_final.html <style> (minus .rank-topbar/
+   .rank-topbar-right, which styled the bare header deleted in PR1 — .pd-topbar
+   covers it; minus .particle + @keyframes float-up + their reduced-motion
+   rule — the ambient particle system stays intentionally absent, locked
+   decision). The Phase-4 hoisted .rank-main/.podium rules were removed above;
+   this block is their single source of truth. .rank-chip--first/.rank-chip--
+   standard, .stat-item inner text and .podium-col--first .podium-card are
+   React-side additions (the prototype carried those variants inline). */
+.rank-main{position:relative;min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:48px var(--pd-space-6);overflow:hidden}
+.rank-intro{text-align:center;z-index:20;margin-bottom:var(--pd-space-6);max-width:560px}
+.rank-eyebrow{display:inline-block;padding:var(--pd-space-1) var(--pd-space-3);border-radius:var(--pd-radius-sm);
+  background:rgba(255,203,5,.1);border:1px solid rgba(255,203,5,.35);margin-bottom:var(--pd-space-3)}
+.podium{position:relative;z-index:20;display:flex;align-items:flex-end;justify-content:center;gap:var(--pd-space-4);
+  width:100%;max-width:1000px;flex-wrap:wrap}
+.podium-col{display:flex;flex-direction:column;align-items:center;width:280px;max-width:100%}
+.podium-col--first{width:320px;transform:translateY(-24px)}
+.podium-card{width:100%;border-radius:var(--pd-radius-md) var(--pd-radius-md) 0 0;border-bottom:none;padding:var(--pd-space-4);display:flex;flex-direction:column;
+  align-items:center;text-align:center;position:relative}
+.podium-col--first .podium-card{border-color:var(--pd-yellow);box-shadow:0 0 20px rgba(255,203,5,.35),0 26px 70px rgba(0,0,0,.72)}
+.rank-chip{position:absolute;top:-14px;padding:var(--pd-space-1) var(--pd-space-3);border-radius:var(--pd-radius-sm);font:700 16px/1 var(--pd-font-mono)}
+.rank-chip--first{background:var(--pd-yellow);color:#1a1400}
+.rank-chip--standard{background:rgba(120,180,255,.14);color:var(--pd-text-meta);border:1px solid var(--pd-border-blue)}
+.podium-avatar{border-radius:50%;overflow:hidden;margin-bottom:var(--pd-space-3);margin-top:var(--pd-space-4)}
+.podium-avatar img{width:100%;height:100%;object-fit:cover}
+.podium-name{margin:0 0 var(--pd-space-1);font:800 18px/1.2 var(--pd-font-display);color:#fff;text-transform:uppercase}
+.podium-rank-label{font-family:var(--pd-font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--pd-space-3)}
+.stat-row{width:100%;display:flex;justify-content:space-between;padding:var(--pd-space-2) var(--pd-space-3);border-radius:var(--pd-radius-sm);
+  background:rgba(9,16,40,.5);border:1px solid var(--pd-border-blue-dim);margin-top:auto}
+.stat-item{display:flex;flex-direction:column;align-items:center;gap:2px}
+.stat-item span{font:400 10px/1 var(--pd-font-mono);letter-spacing:.1em;color:var(--pd-text-meta);text-transform:uppercase}
+.stat-item strong{font:700 13px/1 var(--pd-font-mono);color:#fff}
+.podium-base{width:100%;border-left:1px solid var(--pd-border-blue-dim);border-right:1px solid var(--pd-border-blue-dim);
+  border-top:1px solid var(--pd-border-blue-dim)}
+.podium-base--2,.podium-base--3{height:110px;background:linear-gradient(180deg, rgba(20,30,60,.6), rgba(9,16,40,.4))}
+.podium-base--1{height:160px;background:linear-gradient(180deg, rgba(255,203,5,.14), rgba(9,16,40,.4));border-color:rgba(255,203,5,.4)}
+.champion-badge{display:inline-block;padding:var(--pd-space-1) var(--pd-space-2);border-radius:var(--pd-radius-sm);margin-bottom:var(--pd-space-2);
+  background:rgba(255,203,5,.14);color:var(--pd-yellow);border:1px solid rgba(255,203,5,.4);
+  font:700 11px/1 var(--pd-font-mono);letter-spacing:.12em;text-transform:uppercase}

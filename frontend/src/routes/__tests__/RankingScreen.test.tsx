@@ -170,6 +170,25 @@ describe('RankingScreen — authoritative ranking', () => {
   })
 })
 
+describe('RankingScreen — podium re-skin classes (Fase 7 PR9)', () => {
+  it('classes the podium: first-place lift, per-rank risers, champion badge, stat rows', () => {
+    const { container } = renderRanking(makeRankingState({ finalRanking: FINAL_RANKING }))
+
+    expect(container.querySelector('.podium-col--first')).not.toBeNull()
+    expect(container.querySelector('.podium-base--1')).not.toBeNull()
+    expect(container.querySelector('.podium-base--2')).not.toBeNull()
+    expect(container.querySelector('.podium-base--3')).not.toBeNull()
+    expect(container.querySelector('.champion-badge')).not.toBeNull()
+    expect(container.querySelector('.stat-row')).not.toBeNull()
+  })
+
+  it('keeps the prototype particle system absent — no #particle-container node', () => {
+    const { container } = renderRanking(makeRankingState({ finalRanking: FINAL_RANKING }))
+
+    expect(container.querySelector('#particle-container')).toBeNull()
+  })
+})
+
 describe('RankingScreen — provisional ranking (wait/go-now path)', () => {
   it('falls back to a provisional podium when finalRanking is still null', () => {
     renderRanking(makeRankingState())
