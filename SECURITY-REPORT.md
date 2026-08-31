@@ -1,5 +1,7 @@
 # Security Pass — PokeDuels
 
+> **Nota (corrección 2026-08-31):** este informe se escribió el 2026-08-22 contra un estado anterior del repo. Varias rutas que cita fueron eliminadas: `poke-duel-engine/` (dead code, borrado en Fase 5, BACKLOG #16) y `frontend/src/engine/` (vestigial, borrado en la misma fase). El motor de combate ahora vive server-side en `backend/engine/`. Los hallazgos del informe se conservan como registro histórico; las rutas específicas pueden no corresponder al árbol actual.
+
 Fecha: 2026-08-22
 Alcance revisado:
 

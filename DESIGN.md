@@ -1,5 +1,7 @@
 # Poke-duels — Arcade Battle Arena
 
+> Brief visual de la pantalla de Login ("El Estadio Encendido"). El sistema de diseño vigente es `frontend/src/assets/pokeduels-design-system.css` (tokens `.pd-*`, Fase 7, BACKLOG #19).
+
 ## North Star: "El Estadio Encendido"
 Una pantalla de combate que se siente como el momento previo al duelo. Arte a sangre completa, interfaz mínima flotando encima, y un solo camino claro: entrar a jugar.
 

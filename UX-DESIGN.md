@@ -1,5 +1,7 @@
 # UX / UI Design — Pokémon Duels (v1)
 
+> Partes de este documento describen el estado pre-Fase-7 (antes del reskin contra prototipos). El estado visual vigente son los prototipos en `Prototipos/` + `frontend/src/assets/pokeduels-design-system.css` (tokens `.pd-*`). La decisión de producto RNF-2 (2026-08-25) es desktop-only; las secciones responsive (Móvil/Tablet) no aplican.
+
 **Documentos asociados:** `PRD.md` · `TECH-DESIGN.md`
 **Stack frontend:** React + Vite + Tailwind CSS (SPA desplegada en Vercel)
 

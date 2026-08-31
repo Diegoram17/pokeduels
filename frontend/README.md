@@ -1,32 +1,38 @@
-# React + TypeScript + Vite
+# PokeDuels — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Real-time Pokemon duels client. Vite + React 19 + TypeScript + Tailwind 4.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Environment variables
+
+Create a `.env` file (or set in your shell):
+
+| Variable | Description | Example |
+|---|---|---|
+| `VITE_API_URL` | Backend REST API base URL | `http://localhost:3001/api` |
+| `VITE_WS_URL` | Backend WebSocket URL | `http://localhost:3001` |
+
+## Scripts
+
+| Command | What |
+|---|---|
+| `npm run dev` | Start dev server (HMR) |
+| `npm test` | Run tests (Vitest) |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run lint` | Lint (oxlint) |
+| `npm run build` | Typecheck + production build |
+
+## Architecture
+
+- **Routes:** `src/routes/` — 7 screens (Login, Lobby, TeamSelect, WaitRoom, Duel, Swap, Ranking)
+- **State:** `src/state/` — Zustand store + Socket.IO hooks
+- **Components:** `src/components/` — shared UI (Modal, ScreenTopbar, HpBar, etc.)
+- **Design system:** `src/assets/pokeduels-design-system.css` (`.pd-*` tokens, Fase 7)
+- **Engine:** combat is server-authoritative (`backend/engine/`); the client renders snapshots
+
+See the [root README](../README.md) for the full project overview.
