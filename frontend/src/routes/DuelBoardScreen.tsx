@@ -246,6 +246,41 @@ function PostDuelChoice({
 }
 
 /**
+ * Between bracket rounds (Fase 7.1): after winning a versus, the next duel
+ * opens in lead_selection. Instead of dropping the player straight onto the
+ * picker, this modal asks whether to keep the pokemon they won with or pick a
+ * fresh one — CONTINUAR auto-submits that lead, CAMBIAR POKÉMON reveals the
+ * normal LeadPicker.
+ */
+function PostVictoryLeadModal({
+  onContinue,
+  onChange,
+}: {
+  onContinue: () => void
+  onChange: () => void
+}) {
+  const continueRef = useRef<HTMLButtonElement>(null)
+  return (
+    <Modal ariaLabel="Ganaste el versus" onClose={onChange} initialFocusRef={continueRef}>
+      <h2 className="pd-title" style={{ marginBottom: 8 }}>
+        ¡GANASTE ESTE VERSUS!
+      </h2>
+      <p className="pd-body" style={{ marginBottom: 24 }}>
+        ¿Quieres seguir con este Pokémon o elegir uno nuevo?
+      </p>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+        <button type="button" ref={continueRef} className="pd-btn pd-btn--primary" onClick={onContinue}>
+          CONTINUAR
+        </button>
+        <button type="button" className="pd-btn pd-btn--secondary" onClick={onChange}>
+          CAMBIAR POKÉMON
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+/**
  * Custom surrender confirmation (RF-7.7): a Tailwind/design-system modal
  * instead of the native window.confirm. Confirming emits duel:surrender,
  * canceling resumes it.
@@ -308,6 +343,15 @@ function DuelBoardScreen() {
   const navigate = useNavigate()
   const handledDuelId = useRef<string | null>(null)
 
+  // Fase 7.1 — between bracket rounds: remember the pokemon a win ended with
+  // and, when the next round opens in lead_selection, prompt "keep it or pick
+  // fresh" before the picker (PostVictoryLeadModal) instead of forcing a
+  // from-scratch selection.
+  const wonBracketDuelIdRef = useRef<string | null>(null)
+  const keepLeadPokemonIdRef = useRef<number | null>(null)
+  const postVictoryPromptedDuelIdRef = useRef<string | null>(null)
+  const [showPostVictoryLead, setShowPostVictoryLead] = useState(false)
+
   // Bot actions are server-controlled (backend/ws/botManager.js + duelHandlers
   // auto-fill lead/turn/switch for bot players) — the client never impersonates
   // a bot on the human's socket.
@@ -336,6 +380,35 @@ function DuelBoardScreen() {
     handledDuelId.current = duel.duelId
     navigate(route.path, { replace: true })
   }, [duel, state, navigate])
+
+  // Fase 7.1 — post-victory lead prompt (bracket only):
+  //  1. on a bracket win, capture the pokemon that was still standing;
+  //  2. when a *different* duel then enters lead_selection, raise the
+  //     keep-or-change modal once for that duel.
+  useEffect(() => {
+    if (!duel || state.tournament == null) return
+
+    if (duel.phase === 'finished') {
+      if (
+        duel.winnerId === state.player.playerId &&
+        wonBracketDuelIdRef.current !== duel.duelId
+      ) {
+        wonBracketDuelIdRef.current = duel.duelId
+        keepLeadPokemonIdRef.current = humanActivePokemon(state)?.pokemonId ?? null
+      }
+      return
+    }
+
+    if (
+      duel.phase === 'lead_selection' &&
+      keepLeadPokemonIdRef.current != null &&
+      duel.duelId !== wonBracketDuelIdRef.current &&
+      postVictoryPromptedDuelIdRef.current !== duel.duelId
+    ) {
+      postVictoryPromptedDuelIdRef.current = duel.duelId
+      setShowPostVictoryLead(true)
+    }
+  }, [duel, state])
 
   // Mid-duel reconnection (spec: Mid-Duel Reconnection): a fresh mount with an
   // in-progress duel re-emits duel:join so the server resyncs duel:state —
@@ -383,6 +456,9 @@ function DuelBoardScreen() {
 
   const isTournament = state.tournament != null
   const showPostDuelChoice = duel.phase === 'finished' && isTournament && state.finalRanking == null
+  const myRoster = state.duelPokemonState.filter(
+    (p) => p.ownerId === Number(state.player.playerId),
+  )
 
   return (
     <div className="pd-page duel-shell">
@@ -455,12 +531,25 @@ function DuelBoardScreen() {
             </p>
           )}
           {duel.phase === 'lead_selection' ? (
-            <LeadPicker
-              roster={state.duelPokemonState.filter(
-                (p) => p.ownerId === Number(state.player.playerId),
+            <>
+              <LeadPicker roster={myRoster} onPick={(pokemonId) => actions.selectLead(pokemonId)} />
+              {showPostVictoryLead && (
+                <PostVictoryLeadModal
+                  onContinue={() => {
+                    const keepId = keepLeadPokemonIdRef.current
+                    if (keepId != null && myRoster.some((p) => p.pokemonId === keepId)) {
+                      actions.selectLead(keepId)
+                    }
+                    keepLeadPokemonIdRef.current = null
+                    setShowPostVictoryLead(false)
+                  }}
+                  onChange={() => {
+                    keepLeadPokemonIdRef.current = null
+                    setShowPostVictoryLead(false)
+                  }}
+                />
               )}
-              onPick={(pokemonId) => actions.selectLead(pokemonId)}
-            />
+            </>
           ) : showPostDuelChoice ? (
             <PostDuelChoice
               waiting={waitingForFinal}

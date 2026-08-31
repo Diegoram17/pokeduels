@@ -300,6 +300,82 @@ describe('DuelBoardScreen — lead selection', () => {
   })
 })
 
+describe('DuelBoardScreen — post-victory lead modal (bracket rounds)', () => {
+  function nextRoundLeadSnapshot(): DuelSnapshot {
+    return {
+      duelId: 77,
+      turnNumber: 1,
+      winnerId: null,
+      endReason: null,
+      pokemonStates: [
+        { duelId: 77, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+        { duelId: 77, ownerId: 10, pokemonId: 5, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+        { duelId: 77, ownerId: 10, pokemonId: 6, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+        { duelId: 77, ownerId: 12, pokemonId: 23, type: 'flying', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+      ],
+    }
+  }
+
+  function winSemifinalWithPikachu() {
+    renderBoard(4)
+    startLeadSelection()
+    act(() => {
+      fakeSocket._fire('tournament:bracket', {
+        roomId: 1,
+        bracket: { semiA: { duelId: 42, playerA: 10, playerB: 11 } },
+      })
+    })
+    act(() => {
+      screen.getByRole('button', { name: /pikachu/i }).click()
+    })
+    act(() => {
+      fakeSocket._fire('duel:state', leadsSettledSnapshot(25))
+    })
+    act(() => {
+      fakeSocket._fire('duel:finished', { duelId: 42, winnerId: 10, endReason: 'ko' })
+    })
+  }
+
+  it('offers CONTINUAR / CAMBIAR POKEMON before the next round picker after a bracket win', () => {
+    winSemifinalWithPikachu()
+    act(() => {
+      fakeSocket._fire('duel:state', nextRoundLeadSnapshot())
+    })
+
+    expect(screen.getByText('¡GANASTE ESTE VERSUS!')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /continuar/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cambiar pokémon/i })).toBeInTheDocument()
+  })
+
+  it('CONTINUAR auto-submits the winning pokemon as the next lead', () => {
+    winSemifinalWithPikachu()
+    act(() => {
+      fakeSocket._fire('duel:state', nextRoundLeadSnapshot())
+    })
+
+    act(() => {
+      screen.getByRole('button', { name: /continuar/i }).click()
+    })
+    expect(fakeSocket.emit).toHaveBeenCalledWith('duel:select_lead', { duelId: 77, pokemonId: 25 })
+    expect(screen.queryByText('¡GANASTE ESTE VERSUS!')).not.toBeInTheDocument()
+  })
+
+  it('CAMBIAR POKEMON drops the modal to the normal picker without auto-selecting', () => {
+    winSemifinalWithPikachu()
+    act(() => {
+      fakeSocket._fire('duel:state', nextRoundLeadSnapshot())
+    })
+
+    act(() => {
+      screen.getByRole('button', { name: /cambiar pokémon/i }).click()
+    })
+    expect(screen.queryByText('¡GANASTE ESTE VERSUS!')).not.toBeInTheDocument()
+    expect(screen.getByTestId('lead-picker')).toBeInTheDocument()
+    // No auto-pick for the new round — only the semifinal's own select_lead ran.
+    expect(fakeSocket.emit).not.toHaveBeenCalledWith('duel:select_lead', { duelId: 77, pokemonId: 25 })
+  })
+})
+
 describe('DuelBoardScreen — move submission', () => {
   it('enables the move grid in round 1 before the rival lead is known and emits the 1-based move', () => {
     renderBoard(2)
