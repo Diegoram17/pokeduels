@@ -65,6 +65,7 @@ function renderTeamSelect() {
             }
           />
           <Route path="/wait-room" element={<div>WAIT-ROOM-LANDED</div>} />
+          <Route path="/lobby" element={<div>LOBBY-LANDED</div>} />
         </Routes>
       </MemoryRouter>
     </MockStateProvider>,
@@ -123,6 +124,18 @@ describe('TeamSelectScreen', () => {
     const mains = screen.getAllByRole('main')
     expect(mains).toHaveLength(1)
     expect(mains[0]).toHaveAttribute('id', 'main-content')
+  })
+
+  it('renders the ELIGE TU EQUIPO heading with the high-contrast draft-heading class', () => {
+    renderTeamSelect()
+    expect(screen.getByRole('heading', { name: /elige tu equipo/i })).toHaveClass('draft-heading')
+  })
+
+  it('offers a VOLVER control that returns to the lobby', async () => {
+    const user = userEvent.setup()
+    renderTeamSelect()
+    await user.click(screen.getByRole('button', { name: /volver/i }))
+    expect(screen.getByText('LOBBY-LANDED')).toBeInTheDocument()
   })
 
   it('fetches the catalog from GET /api/pokemons and renders starters and roster', async () => {

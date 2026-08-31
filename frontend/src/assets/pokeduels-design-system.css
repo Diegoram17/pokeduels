@@ -453,6 +453,10 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .draft-main{flex:1;overflow:hidden;display:flex;gap:var(--pd-space-5);padding:var(--pd-space-5) var(--pd-space-6);position:relative;z-index:2}
 .draft-left{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--pd-space-5);padding-right:var(--pd-space-2)}
 .draft-progress-head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--pd-space-4);margin-bottom:var(--pd-space-3);flex-wrap:wrap}
+/* Fase 7.1: "ELIGE TU EQUIPO" was washing out over the arena backdrop — force
+   solid white, a heavier size, and a dark halo so it reads at any scroll. */
+.draft-heading{color:#fff;font-size:34px;letter-spacing:.02em;
+  text-shadow:0 2px 12px rgba(3,6,16,.85), 0 0 3px rgba(3,6,16,.95)}
 .section-heading{display:flex;align-items:center;gap:var(--pd-space-2);margin:0 0 var(--pd-space-3);text-transform:uppercase}
 .starter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--pd-space-4)}
 .catalog-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--pd-space-4)}

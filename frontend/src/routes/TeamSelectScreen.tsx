@@ -364,6 +364,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
 
 function TeamSelectScreen() {
   const [state] = useMockState()
+  const navigate = useNavigate()
   const [catalog, setCatalog] = useState<Pokemon[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [wsError, setWsError] = useState<string | null>(null)
@@ -410,14 +411,25 @@ function TeamSelectScreen() {
     <div className="pd-page draft-shell">
       <GlowBlob style={{ left: '-10%', bottom: '-10%', width: 520, height: 520 }} />
 
-      <ScreenTopbar nickname={state.player.nickname} />
+      <ScreenTopbar nickname={state.player.nickname}>
+        <button
+          type="button"
+          className="pd-btn pd-btn--ghost"
+          onClick={() => navigate('/lobby')}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            arrow_back
+          </span>
+          VOLVER
+        </button>
+      </ScreenTopbar>
 
       <main id="main-content" className="draft-main">
         <div className="draft-left pd-scroll">
           <section className="pd-card">
             <div>
               <div>
-                <h2 className="pd-title pd-title--lg" style={{ textTransform: 'uppercase' }}>
+                <h2 className="pd-title pd-title--lg draft-heading" style={{ textTransform: 'uppercase' }}>
                   ELIGE TU EQUIPO
                 </h2>
                 <p className="pd-body" style={{ marginTop: 'var(--pd-space-1)' }}>
