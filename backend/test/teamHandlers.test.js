@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { WsError } from '../lib/wsError.js';
+import { logger } from '../lib/logger.js';
 import { selectStarter, selectRoster } from '../db/teamSelections.js';
 import { broadcastRoomState } from '../ws/roomState.js';
 import { registerTeamHandlers } from '../ws/teamHandlers.js';
@@ -25,7 +26,8 @@ describe('registerTeamHandlers', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Faults flow through withWsHandler → the structured logger (spec R4).
+    errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
 
     io = { to: vi.fn(() => ({ emit: vi.fn() })) };
     // EventEmitter so the test can dispatch into registered handlers; the

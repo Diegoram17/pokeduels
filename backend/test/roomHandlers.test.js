@@ -14,6 +14,7 @@ import { broadcastRoomState } from '../ws/roomState.js';
 import { bootstrapDuelIfReady, bootstrapBracketIfReady } from '../ws/duelBootstrap.js';
 import { advanceTournamentOrRematch, walkoverPendingDuel } from '../ws/tournamentLifecycle.js';
 import { registerRoomHandlers } from '../ws/roomHandlers.js';
+import { logger } from '../lib/logger.js';
 
 // Handler-glue tests: the DB functions and the broadcast helper are mocked
 // (their real behavior is covered by rooms.test.js / roomState.test.js), and
@@ -60,7 +61,7 @@ describe('registerRoomHandlers', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
 
     io = { to: vi.fn(() => ({ emit: vi.fn() })) };
     socket = new EventEmitter();
