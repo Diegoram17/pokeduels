@@ -1,8 +1,9 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { assertDestructiveDbAllowed } from './helpers.js';
 
 /**
  * End-to-end schema + seed integration test against a real Postgres/Neon
@@ -44,6 +45,13 @@ function run(cmd) {
 
 describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATABASE_URL)', () => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+  // This suite is destructive by design (migrate down 0 wipes the schema and
+  // re-seed rebuilds it). The guard refuses to run unless the target is a
+  // throwaway DB (ALLOW_DESTRUCTIVE_DB_TESTS=1) — spec R7c, ADR-0012.
+  beforeAll(() => {
+    assertDestructiveDbAllowed();
+  });
 
   afterAll(async () => {
     await pool.end();
