@@ -20,6 +20,7 @@
     "express-rate-limit": "^8.6.2",
     "node-pg-migrate": "^7",
     "pg": "^8",
+    "pino": "^10.3.1",
     "socket.io": "^4"
   },
   "devDependencies": {
