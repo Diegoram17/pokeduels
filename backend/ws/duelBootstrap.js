@@ -94,9 +94,9 @@ export function fisherYatesShuffle(arr) {
  *
  * @param {import('socket.io').Server} io
  * @param {number} roomId
- * @param {object} ctx - the DuelContext composition root (spec A1); threaded
- *        for the caller contract (3b consumes it — the bracket path writes no
- *        phase/round state in 3a)
+ * @param {object} ctx - the DuelContext composition root (spec A1); the bracket
+ *        path registers both semifinals for lead selection (ctx.phaseStore →
+ *        lead_selection, ctx.roundState → AWAITING_LEAD)
  * @param {(arr: number[]) => number[]} [shuffle]
  * @returns {Promise<{ semiA: object, semiB: object } | undefined>}
  */

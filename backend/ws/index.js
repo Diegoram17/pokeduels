@@ -29,10 +29,10 @@ export function createSocketServer(
   const io = new Server(httpServer, { cors: { origin: corsOrigin } });
   const bracketWalkoverTimers = createBracketWalkoverTimerRegistry();
   // One DuelContext per server, built BEFORE any handler registers (spec A1 —
-  // the ordering hazard is enforced by construction, not by comment). Slice 3a:
-  // the context delegates to the module singletons and owns the fresh
-  // per-server timer registries; the KO path's advanceTournamentOrRematch
-  // still receives the walkover registry through it.
+  // the ordering hazard is enforced by construction, not by comment). The
+  // context owns fresh per-connection phaseStore / roundState / turnCycle and
+  // timer registries; nothing is a module singleton. The KO path's
+  // advanceTournamentOrRematch receives the stores through ctx.
   const ctx = createDuelContext({ turnTimeoutMs, reconnectGraceMs, bracketWalkoverTimers });
   const { reconnectTimers } = ctx;
 
