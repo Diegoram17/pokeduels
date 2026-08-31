@@ -96,13 +96,13 @@ export default function BracketTree({ bracket, room }: BracketTreeProps) {
               <path
                 d="M 0 15 L 50 15 L 50 50 L 100 50"
                 fill="none"
-                stroke={semiAWon ? '#ffcb05' : 'rgba(120,180,255,.35)'}
+                stroke={semiAWon ? 'var(--pd-yellow)' : 'rgba(120,180,255,.35)'}
                 strokeWidth="2"
               />
               <path
                 d="M 0 85 L 50 85 L 50 50"
                 fill="none"
-                stroke={semiBWon ? '#ffcb05' : 'rgba(120,180,255,.35)'}
+                stroke={semiBWon ? 'var(--pd-yellow)' : 'rgba(120,180,255,.35)'}
                 strokeWidth="2"
               />
             </svg>
