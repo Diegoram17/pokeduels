@@ -4,6 +4,9 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
+import { useMockState } from '../../state/useMockState'
+import { serializeMockState, STORAGE_KEY } from '../../state/store'
+import type { MockState } from '../../state/schema'
 import LobbyScreen from '../LobbyScreen'
 import { setSessionToken } from '../../lib/api'
 
@@ -21,6 +24,16 @@ const waitingRooms = [
   { id: 'r2', code: 'Z009', max_players: 4, status: 'waiting', player_count: 2 },
 ]
 
+function SessionProbe() {
+  const [state] = useMockState()
+  return (
+    <div data-testid="session-probe">
+      <span data-testid="probe-nickname">{state.player.nickname}</span>
+      <span data-testid="probe-token">{state.player.sessionToken ?? 'none'}</span>
+    </div>
+  )
+}
+
 function renderLobby() {
   return render(
     <MockStateProvider>
@@ -35,6 +48,15 @@ function renderLobby() {
             }
           />
           <Route path="/team-select" element={<div>TEAM-SELECT-LANDED</div>} />
+          <Route
+            path="/"
+            element={
+              <>
+                <div>HOME-LANDED</div>
+                <SessionProbe />
+              </>
+            }
+          />
         </Routes>
       </MemoryRouter>
     </MockStateProvider>,
@@ -232,6 +254,48 @@ describe('LobbyScreen', () => {
 
     expect(await screen.findByText('#AB12')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('opens the Reglas del juego modal from the topbar button and closes it via CERRAR', async () => {
+    const user = userEvent.setup()
+    renderLobby()
+    await screen.findByText('SALAS DE BATALLA')
+
+    await user.click(screen.getByRole('button', { name: 'Reglas del juego' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Reglas del juego' })
+    expect(within(dialog).getByText('⚡ DUELOS POKÉMON')).toBeInTheDocument()
+    expect(within(dialog).getByText('Armá tu Escuadrón')).toBeInTheDocument()
+    expect(within(dialog).getByText('Reglas de Batalla')).toBeInTheDocument()
+    expect(within(dialog).getByText('Formato de Juego')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: /cerrar/i }))
+    expect(screen.queryByRole('dialog', { name: 'Reglas del juego' })).not.toBeInTheDocument()
+  })
+
+  it('navigates to the home route via Volver al inicio without clearing the session or nickname', async () => {
+    const user = userEvent.setup()
+    const seeded: MockState = {
+      player: { nickname: 'Ash', playerId: 'p1', sessionToken: 'token-1' },
+      room: null,
+      teamSelection: { starterId: null, rosterIds: [] },
+      tournament: null,
+      duelPokemonState: [],
+      duel: null,
+      pendingDuelId: null,
+      finalRanking: null,
+      roomAborted: null,
+    }
+    localStorage.setItem(STORAGE_KEY, serializeMockState(seeded))
+
+    renderLobby()
+    await screen.findByText('SALAS DE BATALLA')
+
+    await user.click(screen.getByRole('button', { name: 'Volver al inicio' }))
+
+    expect(screen.getByText('HOME-LANDED')).toBeInTheDocument()
+    expect(screen.getByTestId('probe-nickname').textContent).toBe('Ash')
+    expect(screen.getByTestId('probe-token').textContent).toBe('token-1')
   })
 })
 

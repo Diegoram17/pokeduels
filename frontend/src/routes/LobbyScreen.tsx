@@ -19,6 +19,7 @@ import { onSocketEvent } from '../lib/socket'
 import { validateNickname } from '../lib/validation'
 import ErrorBanner from '../components/ErrorBanner'
 import ScreenTopbar from '../components/ScreenTopbar'
+import RulesModal from '../components/RulesModal'
 import GlowBlob from '../components/GlowBlob'
 
 /**
@@ -268,6 +269,7 @@ function LobbyScreen() {
   const [error, setError] = useState<string | null>(null)
   const [wsError, setWsError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
 
   const loadRooms = useCallback(() => {
     setError(null)
@@ -346,7 +348,15 @@ function LobbyScreen() {
 
       <ScreenTopbar nickname={state.player.nickname}>
         <ChangeNicknameControl />
+        <button type="button" className="pd-btn pd-btn--secondary pd-btn--sm" onClick={() => setRulesOpen(true)}>
+          Reglas del juego
+        </button>
+        <button type="button" className="pd-btn pd-btn--sm" onClick={() => navigate('/')}>
+          Volver al inicio
+        </button>
       </ScreenTopbar>
+
+      {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
 
       <div>
         <main id="main-content">

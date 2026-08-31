@@ -393,3 +393,6 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 
 /* ============ Modal overlay (shared by the A4 Modal component) ============ */
 .pd-modal-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(4,7,18,.78);backdrop-filter:blur(4px);padding:24px}
+/* Fase 7: size="lg" modal scroll body — long content (Lobby rules text) stays
+   reachable without scrolling the page. */
+.pd-modal-body{max-height:70vh;overflow-y:auto}

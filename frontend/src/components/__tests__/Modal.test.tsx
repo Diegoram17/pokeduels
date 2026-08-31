@@ -64,7 +64,7 @@ describe('Modal', () => {
     expect(behind).not.toHaveFocus()
   })
 
-  it('detaches the keydown listener on unmount so later keys do not fire', async () => {
+it('detaches the keydown listener on unmount so later keys do not fire', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     const { unmount } = render(
@@ -73,10 +73,39 @@ describe('Modal', () => {
       </Modal>,
     )
     unmount()
-    // Focus a live document element so the press actually bubbles to document —
+    // Focus a live document element so the press actually bubbles to document �?"
     // a leaked listener would still fire and fail this test.
     document.body.focus()
     await user.keyboard('{Escape}')
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  // Fase 7: size="lg" affordance (design "Modal size affordance"). The lg
+  // variant widens the dialog and wraps children in a scrollable .pd-modal-body
+  // so long content (e.g. the Lobby rules text) stays reachable without
+  // scrolling the page. Omitting size keeps the sm behavior byte-identical.
+
+  it('size="lg" widens the dialog and wraps children in the scrollable .pd-modal-body', () => {
+    const { container } = render(
+      <Modal ariaLabel="Reglas del juego" onClose={vi.fn()} size="lg">
+        <button type="button">CERRAR</button>
+      </Modal>,
+    )
+    const dialog = screen.getByRole('dialog', { name: /reglas del juego/i })
+    expect(dialog).toHaveStyle({ maxWidth: '640px' })
+    const body = container.querySelector('.pd-modal-body')
+    expect(body).not.toBeNull()
+    expect(within(body as HTMLElement).getByRole('button', { name: /cerrar/i })).toBeInTheDocument()
+  })
+
+  it('omitting size keeps the default sm dialog without a .pd-modal-body wrapper', () => {
+    const { container } = render(
+      <Modal ariaLabel="Confirmar" onClose={vi.fn()}>
+        <button type="button">ACEPTAR</button>
+      </Modal>,
+    )
+    const dialog = screen.getByRole('dialog', { name: /confirmar/i })
+    expect(dialog).toHaveStyle({ maxWidth: '420px' })
+    expect(container.querySelector('.pd-modal-body')).toBeNull()
   })
 })
