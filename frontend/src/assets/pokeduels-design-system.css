@@ -381,11 +381,9 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
    it the containing block for the absolutely-positioned logo. */
 .pd-topbar__start{display:flex;align-items:center;gap:16px}
 .pd-topbar__logo{position:absolute;left:50%;transform:translateX(-50%);pointer-events:none}
-.duel-main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
-.duel-arena{position:relative;height:55vh;flex:none;overflow:hidden}
-.duel-hud{position:absolute;inset:0;padding:24px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:10}
-.duel-command{flex:1;background:rgba(5,8,20,.9);border-top:1px solid var(--pd-border-blue-dim);padding:24px 32px;display:flex;flex-direction:column;gap:16px;position:relative;z-index:20;overflow-y:auto}
-.move-grid{flex:1;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+/* Fase 7 (PR6): the Phase-4 hoisted .duel-main/.duel-arena/.duel-hud/
+   .duel-command/.move-grid rules were superseded by the verbatim ported
+   DuelBoard block at the bottom of this file (one source of truth). */
 .rank-main{position:relative;min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 32px;overflow:hidden}
 .podium{display:flex;align-items:flex-end;justify-content:center;gap:16px;width:100%;max-width:1100px;flex-wrap:wrap}
 .bench-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
@@ -543,3 +541,47 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .final-slot{display:flex;flex-direction:column;justify-content:center;height:100%;width:220px}
 .final-slot .pd-card{text-align:center}
 .bracket-third{display:flex;align-items:center;justify-content:center;gap:var(--pd-space-2);margin-top:var(--pd-space-3)}
+
+/* ============ Screen: DuelBoard — ported from Prototipos/5 ============
+   Verbatim from Prototipos/5.Tablero_de_duelo.html <style> (minus
+   .duel-topbar/.duel-topbar-right, which styled the bare header deleted in
+   PR1 — .pd-topbar covers it). The Phase-4 hoisted .duel-*/.move-grid rules
+   were removed in PR6; this block is now their single source of truth.
+   .duel-main is a React-side addition (the prototype's arena+command are
+   direct children of .duel-shell; in React they sit inside <main>). */
+.duel-shell{display:flex;flex-direction:column;height:100vh}
+.duel-main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.duel-arena{position:relative;height:55vh;overflow:hidden;flex:none}
+.duel-timer{position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:20;
+  width:80px;height:80px;border-radius:50%;background:rgba(9,16,40,.7);border:2px solid var(--pd-yellow);
+  display:flex;align-items:center;justify-content:center;box-shadow:0 0 15px rgba(255,203,5,.5)}
+.duel-hud{position:absolute;inset:0;padding:var(--pd-space-5);display:flex;justify-content:space-between;align-items:flex-start;
+  pointer-events:none;z-index:10}
+.hud-card{width:280px;pointer-events:auto;padding:var(--pd-space-3)}
+.hud-card .hud-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--pd-space-1)}
+.hud-card .hud-name{font:800 18px/1.2 var(--pd-font-display);color:#fff;text-transform:uppercase}
+.hud-card .hud-lvl{font:700 14px/1 var(--pd-font-mono);color:var(--pd-yellow)}
+.hud-card--rival{border-right:4px solid var(--pd-red)}
+.hud-card--rival .hud-lvl{color:var(--pd-danger)}
+.hud-badges{display:flex;gap:var(--pd-space-1);margin-bottom:var(--pd-space-2)}
+.hud-hp-foot{display:flex;justify-content:flex-end;margin-top:var(--pd-space-1)}
+.hud-hp-foot--left{justify-content:flex-start}
+.sprite-wrap{position:absolute;bottom:40px;left:25%;transform:translateX(-50%);width:220px;height:220px}
+.sprite-wrap--rival{bottom:96px;left:auto;right:25%;transform:translateX(50%);width:250px;height:250px}
+.sprite-wrap img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 10px 20px rgba(90,170,255,.35))}
+
+.duel-command{flex:1;background:rgba(5,8,20,.9);border-top:1px solid var(--pd-border-blue-dim);
+  padding:var(--pd-space-5) var(--pd-space-6);display:flex;flex-direction:column;gap:var(--pd-space-4);position:relative;z-index:20;overflow-y:auto}
+@media(min-width:960px){.duel-command{flex-direction:row}}
+.move-grid{flex:1;display:grid;grid-template-columns:repeat(2,1fr);gap:var(--pd-space-2)}
+.move-btn{text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:var(--pd-space-2);
+  padding:var(--pd-space-4);border-left:4px solid var(--pd-blue-light);cursor:pointer}
+.move-btn:hover{border-color:var(--pd-yellow)}
+.move-btn--weak{border-left-color:var(--pd-border-blue)}
+.move-row{display:flex;justify-content:space-between;align-items:center;width:100%}
+.move-name{font:800 16px/1.2 var(--pd-font-display);color:#fff;text-transform:uppercase}
+.move-dmg{font:700 13px/1 var(--pd-font-mono);color:var(--pd-blue-light)}
+.move-btn--weak .move-dmg{color:var(--pd-text-meta)}
+.move-pp{font:700 13px/1 var(--pd-font-mono);color:var(--pd-text-meta)}
+.side-panel{width:100%;display:flex;flex-direction:column;justify-content:flex-end}
+@media(min-width:960px){.side-panel{width:240px;flex:none}}

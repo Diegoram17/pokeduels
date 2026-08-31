@@ -54,23 +54,8 @@ function TimerRing({
 
   return (
     <div
+      className="duel-timer"
       data-testid="timer-ring"
-      style={{
-        position: 'absolute',
-        top: 24,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 20,
-        width: 80,
-        height: 80,
-        borderRadius: '50%',
-        background: 'rgba(9,16,40,.7)',
-        border: '2px solid var(--pd-yellow)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 0 15px rgba(255,203,5,.5)',
-      }}
     >
       <span className="pd-stat pd-stat--xl" style={{ color: 'var(--pd-yellow)' }}>
         {String(remaining).padStart(2, '0')}
@@ -95,19 +80,9 @@ function MoveButton({
   return (
     <button
       type="button"
-      className="pd-card"
+      className={`pd-card move-btn${basic ? ' move-btn--weak' : ''}`}
       disabled={disabled}
       onClick={() => onAttack(index)}
-      style={{
-        textAlign: 'left',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        gap: 8,
-        padding: 16,
-        cursor: 'pointer',
-        borderLeft: basic ? '4px solid var(--pd-border-blue)' : '4px solid var(--pd-blue-light)',
-      }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <span style={{ font: '800 16px/1.2 var(--pd-font-display)', color: '#fff', textTransform: 'uppercase' }}>
@@ -375,7 +350,7 @@ function DuelBoardScreen() {
   const showPostDuelChoice = duel.phase === 'finished' && isTournament && state.finalRanking == null
 
   return (
-    <div className="pd-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="pd-page duel-shell">
       <ScreenTopbar nickname={state.player.nickname}>
         <SurrenderButton onClick={() => setShowSurrender(true)} />
       </ScreenTopbar>
@@ -407,6 +382,20 @@ function DuelBoardScreen() {
             {humanActive && <HudCard pokemon={humanActive} side="human" />}
             {rivalActive && <HudCard pokemon={rivalActive} side="rival" />}
           </div>
+
+          {/* Free-standing arena field sprites (Prototipos/5): own pokemon
+              seen from the back, rival from the front. PR8 attaches the
+              attack-replay keyframes to these wrappers. */}
+          {humanActive && (
+            <div className="sprite-wrap">
+              <img src={humanActive.backSpriteUrl} alt={humanActive.name} />
+            </div>
+          )}
+          {rivalActive && (
+            <div className="sprite-wrap sprite-wrap--rival">
+              <img src={rivalActive.spriteUrl} alt={rivalActive.name} />
+            </div>
+          )}
         </div>
 
         <div
@@ -438,7 +427,7 @@ function DuelBoardScreen() {
           ) : (
             <div style={{ display: 'flex', gap: 16, flex: 1, flexDirection: 'column' }}>
               <MoveButtonGrid disabled={!canAct} active={humanActive} onAttack={handleAttack} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div className="side-panel">
                 <button
                   type="button"
                   className="pd-btn pd-btn--secondary"

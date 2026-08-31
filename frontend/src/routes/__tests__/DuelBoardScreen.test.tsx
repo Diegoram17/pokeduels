@@ -210,18 +210,24 @@ describe('DuelBoardScreen — HUD', () => {
     expect(within(rivalHud).getByText('100/100')).toBeInTheDocument()
   })
 
-  it('renders the GB-style sprites: rival seen from the front, own pokemon from the back', () => {
-    renderBoardFromState(buildLiveState())
+  it('renders the arena sprites: rival seen from the front, own pokemon from the back', () => {
+    // Fase 7 (PR6): the front/back sprite-location contract moved onto the
+    // free-standing arena sprites (where the PR8 attack replay runs) — the
+    // HUD keeps its own <img> but no longer carries the sprite-location
+    // assertion (see HudCard.test.tsx for the HUD image contract).
+    const { container } = renderBoardFromState(buildLiveState())
+
+    const humanSprite = container.querySelector('.duel-arena .sprite-wrap img')
+    expect(humanSprite?.getAttribute('src')).toBe('back-pikachu')
+
+    const rivalSprite = container.querySelector('.duel-arena .sprite-wrap--rival img')
+    expect(rivalSprite?.getAttribute('src')).toBe('front-snorlax')
+
+    // Lighter check: each HUD card still shows its own pokemon name.
     const humanHud = screen.getByTestId('hud-human')
     const rivalHud = screen.getByTestId('hud-rival')
-
-    const rivalSprite = within(rivalHud).getByRole('img')
-    expect(rivalSprite).toHaveAttribute('src', 'front-snorlax')
-    expect(rivalSprite).toHaveAttribute('alt', 'Snorlax')
-
-    const humanSprite = within(humanHud).getByRole('img')
-    expect(humanSprite).toHaveAttribute('src', 'back-pikachu')
-    expect(humanSprite).toHaveAttribute('alt', 'Pikachu')
+    expect(within(humanHud).getByText('PIKACHU')).toBeInTheDocument()
+    expect(within(rivalHud).getByText('SNORLAX')).toBeInTheDocument()
   })
 
   it('shows the HP bars with the live HP value', () => {

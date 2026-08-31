@@ -9,22 +9,17 @@ export interface HudCardProps {
 
 /**
  * Shared duel HUD card (design A4): name / type / HP for the human or rival
- * side of the duel arena, emitting `data-testid="hud-{side}"` and a conditional
- * red right border on the rival card. Bench/catalog cards stay in their
- * screens (different DOM + testids).
+ * side of the duel arena, emitting `data-testid="hud-{side}"` and a red right
+ * border on the rival card via the `.hud-card--rival` class (ported from
+ * Prototipos/5). Bench/catalog cards stay in their screens (different DOM +
+ * testids).
  */
 export function HudCard({ pokemon, side }: HudCardProps) {
   const isRival = side === 'rival'
   return (
     <div
-      className="pd-card"
+      className={`pd-card hud-card${isRival ? ' hud-card--rival' : ''}`}
       data-testid={`hud-${side}`}
-      style={{
-        width: 280,
-        padding: 12,
-        pointerEvents: 'auto',
-        ...(isRival ? { borderRight: '4px solid var(--pd-red)' } : {}),
-      }}
     >
       <div
         style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}

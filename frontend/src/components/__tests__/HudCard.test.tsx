@@ -37,15 +37,14 @@ describe('HudCard', () => {
     const card = screen.getByTestId('hud-rival')
     expect(card).toHaveTextContent('PIKACHU')
     expect(card).toHaveTextContent('34/100')
-    // Inline style assertion: jsdom's getComputedStyle cannot resolve the
-    // `var(--pd-red)` custom property, so assert the inline declaration
-    // (the designed conditional-rival-border contract) directly.
-    expect(card.style.borderRight).toBe('4px solid var(--pd-red)')
+    // Fase 7 (PR6): the rival accent moved off the inline style onto the
+    // .hud-card--rival class (ported from Prototipos/5) — assert the class.
+    expect(card.classList.contains('hud-card--rival')).toBe(true)
   })
 
   it('does not apply the rival border on the human side', () => {
     render(<HudCard pokemon={makePokemon()} side="human" />)
-    expect(screen.getByTestId('hud-human').style.borderRight).toBe('')
+    expect(screen.getByTestId('hud-human').classList.contains('hud-card--rival')).toBe(false)
   })
 
   it('shows the back sprite for the human side and the front sprite for the rival', () => {
