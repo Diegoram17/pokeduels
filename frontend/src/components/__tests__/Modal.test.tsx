@@ -64,7 +64,7 @@ describe('Modal', () => {
     expect(behind).not.toHaveFocus()
   })
 
-it('detaches the keydown listener on unmount so later keys do not fire', async () => {
+  it('detaches the keydown listener on unmount so later keys do not fire', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     const { unmount } = render(
@@ -73,7 +73,7 @@ it('detaches the keydown listener on unmount so later keys do not fire', async (
       </Modal>,
     )
     unmount()
-    // Focus a live document element so the press actually bubbles to document �?"
+    // Focus a live document element so the press actually bubbles to document;
     // a leaked listener would still fire and fail this test.
     document.body.focus()
     await user.keyboard('{Escape}')
