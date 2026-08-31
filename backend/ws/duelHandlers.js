@@ -8,10 +8,8 @@ import {
 } from '../repositories/duelRepository.js';
 import { ValidationError } from '../engine/switchValidation.js';
 import { PHASES, EVENTS, transition } from '../engine/stateMachine.js';
-import { getPhaseStore } from '../engine/duelPhaseStore.js';
-import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
+import { ROUND_SUB_STATES } from './duelRoundState.js';
 import { withWsHandler } from './wsFaultIsolation.js';
-import { createDuelLifecycle } from './duelLifecycle.js';
 import { advanceTournamentOrRematch } from './tournamentLifecycle.js';
 import { isBotPlayer, opponentOf, selectBotLead, makeBotDuelAction } from './botManager.js';
 
@@ -30,12 +28,11 @@ import { isBotPlayer, opponentOf, selectBotLead, makeBotDuelAction } from './bot
  *
  * @param {import('socket.io').Server} io
  * @param {import('socket.io').Socket} socket
- * @param {{ turnTimers?: object, turnCycle?: object, bracketWalkoverTimers?: object }} [deps]
- *        - injected per-duel turn timer registry (composition root,
- *          injectable timeoutMs), the shared turn cycle (factory singleton),
- *          and the bracket-walkover timer registry (PR 3) — the surrender
- *          path re-advances the tournament after a finish so a 4p bracket
- *          progresses.
+ * @param {object} ctx - the DuelContext composition root (spec A1): the
+ *        per-duel turn timer registry (injectable timeoutMs), the shared turn
+ *        cycle, the bracket-walkover timer registry (PR 3), the centralized
+ *        finish lifecycle, and the phase/round stores. The surrender path
+ *        re-advances the tournament after a finish so a 4p bracket progresses.
  */
 
 /**
@@ -61,12 +58,11 @@ function toRejectionWsError(event, err, extra = {}) {
   throw err;
 }
 
-export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracketWalkoverTimers } = {}) {
-  // Item #6 centralized finish path, bound to THIS server's turn-timer
-  // registry (composition root) so the correct pending 10s window is cancelled
-  // on surrender/disconnect (PR 2 note: never the default singleton for
-  // handlers that own a per-server registry).
-  const lifecycle = createDuelLifecycle({ turnTimers });
+export function registerDuelHandlers(io, socket, ctx) {
+  // Item #6 centralized finish path bound to THIS server's turn-timer registry
+  // (composition root, spec A1): every collaborator resolves from the one
+  // DuelContext built before handler registration.
+  const { lifecycle, turnCycle, turnTimers, phaseStore, roundState, bracketWalkoverTimers } = ctx;
 
   socket.on('duel:join', (payload) =>
     withWsHandler(socket, async () => {
@@ -101,7 +97,7 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       // rejected explicitly (never silently applied), as defense-in-depth on
       // top of the roster-wide `already_active` DB check in
       // validateLeadSelectionCore. Both layers close the same exploit.
-      if (getPhaseStore().get(duelId) !== PHASES.LEAD_SELECTION) {
+      if (phaseStore.get(duelId) !== PHASES.LEAD_SELECTION) {
         throw new WsError('duel:lead_rejected', { pokemonId, reason: 'not_lead_phase' });
       }
 
@@ -116,7 +112,6 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       // in_progress (design: stateMachine.js is never widened). The coarse
       // duels.status column follows: this is the moment the duel goes LIVE
       // (item #6's in_progress-guarded repository operations depend on it).
-      const roundState = getRoundStateStore();
       roundState.markLeadReady(duelId, playerId);
 
       // Server-side bot lead: a bot has no socket, so when the human picks its
@@ -132,8 +127,8 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
         }
       }
 
-      if (roundState.bothLeadsReady(duelId) && getPhaseStore().get(duelId) === PHASES.LEAD_SELECTION) {
-        getPhaseStore().set(duelId, transition(PHASES.LEAD_SELECTION, EVENTS.SELECT_LEADS));
+      if (roundState.bothLeadsReady(duelId) && phaseStore.get(duelId) === PHASES.LEAD_SELECTION) {
+        phaseStore.set(duelId, transition(PHASES.LEAD_SELECTION, EVENTS.SELECT_LEADS));
         roundState.set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
         await markDuelInProgress(duelId);
         // Broadcast the live snapshot so both clients see each other's active
@@ -158,7 +153,7 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       // switchTo null/undefined = keep the current active (TECH-DESIGN §5.2);
       // the forced-switch prompt is cleared and play resumes.
       if (switchTo === null || switchTo === undefined) {
-        getRoundStateStore().set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
+        roundState.set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
         return;
       }
       if (!Number.isInteger(switchTo) || switchTo <= 0) {
@@ -170,7 +165,7 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       } catch (err) {
         throw toRejectionWsError('duel:switch_rejected', err, { switchTo });
       }
-      getRoundStateStore().set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
+      roundState.set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);
 
       // Server-side bot switch: if the bot lost its active and must switch in
       // a bench unit, pick one for it too — otherwise the duel stalls in
@@ -285,7 +280,12 @@ export function registerDuelHandlers(io, socket, { turnTimers, turnCycle, bracke
       await lifecycle.finishDuel(io, duelId, opponentId, 'surrender');
       // Item #7: re-advance the tournament after the surrender finish so a
       // 4p bracket progresses (e.g. a semifinal surrender -> finals creation).
-      await advanceTournamentOrRematch(io, state.duel.room_id, duelId, { bracketWalkoverTimers });
+      await advanceTournamentOrRematch(io, state.duel.room_id, duelId, {
+        bracketWalkoverTimers,
+        lifecycle,
+        phaseStore,
+        roundState,
+      });
     }),
   );
 }

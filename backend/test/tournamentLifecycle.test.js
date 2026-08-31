@@ -161,12 +161,23 @@ describe('advanceTournamentOrRematch — 4-player bracket branch (item #7, PR 3)
     createDuelFromRoom
       .mockResolvedValueOnce({ id: 20, status: 'pending' }) // final
       .mockResolvedValueOnce({ id: 21, status: 'pending' }); // thirdPlace
+    const phaseStore = { set: vi.fn(), get: vi.fn() };
+    const roundState = { set: vi.fn(), get: vi.fn() };
 
-    await advanceTournamentOrRematch(io, 7, 10);
+    await advanceTournamentOrRematch(io, 7, 10, { phaseStore, roundState });
 
     // Final = the two semifinal winners; third-place = the two semifinal losers.
     expect(createDuelFromRoom).toHaveBeenNthCalledWith(1, 7, 1, 3, 'final');
     expect(createDuelFromRoom).toHaveBeenNthCalledWith(2, 7, 2, 4, 'tercer_puesto');
+
+    // Both finals duels are registered for lead selection (A5 latent-bug gate
+    // #2: the F1 phase guard rejects every bracket duel:select_lead when the
+    // phase store has no entry, so the finals must be initialized exactly like
+    // the semifinals and the 1v1 path).
+    expect(phaseStore.set).toHaveBeenCalledWith(20, 'lead_selection');
+    expect(phaseStore.set).toHaveBeenCalledWith(21, 'lead_selection');
+    expect(roundState.set).toHaveBeenCalledWith(20, 'AWAITING_LEAD');
+    expect(roundState.set).toHaveBeenCalledWith(21, 'AWAITING_LEAD');
 
     const emitted = io.to.mock.results.map((r) => r.value.emit);
     const bracketCall = emitted.find((e) => e.mock.calls.some((c) => c[0] === 'tournament:bracket'));
@@ -197,8 +208,10 @@ describe('advanceTournamentOrRematch — 4-player bracket branch (item #7, PR 3)
       .mockResolvedValueOnce({ id: 20, status: 'pending' })
       .mockResolvedValueOnce({ id: 21, status: 'pending' });
     const timers = { arm: vi.fn(), cancel: vi.fn() };
+    const phaseStore = { set: vi.fn(), get: vi.fn() };
+    const roundState = { set: vi.fn(), get: vi.fn() };
 
-    await advanceTournamentOrRematch(io, 7, 10, { bracketWalkoverTimers: timers });
+    await advanceTournamentOrRematch(io, 7, 10, { bracketWalkoverTimers: timers, phaseStore, roundState });
 
     expect(timers.arm).toHaveBeenCalledWith(7, 3, expect.any(Function));
     expect(timers.arm).not.toHaveBeenCalledWith(7, 1, expect.any(Function));

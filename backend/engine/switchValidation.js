@@ -14,7 +14,7 @@
  * ('wrong_owner' | 'fainted' | 'already_active') so the WS layer can map it to
  * a player-facing message.
  */
-import { getPlayerRoster } from '../repositories/duelRepository.js';
+import { getPlayerRoster } from '../repositories/duelQueries.js';
 
 /** Error thrown for an invalid switch decision; `reason` is machine-readable. */
 export class ValidationError extends Error {

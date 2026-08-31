@@ -5,10 +5,7 @@ import { createRoomWithCreator } from '../db/rooms.js';
 import { selectStarter, selectRoster } from '../db/teamSelections.js';
 import { getDuelState } from '../repositories/duelRepository.js';
 import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
-import { startWsHarness, waitForEvent, waitUntil, joinRoomViaWs } from './wsHelpers.js';
-import { resetPhaseStore, getPhaseStore } from '../engine/duelPhaseStore.js';
-import { resetRoundStateStore, getRoundStateStore } from '../ws/duelRoundState.js';
-import { resetTurnCycle, getTurnCycle } from '../ws/turnCycle.js';
+import { startWsHarness, waitForEvent, waitUntil, joinRoomViaWs, readyAll, joinDuelChannel, selectLeads } from './wsHelpers.js';
 
 /**
  * End-to-end duel cycle over a real Socket.IO connection (item #5): room:ready
@@ -22,9 +19,6 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
   beforeAll(async () => {
     await ensureSchemaAndSeed(pool);
     await pool.query('SELECT 1'); // warm the Neon cold start
-    resetPhaseStore();
-    resetRoundStateStore();
-    resetTurnCycle();
   }, SEED_TIMEOUT);
 
   const roomIds = [];
@@ -38,9 +32,6 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
 
   afterEach(async () => {
     while (harnesses.length) await harnesses.pop().teardown();
-    resetPhaseStore();
-    resetRoundStateStore();
-    resetTurnCycle();
   });
 
   afterAll(async () => {
@@ -79,43 +70,10 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     return { p1, p2, room, c1, c2, p1Team, p2Team };
   }
 
-  /**
-   * Marks both players ready over WS: creator first (no bootstrap — only one
-   * ready), joiner second (both ready -> bootstrap fires). Drains every
-   * room:state broadcast on both clients so a later wait never catches a
-   * stale one. Resolves with the `duel:start` payload `{ duelId }`.
-   */
-  async function readyBoth(ctx) {
-    const { c1, c2 } = ctx;
-    const startP = waitForEvent(c1, 'duel:start');
-
-    c1.emit('room:ready', { ready: true });
-    await waitForEvent(c1, 'room:state'); // c1's own ready broadcast
-    await waitForEvent(c2, 'room:state'); // creator-ready broadcast to c2
-
-    c2.emit('room:ready', { ready: true });
-    await waitForEvent(c1, 'room:state'); // joiner-ready broadcast to c1
-    await waitForEvent(c2, 'room:state'); // c2's own ready broadcast
-
-    return await startP;
-  }
-
-  /** Both sockets join the duel channel; resolves with both `duel:state` snapshots. */
-  async function joinDuel(ctx, duelId) {
-    const { c1, c2 } = ctx;
-    const s1P = waitForEvent(c1, 'duel:state');
-    c1.emit('duel:join', { duelId });
-    const s1 = await s1P;
-    const s2P = waitForEvent(c2, 'duel:state');
-    c2.emit('duel:join', { duelId });
-    const s2 = await s2P;
-    return { s1, s2 };
-  }
-
   it('bootstraps a duel when both players are ready and duel:join returns a camelCase snapshot', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
 
     expect(duelId).toBeGreaterThan(0);
 
@@ -130,7 +88,8 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     expect(roomRow.status).toBe('in_progress');
 
     // Both join the duel channel and receive a targeted camelCase snapshot
-    const { s1, s2 } = await joinDuel(ctx, duelId);
+    const s1 = await joinDuelChannel(ctx.c1, duelId);
+    const s2 = await joinDuelChannel(ctx.c2, duelId);
     expect(s1.duelId).toBe(duelId);
     expect(s1.turnNumber).toBe(1);
     expect(s1.pokemonStates).toHaveLength(12);
@@ -150,7 +109,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
   it('does not bootstrap a second duel on a repeat room:ready', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
 
     const count = () =>
       pool.query('SELECT COUNT(*)::int AS n FROM duels WHERE room_id = $1', [ctx.room.id])
@@ -173,45 +132,21 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
   it('registers the WS-layer round sub-state as AWAITING_LEAD after bootstrap', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
 
     // Bootstrap must NOT touch the coarse engine FSM phase — it stays pending
     // until both leads are picked (select_lead). The WS sub-state is the live
     // fine-grained signal.
-    expect(getPhaseStore().get(duelId)).toBe('lead_selection');
-    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_LEAD');
+    expect(harness.ctx.phaseStore.get(duelId)).toBe('lead_selection');
+    expect(harness.ctx.roundState.get(duelId)).toBe('AWAITING_LEAD');
   }, 90000);
-
-  /**
-   * Both players pick their first lead; waits until both are active in the DB
-   * (light count query; generous timeout for slow Neon round trips).
-   */
-  async function selectLeads(ctx, duelId) {
-    const { c1, c2, p1Team, p2Team } = ctx;
-    c1.emit('duel:select_lead', { duelId, pokemonId: p1Team[0] });
-    c2.emit('duel:select_lead', { duelId, pokemonId: p2Team[0] });
-    await waitUntil(
-      () =>
-        pool.query(
-          `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
-           WHERE duel_id = $1 AND is_active = TRUE`,
-          [duelId],
-        ).then((r) => r.rows[0].n === 2),
-      20000,
-    );
-    // Both leads are active in the DB, but the handler still has to advance
-    // the engine FSM (bothLeadsReady -> transition -> in_progress) after its
-    // final activateLead. Wait for that phase too so a test reading
-    // getPhaseStore() immediately after is not racing the handler.
-    await waitUntil(() => getPhaseStore().get(duelId) === 'in_progress', 20000);
-  }
 
   it('advances the duel to AWAITING_ACTIONS once both players pick a valid lead', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
 
-    await selectLeads(ctx, duelId);
+    await selectLeads([ctx.c1, ctx.c2], duelId, [ctx.p1Team[0], ctx.p2Team[0]], harness.ctx.phaseStore);
 
     // DB: exactly the two picked leads are active
     const state = await getDuelState(duelId);
@@ -219,8 +154,8 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
       .toEqual([ctx.p1Team[0], ctx.p2Team[0]].sort((a, b) => a - b));
 
     // WS sub-state advanced; the coarse engine FSM advanced to in_progress
-    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
-    expect(getPhaseStore().get(duelId)).toBe('in_progress');
+    expect(harness.ctx.roundState.get(duelId)).toBe('AWAITING_ACTIONS');
+    expect(harness.ctx.phaseStore.get(duelId)).toBe('in_progress');
 
     // The coarse duels.status column follows the FSM: the duel is LIVE only
     // once both leads are picked. Before this write the column stayed
@@ -234,7 +169,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
   it('rejects an invalid lead with duel:lead_rejected and no state change', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
 
     // wrong_owner: P1 targets a pokemon owned by P2
     const rej1P = waitForEvent(ctx.c1, 'duel:lead_rejected');
@@ -260,14 +195,14 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
       [duelId],
     );
     expect(rows[0].n).toBe(0);
-    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_LEAD');
+    expect(harness.ctx.roundState.get(duelId)).toBe('AWAITING_LEAD');
   }, 60000);
 
   it('persists a valid switch: is_active toggle + switch move row', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
-    await selectLeads(ctx, duelId);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
+    await selectLeads([ctx.c1, ctx.c2], duelId, [ctx.p1Team[0], ctx.p2Team[0]], harness.ctx.phaseStore);
 
     // P1 switches from their lead (p1Team[0]) to bench (p1Team[1])
     ctx.c1.emit('duel:switch_decision', { duelId, switchTo: ctx.p1Team[1] });
@@ -298,14 +233,14 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     });
 
     // sub-state returned to AWAITING_ACTIONS
-    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+    expect(harness.ctx.roundState.get(duelId)).toBe('AWAITING_ACTIONS');
   }, 60000);
 
   it('rejects a switch to a fainted target with duel:switch_rejected and unchanged is_active', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
-    await selectLeads(ctx, duelId);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
+    await selectLeads([ctx.c1, ctx.c2], duelId, [ctx.p1Team[0], ctx.p2Team[0]], harness.ctx.phaseStore);
 
     await pool.query(
       `UPDATE duel_pokemon_state SET fainted = TRUE
@@ -334,9 +269,10 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
    */
   async function createActingDuel(harness) {
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
-    await joinDuel(ctx, duelId);
-    await selectLeads(ctx, duelId);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
+    await joinDuelChannel(ctx.c1, duelId);
+    await joinDuelChannel(ctx.c2, duelId);
+    await selectLeads([ctx.c1, ctx.c2], duelId, [ctx.p1Team[0], ctx.p2Team[0]], harness.ctx.phaseStore);
     return { ...ctx, duelId };
   }
 
@@ -347,7 +283,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     // createActingDuel left the duel in_progress (both leads picked), so the
     // phase is no longer LEAD_SELECTION. A direct mid-duel bench activation
     // via the WS API must be explicitly rejected, never silently applied.
-    expect(getPhaseStore().get(duelId)).toBe('in_progress');
+    expect(harness.ctx.phaseStore.get(duelId)).toBe('in_progress');
 
     const rejP = waitForEvent(c1, 'duel:lead_rejected', 30000);
     c1.emit('duel:select_lead', { duelId, pokemonId: p1Team[1] });
@@ -390,8 +326,8 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     expect(rows.every((r) => r.move_index === 4 && r.was_timeout === false)).toBe(true);
 
     // No KO -> sub-state back to AWAITING_ACTIONS; coarse phase unchanged
-    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
-    expect(getPhaseStore().get(duelId)).toBe('in_progress');
+    expect(harness.ctx.roundState.get(duelId)).toBe('AWAITING_ACTIONS');
+    expect(harness.ctx.phaseStore.get(duelId)).toBe('in_progress');
   }, 120000);
 
   it('rejects a 0-PP action with duel:action_rejected targeted only, timer keeps running, re-pick succeeds', async () => {
@@ -450,7 +386,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     expect(p2Row).toMatchObject({ move_index: 4, was_timeout: true });
     const p1Row = rows.find((r) => r.player_id === p1.id);
     expect(p1Row.was_timeout).toBe(false);
-    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+    expect(harness.ctx.roundState.get(duelId)).toBe('AWAITING_ACTIONS');
   }, 120000);
 
   it('finishes the duel when a whole team is knocked out', async () => {
@@ -488,8 +424,8 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
 
     // sub-state cleaned up; coarse FSM terminal. The phase-store entry is
     // evicted on finalization (F6, ADR-0005 terminal-state eviction).
-    expect(getRoundStateStore().get(duelId)).toBeUndefined();
-    expect(getPhaseStore().get(duelId)).toBeUndefined();
+    expect(harness.ctx.roundState.get(duelId)).toBeUndefined();
+    expect(harness.ctx.phaseStore.get(duelId)).toBeUndefined();
   }, 120000);
 
   it('advances sub-state to AWAITING_SWITCH after a single-Pokémon KO round (no team wipe)', async () => {
@@ -515,8 +451,8 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     expect(awaitingSwitch).toMatchObject({ duelId });
 
     // Not a wipe: duel stays in progress, sub-state AWAITING_SWITCH.
-    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_SWITCH');
-    expect(getPhaseStore().get(duelId)).toBe('in_progress');
+    expect(harness.ctx.roundState.get(duelId)).toBe('AWAITING_SWITCH');
+    expect(harness.ctx.phaseStore.get(duelId)).toBe('in_progress');
     const { rows } = await pool.query('SELECT status FROM duels WHERE id = $1', [duelId]);
     expect(rows[0].status).not.toBe('finished');
   }, 120000);
@@ -524,11 +460,11 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
   it('returns sub-state to AWAITING_ACTIONS from a forced-switch precondition', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
-    await selectLeads(ctx, duelId);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
+    await selectLeads([ctx.c1, ctx.c2], duelId, [ctx.p1Team[0], ctx.p2Team[0]], harness.ctx.phaseStore);
 
     // Simulate the forced-switch precondition left behind by a KO round.
-    getRoundStateStore().set(duelId, 'AWAITING_SWITCH');
+    harness.ctx.roundState.set(duelId, 'AWAITING_SWITCH');
 
     ctx.c1.emit('duel:switch_decision', { duelId, switchTo: ctx.p1Team[1] });
 
@@ -538,9 +474,9 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     // applySwitchDecision commits, before the handler continuation runs the
     // store .set(). Wait on the sub-state transition itself -- that is what
     // this test asserts -- so the check is deterministic.
-    await waitUntil(() => getRoundStateStore().get(duelId) === 'AWAITING_ACTIONS', 20000);
+    await waitUntil(() => harness.ctx.roundState.get(duelId) === 'AWAITING_ACTIONS', 20000);
 
-    expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+    expect(harness.ctx.roundState.get(duelId)).toBe('AWAITING_ACTIONS');
 
     // The switch also landed in the DB (guaranteed committed by the time the
     // sub-state flipped, since the handler commits before it).
@@ -591,7 +527,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
         [duelId],
       );
       expect(rows[0]).toMatchObject({ status: 'finished', winner_id: p2.id, end_reason: 'surrender' });
-      expect(getRoundStateStore().get(duelId)).toBeUndefined();
+      expect(harness.ctx.roundState.get(duelId)).toBeUndefined();
     }, 120000);
 
     it('rejects a surrender from a non-participant with no state change', async () => {
@@ -619,8 +555,9 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     it('accepts a surrender during lead selection (pending) so a stuck pre-battle player can concede', async () => {
       const harness = await startHarness({ turnTimeoutMs: 60000 });
       const ctx = await createSeatedAndTeamedRoom(harness);
-      const { duelId } = await readyBoth(ctx); // duel created 'pending'; no leads picked
-      await joinDuel(ctx, duelId); // both sockets join the duel channel to receive broadcasts
+      const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]); // duel created 'pending'; no leads picked
+      await joinDuelChannel(ctx.c1, duelId);
+    await joinDuelChannel(ctx.c2, duelId); // both sockets join the duel channel to receive broadcasts
 
       // A player stuck in the lead-selection window (e.g. waiting on a bot that
       // never answers) must still be able to surrender.
@@ -657,7 +594,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
 
       // Reproduce the stray timer firing after the finish: the exact resolution
       // the turn-timer callback runs (bufferTimeoutAction + attemptResolveTurn).
-      const turnCycle = getTurnCycle();
+      const turnCycle = harness.ctx.turnCycle;
       const countFinished = countBroadcasts(harness.io, 'duel:finished');
       const before = (
         await pool.query('SELECT status, winner_id, end_reason FROM duels WHERE id = $1', [duelId])
@@ -675,7 +612,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
       expect(after).toEqual(before);
       expect(after).toMatchObject({ status: 'finished', winner_id: p2.id, end_reason: 'surrender' });
       // The finish cleanup also ran: WS round sub-state is gone.
-      expect(getRoundStateStore().get(duelId)).toBeUndefined();
+      expect(harness.ctx.roundState.get(duelId)).toBeUndefined();
     }, 120000);
   });
 
@@ -728,7 +665,7 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
       c1.emit('duel:select_lead', { duelId, pokemonId: humanTeam[0] });
       const settled = await settledP;
       expect(settled.pokemonStates.filter((p) => p.isActive)).toHaveLength(2);
-      expect(getPhaseStore().get(duelId)).toBe('in_progress');
+      expect(harness.ctx.phaseStore.get(duelId)).toBe('in_progress');
 
       // Human acts -> the bot answers immediately (no 10s wait) -> the round
       // resolves: the bot's active pokemon took the human's damage.

@@ -24,9 +24,18 @@ function waitForEvent(emitter, event, timeoutMs = 2000) {
 
 async function startHarness(options) {
   const httpServer = createServer();
-  const { io, reconnectTimers, turnTimers } = createSocketServer(httpServer, options);
+  const { io, reconnectTimers, turnTimers, bracketWalkoverTimers, ctx } =
+    createSocketServer(httpServer, options);
   await new Promise((resolve) => httpServer.listen(0, resolve));
-  return { httpServer, io, reconnectTimers, turnTimers, port: httpServer.address().port };
+  return {
+    httpServer,
+    io,
+    reconnectTimers,
+    turnTimers,
+    bracketWalkoverTimers,
+    ctx,
+    port: httpServer.address().port,
+  };
 }
 
 const harnesses = [];
@@ -40,7 +49,7 @@ afterEach(async () => {
 
 describe('createSocketServer', () => {
   it('returns a Socket.IO Server and reconnect + turn timer registries', async () => {
-    const { httpServer, io, reconnectTimers, turnTimers } = await startHarness();
+    const { httpServer, io, reconnectTimers, turnTimers, ctx } = await startHarness();
     harnesses.push({ io, httpServer });
 
     expect(io).toBeInstanceOf(Server);
@@ -52,6 +61,32 @@ describe('createSocketServer', () => {
     expect(typeof turnTimers.cancel).toBe('function');
     expect(typeof turnTimers.has).toBe('function');
     expect(typeof turnTimers.clear).toBe('function');
+  });
+
+  it('returns the DuelContext (spec A1) whose registries are the exposed ones', async () => {
+    const { httpServer, io, reconnectTimers, turnTimers, bracketWalkoverTimers, ctx } =
+      await startHarness();
+    harnesses.push({ io, httpServer });
+
+    // The ctx is the single composition root built before handler registration.
+    // The registries the server exposes (and server.js hands to shutdown) MUST
+    // be the exact instances the handlers use through ctx.
+    expect(ctx.turnTimers).toBe(turnTimers);
+    expect(ctx.reconnectTimers).toBe(reconnectTimers);
+    expect(ctx.bracketWalkoverTimers).toBe(bracketWalkoverTimers);
+
+    // Every collaborator is a working instance, not a stub.
+    expect(ctx.turnCycle.bufferAction(1, 1, { moveIndex: 4 })).toEqual({
+      isFirst: true,
+      pairComplete: false,
+    });
+    ctx.phaseStore.set(99, 'pending');
+    expect(ctx.phaseStore.get(99)).toBe('pending');
+    ctx.phaseStore.delete(99);
+    ctx.roundState.set(99, 'AWAITING_LEAD');
+    expect(ctx.roundState.get(99)).toBe('AWAITING_LEAD');
+    ctx.roundState.delete(99);
+    expect(typeof ctx.lifecycle.finishDuel).toBe('function');
   });
 
   it('threads reconnectGraceMs into the timer registry', async () => {

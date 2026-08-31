@@ -10,7 +10,6 @@ import { findActiveDuelForPlayer, findPendingBracketDuelForPlayer } from '../rep
 import { broadcastRoomState } from '../ws/roomState.js';
 import { withWsHandler } from '../ws/wsFaultIsolation.js';
 import { bootstrapDuelIfReady, bootstrapBracketIfReady } from '../ws/duelBootstrap.js';
-import { createDuelLifecycle } from '../ws/duelLifecycle.js';
 import { advanceTournamentOrRematch, walkoverPendingDuel } from '../ws/tournamentLifecycle.js';
 import { HttpError } from '../lib/httpError.js';
 import { WsError } from '../lib/wsError.js';
@@ -56,19 +55,15 @@ async function handleLeaveOrClose(io, roomId, playerId) {
  * Identity comes from the auth middleware (socket.data.player); the room id
  * the socket is seated in is tracked in socket.data.roomId.
  *
- * `turnTimers` is the per-server turn-timer registry and `bracketWalkoverTimers`
- * the per-server bracket-walkover registry (composition root) — the disconnect
- * listener needs them so a mid-duel forfeit cancels the correct pending 10s
- * window and a between-round 4p absence arms the right walkover window.
+ * `ctx` is the DuelContext composition root (spec A1) — the centralized
+ * finish lifecycle and the bracket-walkover registry resolve from it, so the
+ * disconnect listener cancels the correct pending 10s window and arms the
+ * right walkover window. `reconnectTimers` stays an explicit positional arg
+ * (design Q2: reconnect/bracketWalkover are never folded into the context's
+ * accessor surface, only into its construction).
  */
-export function registerRoomHandlers(
-  io,
-  socket,
-  reconnectTimers,
-  turnTimers,
-  bracketWalkoverTimers = NOOP_WALKOVER_TIMERS,
-) {
-  const lifecycle = createDuelLifecycle({ turnTimers });
+export function registerRoomHandlers(io, socket, ctx, reconnectTimers) {
+  const { lifecycle, bracketWalkoverTimers = NOOP_WALKOVER_TIMERS, phaseStore, roundState } = ctx ?? {};
   socket.on('room:join', (payload) =>
     withWsHandler(socket, async () => {
       const { code } = payload ?? {};
@@ -131,8 +126,8 @@ export function registerRoomHandlers(
       await broadcastRoomState(io, roomId);
       // Item #5: a full ready 1v1 room bootstraps its duel. Item #7 PR 3: a
       // full ready 4-player room opens its bracket (2 random semifinals).
-      await bootstrapDuelIfReady(io, roomId);
-      await bootstrapBracketIfReady(io, roomId);
+      await bootstrapDuelIfReady(io, roomId, ctx);
+      await bootstrapBracketIfReady(io, roomId, ctx);
     }),
   );
 
@@ -151,7 +146,7 @@ export function registerRoomHandlers(
       const room = await getRoomState(roomId);
       if (room && room.maxPlayers === 4 && room.status === 'in_progress') {
         await markPlayerDisconnected(roomId, playerId);
-        await walkoverPendingDuel(io, roomId, playerId, { bracketWalkoverTimers });
+        await walkoverPendingDuel(io, roomId, playerId, { bracketWalkoverTimers, lifecycle, phaseStore, roundState });
         socket.data.roomId = undefined;
         await broadcastRoomState(io, roomId);
         socket.leave(`room:${roomId}`);
@@ -182,7 +177,12 @@ export function registerRoomHandlers(
         const opponentId = playerId === player1_id ? player2_id : player1_id;
         await lifecycle.finishDuel(io, duelId, opponentId, 'disconnect');
         io.to(`duel:${duelId}`).emit('duel:opponent_disconnected', { duelId });
-        await advanceTournamentOrRematch(io, activeRoomId, duelId, { bracketWalkoverTimers });
+        await advanceTournamentOrRematch(io, activeRoomId, duelId, {
+          bracketWalkoverTimers,
+          lifecycle,
+          phaseStore,
+          roundState,
+        });
         return;
       }
 
@@ -202,7 +202,7 @@ export function registerRoomHandlers(
         const pending = await findPendingBracketDuelForPlayer(roomId, playerId);
         if (pending) {
           bracketWalkoverTimers.arm(roomId, playerId, () =>
-            walkoverPendingDuel(io, roomId, playerId, { bracketWalkoverTimers }),
+            walkoverPendingDuel(io, roomId, playerId, { bracketWalkoverTimers, lifecycle, phaseStore, roundState }),
           );
         }
         return;

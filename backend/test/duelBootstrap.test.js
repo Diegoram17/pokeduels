@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { resetPhaseStore, getPhaseStore } from '../engine/duelPhaseStore.js';
-import { resetRoundStateStore, getRoundStateStore } from '../ws/duelRoundState.js';
+import { createPhaseStore } from '../engine/duelPhaseStore.js';
+import { createRoundStateStore } from '../ws/duelRoundState.js';
 
 // Unit tests for the 1v1 duel-bootstrap readiness gate (item #7, PR 1 rematch).
 // `bootstrapDuelIfReady` is driven purely by the room state it reads via
@@ -32,19 +32,24 @@ function ready1v1Room(status) {
   };
 }
 
+// The bootstrap functions resolve the phase/round stores from the DuelContext
+// (spec A1). A1-3b: fresh factory stores per ctx — exactly what the context
+// produces (the module singletons are deleted). Each test builds its own ctx so
+// assertions observe the same instances the bootstrap wrote to.
+function makeCtx() {
+  return { phaseStore: createPhaseStore(), roundState: createRoundStateStore() };
+}
+
 describe('bootstrapDuelIfReady gate (item #7, PR 1 rematch)', () => {
   const io = { to: vi.fn(() => ({ emit: vi.fn() })) };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    resetPhaseStore();
-    resetRoundStateStore();
     createDuelFromRoom.mockResolvedValue({ id: 42, status: 'pending' });
   });
 
   afterEach(() => {
-    resetPhaseStore();
-    resetRoundStateStore();
+    vi.clearAllMocks();
   });
 
   it('bootstraps a second duel in an in_progress 1v1 room with no active duel (rematch)', async () => {
@@ -53,13 +58,14 @@ describe('bootstrapDuelIfReady gate (item #7, PR 1 rematch)', () => {
     // re-readied. The old gate (`status !== 'waiting'`) blocked this.
     getRoomState.mockResolvedValue(ready1v1Room('in_progress'));
 
-    const duel = await bootstrapDuelIfReady(io, 7);
+    const ctx = makeCtx();
+    const duel = await bootstrapDuelIfReady(io, 7, ctx);
 
     expect(duel).toEqual({ id: 42, status: 'pending' });
     expect(createDuelFromRoom).toHaveBeenCalledWith(7, 1, 2);
     // The fresh duel is registered for lead selection in the WS sub-state.
-    expect(getRoundStateStore().get(42)).toBe('AWAITING_LEAD');
-    expect(getPhaseStore().get(42)).toBe('lead_selection');
+    expect(ctx.roundState.get(42)).toBe('AWAITING_LEAD');
+    expect(ctx.phaseStore.get(42)).toBe('lead_selection');
     expect(io.to).toHaveBeenCalledWith('room:7');
   });
 
@@ -67,7 +73,7 @@ describe('bootstrapDuelIfReady gate (item #7, PR 1 rematch)', () => {
     // A room that closed (rooms.status='finished') must never open a new duel.
     getRoomState.mockResolvedValue(ready1v1Room('finished'));
 
-    const duel = await bootstrapDuelIfReady(io, 7);
+    const duel = await bootstrapDuelIfReady(io, 7, makeCtx());
 
     expect(duel).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
@@ -77,7 +83,7 @@ describe('bootstrapDuelIfReady gate (item #7, PR 1 rematch)', () => {
   it('still bootstraps a full waiting 1v1 room (regression — first duel)', async () => {
     getRoomState.mockResolvedValue(ready1v1Room('waiting'));
 
-    const duel = await bootstrapDuelIfReady(io, 7);
+    const duel = await bootstrapDuelIfReady(io, 7, makeCtx());
 
     expect(duel).toEqual({ id: 42, status: 'pending' });
     expect(createDuelFromRoom).toHaveBeenCalledWith(7, 1, 2);
@@ -92,7 +98,7 @@ describe('bootstrapDuelIfReady gate (item #7, PR 1 rematch)', () => {
       startersTaken: [],
     });
 
-    expect(await bootstrapDuelIfReady(io, 7)).toBeUndefined();
+    expect(await bootstrapDuelIfReady(io, 7, makeCtx())).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
 
     // Full room but one player not ready.
@@ -106,13 +112,13 @@ describe('bootstrapDuelIfReady gate (item #7, PR 1 rematch)', () => {
       ],
       startersTaken: [],
     });
-    expect(await bootstrapDuelIfReady(io, 7)).toBeUndefined();
+    expect(await bootstrapDuelIfReady(io, 7, makeCtx())).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
   });
 
   it('returns undefined for an unknown room (getRoomState null)', async () => {
     getRoomState.mockResolvedValue(undefined);
-    expect(await bootstrapDuelIfReady(io, 999)).toBeUndefined();
+    expect(await bootstrapDuelIfReady(io, 999, makeCtx())).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
   });
 });
@@ -148,11 +154,21 @@ describe('bootstrapBracketIfReady (item #7, PR 3 — 4-player bracket pairing)',
       .mockResolvedValueOnce({ id: 101, status: 'pending' }) // semiA
       .mockResolvedValueOnce({ id: 102, status: 'pending' }); // semiB
 
-    const result = await bootstrapBracketIfReady(io, 7, identityShuffle);
+    const ctx = makeCtx();
+    const result = await bootstrapBracketIfReady(io, 7, ctx, identityShuffle);
 
     expect(createDuelFromRoom).toHaveBeenNthCalledWith(1, 7, 1, 2, 'semifinal');
     expect(createDuelFromRoom).toHaveBeenNthCalledWith(2, 7, 3, 4, 'semifinal');
     expect(result).toEqual({ semiA: { id: 101, status: 'pending' }, semiB: { id: 102, status: 'pending' } });
+
+    // Both semifinal duels are registered for lead selection, exactly like the
+    // 1v1 bootstrap does (A5 latent-bug gate #2: without this, the F1 phase
+    // guard rejects every bracket duel:select_lead — the bracket was
+    // unplayable over WS).
+    expect(ctx.phaseStore.get(101)).toBe('lead_selection');
+    expect(ctx.phaseStore.get(102)).toBe('lead_selection');
+    expect(ctx.roundState.get(101)).toBe('AWAITING_LEAD');
+    expect(ctx.roundState.get(102)).toBe('AWAITING_LEAD');
 
     // tournament:bracket carries the two semifinal pairings by slot.
     expect(io.to).toHaveBeenCalledWith('room:7');
@@ -185,13 +201,13 @@ describe('bootstrapBracketIfReady (item #7, PR 3 — 4-player bracket pairing)',
       ],
       startersTaken: [],
     });
-    expect(await bootstrapBracketIfReady(io, 7, identityShuffle)).toBeUndefined();
+    expect(await bootstrapBracketIfReady(io, 7, makeCtx(), identityShuffle)).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
     expect(io.to).not.toHaveBeenCalled();
 
     // All ready but the room already left 'waiting' (duel already created).
     getRoomState.mockResolvedValue(ready4Room('in_progress'));
-    expect(await bootstrapBracketIfReady(io, 7, identityShuffle)).toBeUndefined();
+    expect(await bootstrapBracketIfReady(io, 7, makeCtx(), identityShuffle)).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
     expect(io.to).not.toHaveBeenCalled();
   });
@@ -207,14 +223,14 @@ describe('bootstrapBracketIfReady (item #7, PR 3 — 4-player bracket pairing)',
       ],
       startersTaken: [],
     });
-    expect(await bootstrapBracketIfReady(io, 7, identityShuffle)).toBeUndefined();
+    expect(await bootstrapBracketIfReady(io, 7, makeCtx(), identityShuffle)).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
     expect(io.to).not.toHaveBeenCalled();
   });
 
   it('returns undefined for an unknown room', async () => {
     getRoomState.mockResolvedValue(undefined);
-    expect(await bootstrapBracketIfReady(io, 999, identityShuffle)).toBeUndefined();
+    expect(await bootstrapBracketIfReady(io, 999, makeCtx(), identityShuffle)).toBeUndefined();
     expect(createDuelFromRoom).not.toHaveBeenCalled();
   });
 });

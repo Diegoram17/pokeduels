@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mapDuelStateToCamelCase, mapRoundEventsToCamelCase } from '../repositories/duelRepository.js';
+import {
+  mapDuelStateToCamelCase,
+  mapRoundEventsToCamelCase,
+} from '../repositories/duelStateMapper.js';
 
 // Pure mapping tests (item #5): mapDuelStateToCamelCase transforms the
 // canonical snake_case repository state into the camelCase shape the frontend

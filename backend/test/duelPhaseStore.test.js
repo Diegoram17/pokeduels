@@ -1,9 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  createPhaseStore,
-  getPhaseStore,
-  resetPhaseStore,
-} from '../engine/duelPhaseStore.js';
+import { describe, it, expect } from 'vitest';
+import { createPhaseStore } from '../engine/duelPhaseStore.js';
 
 describe('createPhaseStore factory', () => {
   it('returns a store whose set/get round-trips a phase', () => {
@@ -39,36 +35,5 @@ describe('createPhaseStore factory', () => {
     store.clear();
     expect(store.get(1)).toBeUndefined();
     expect(store.get(2)).toBeUndefined();
-  });
-});
-
-describe('module singleton', () => {
-  beforeEach(() => {
-    resetPhaseStore();
-  });
-
-  it('getPhaseStore returns the same shared instance every call', () => {
-    expect(getPhaseStore()).toBe(getPhaseStore());
-  });
-
-  it('shares entries across callers of the singleton', () => {
-    getPhaseStore().set(5, 'finished');
-    expect(getPhaseStore().get(5)).toBe('finished');
-  });
-
-  it('singleton is independent from factory-created stores', () => {
-    const standalone = createPhaseStore();
-    getPhaseStore().set(2, 'in_progress');
-    expect(standalone.get(2)).toBeUndefined();
-    expect(getPhaseStore().get(2)).toBe('in_progress');
-  });
-
-  it('resetPhaseStore clears the singleton without touching factory stores', () => {
-    const standalone = createPhaseStore();
-    standalone.set(9, 'aborted');
-    getPhaseStore().set(9, 'in_progress');
-    resetPhaseStore();
-    expect(getPhaseStore().get(9)).toBeUndefined();
-    expect(standalone.get(9)).toBe('aborted');
   });
 });

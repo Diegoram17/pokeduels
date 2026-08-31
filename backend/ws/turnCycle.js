@@ -5,8 +5,7 @@ import {
 } from '../repositories/duelRepository.js';
 import { resolverRonda } from '../engine/roundResolver.js';
 import { withDuelFaultIsolation } from '../engine/faultIsolation.js';
-import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
-import { finalizeDuelSideEffects } from './duelLifecycle.js';
+import { ROUND_SUB_STATES } from './duelRoundState.js';
 import { advanceTournamentOrRematch } from './tournamentLifecycle.js';
 
 /**
@@ -22,12 +21,32 @@ import { advanceTournamentOrRematch } from './tournamentLifecycle.js';
  * is created in the composition root and coordinated by the handler — this
  * module never touches the timer registry.
  *
- * Factory + singleton shape (mirrors duelPhaseStore.js / duelRoundState.js).
+ * A1-3b: factory-only shape. The module singletons (`getTurnCycle` /
+ * `resetTurnCycle`) and the direct `duelLifecycle.js` import are GONE. The
+ * composition root injects the round sub-state store and phase store at
+ * construction and wires the finish lifecycle through `bindLifecycle` (two-
+ * phase init) — the circular import turnCycle <-> duelLifecycle is broken:
+ * this module resolves `lifecycle.finalizeDuelSideEffects` only through the
+ * bound reference, never through a module import.
  */
-export function createTurnCycle({ bracketWalkoverTimers } = {}) {
+export function createTurnCycle({ bracketWalkoverTimers, roundState, phaseStore } = {}) {
   const buffers = new Map();
+  let lifecycle = null;
 
   return {
+    /**
+     * One-shot setter wiring the finish lifecycle into the resolution path
+     * (design: two-phase init, step 7 of DuelContext construction). Must be
+     * called before any turn can resolve; a second bind is a programming
+     * error.
+     */
+    bindLifecycle(l) {
+      if (lifecycle) {
+        throw new Error('turnCycle lifecycle already bound (bindLifecycle runs once)');
+      }
+      lifecycle = l;
+    },
+
     /**
      * Buffers one player's action for a duel. Returns `{ isFirst,
      * pairComplete }` so the caller knows whether to arm the 10s timer
@@ -89,11 +108,10 @@ export function createTurnCycle({ bracketWalkoverTimers } = {}) {
       if (!accionP1 || !accionP2) return false;
 
       buffers.delete(duelId);
-      const roundState = getRoundStateStore();
       roundState.set(duelId, ROUND_SUB_STATES.RESOLVING);
 
       const isolated = await withDuelFaultIsolation(duelId, () =>
-        resolverRonda(duelId, accionP1, accionP2),
+        resolverRonda(duelId, accionP1, accionP2, { phaseStore }),
       );
       if (!isolated.ok) {
         // Genuine fault — the turn did not happen; let both players retry.
@@ -117,8 +135,9 @@ export function createTurnCycle({ bracketWalkoverTimers } = {}) {
         // (applyRoundResult's guarded transactional write). Route the post-write
         // cleanup + broadcast through the centralized lifecycle (item #6) so
         // KO shares one finalize path with surrender/disconnect, then
-        // re-advance the tournament (item #7) so a 4p bracket progresses.
-        await finalizeDuelSideEffects(
+        // re-advance the tournament (item #7) so a 4p bracket progresses. The
+        // lifecycle is the bound reference from bindLifecycle (A1-3b).
+        await lifecycle.finalizeDuelSideEffects(
           io,
           duelId,
           fresh.duel.winner_id ?? null,
@@ -126,6 +145,9 @@ export function createTurnCycle({ bracketWalkoverTimers } = {}) {
         );
         await advanceTournamentOrRematch(io, fresh.duel.room_id, duelId, {
           bracketWalkoverTimers,
+          lifecycle,
+          phaseStore,
+          roundState,
         });
         return true;
       }
@@ -163,28 +185,4 @@ export function createTurnCycle({ bracketWalkoverTimers } = {}) {
       buffers.clear();
     },
   };
-}
-
-let singletonTurnCycle = null;
-
-/**
- * Returns the shared process-wide turn cycle, creating it on first use. The
- * bracket-walkover registry is threaded into the singleton so the KO path can
- * re-advance a 4p bracket and arm walkovers when it creates the finals.
- * @param {{ bracketWalkoverTimers?: object }} [opts]
- * @returns {ReturnType<typeof createTurnCycle>}
- */
-export function getTurnCycle({ bracketWalkoverTimers } = {}) {
-  if (!singletonTurnCycle) {
-    singletonTurnCycle = createTurnCycle({ bracketWalkoverTimers });
-  }
-  return singletonTurnCycle;
-}
-
-/**
- * Test escape hatch: drops the shared singleton. Factory-created cycles are
- * unaffected (they own their own Maps).
- */
-export function resetTurnCycle() {
-  singletonTurnCycle = null;
 }

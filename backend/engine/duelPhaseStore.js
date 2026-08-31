@@ -6,8 +6,11 @@
  * column in Postgres is deliberately left untouched — live phase is ephemeral
  * and dies with the process (restart reconciliation is item #8, out of scope).
  *
- * Exports a module-level singleton for the running app plus a `createPhaseStore()`
- * factory for test isolation.
+ * A1-3b: factory-only. The module-level singleton trio
+ * (`singletonPhaseStore` / `getPhaseStore()` / `resetPhaseStore()`) is
+ * DELETED — the composition root (DuelContext) owns the store via
+ * `createPhaseStore()` and injects it into every collaborator (spec A1: "No
+ * registry-less singleton MAY be silently cached").
  */
 
 /**
@@ -36,25 +39,4 @@ export function createPhaseStore() {
       phases.clear();
     },
   };
-}
-
-let singletonPhaseStore = null;
-
-/**
- * Returns the shared process-wide phase store, creating it on first use.
- * @returns {ReturnType<typeof createPhaseStore>}
- */
-export function getPhaseStore() {
-  if (!singletonPhaseStore) {
-    singletonPhaseStore = createPhaseStore();
-  }
-  return singletonPhaseStore;
-}
-
-/**
- * Test escape hatch: drops the shared singleton. Factory-created stores are
- * unaffected (they own their own Map).
- */
-export function resetPhaseStore() {
-  singletonPhaseStore = null;
 }

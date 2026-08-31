@@ -16,6 +16,13 @@ import { logger } from '../lib/logger.js';
  *
  * Known limitation per spec: timers are NOT persisted; a backend restart loses
  * in-flight turn windows (accepted, documented).
+ *
+ * A1-3b: factory-only. The module singleton trio
+ * (`singletonTurnTimerRegistry` / `getTurnTimerRegistry()` /
+ * `resetTurnTimerRegistry()`) is DELETED — the DuelContext composition root
+ * owns the registry via `createTurnTimerRegistry({ timeoutMs })` and injects
+ * it into the finish lifecycle (spec A1: no registry-less singleton MAY be
+ * silently cached).
  */
 export const DEFAULT_TURN_TIMEOUT_MS = 10_000;
 
@@ -65,30 +72,4 @@ export function createTurnTimerRegistry({ timeoutMs = DEFAULT_TURN_TIMEOUT_MS } 
       timers.clear();
     },
   };
-}
-
-let singletonTurnTimerRegistry = null;
-
-/**
- * Returns the shared process-wide turn timer registry, creating it on first
- * use. Mirrors `getTurnCycle()` / `getRoundStateStore()` so the centralized
- * duel-finish lifecycle (`duelLifecycle.js`) can reach the default registry
- * without threading a dependency through every caller. Per-server callers that
- * need a custom timeout still use `createTurnTimerRegistry({ timeoutMs })`
- * directly (composition root pattern).
- * @returns {ReturnType<typeof createTurnTimerRegistry>}
- */
-export function getTurnTimerRegistry() {
-  if (!singletonTurnTimerRegistry) {
-    singletonTurnTimerRegistry = createTurnTimerRegistry();
-  }
-  return singletonTurnTimerRegistry;
-}
-
-/**
- * Test escape hatch: drops the shared singleton. Factory-created registries are
- * unaffected (they own their own Maps).
- */
-export function resetTurnTimerRegistry() {
-  singletonTurnTimerRegistry = null;
 }

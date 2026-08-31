@@ -1,8 +1,4 @@
 import { finishDuelWrite } from '../repositories/duelRepository.js';
-import { getTurnCycle } from './turnCycle.js';
-import { getRoundStateStore } from './duelRoundState.js';
-import { getTurnTimerRegistry } from './turnTimers.js';
-import { getPhaseStore } from '../engine/duelPhaseStore.js';
 
 /**
  * Centralized duel-finish lifecycle (item #6, PR 2). Single termination path for
@@ -15,22 +11,27 @@ import { getPhaseStore } from '../engine/duelPhaseStore.js';
  * `duels.status/winner_id/end_reason`; it NEVER touches `rooms.status` or
  * `room_players`, and NEVER emits any bracket-advance signal (owned by backlog
  * #7).
+ *
+ * A1-3b: factory-only shape with ALL dependencies injected. The module
+ * singletons (`getTurnCycle` / `getTurnTimerRegistry` / `getRoundStateStore` /
+ * `getPhaseStore` / `getDuelLifecycle`) and the module-level
+ * `finalizeDuelSideEffects` / `finishDuel` shims are GONE — the composition
+ * root builds the lifecycle over the context-owned collaborators (design:
+ * `createDuelLifecycle({ turnTimers, turnCycle, duelRoundState, phaseStore })`).
  */
 
 /**
- * Creates an isolated duel-lifecycle over injected dependencies. The default
- * (module-level) instance uses the shared singletons; handlers that own a
- * per-server `turnTimers` registry (composition root) pass it here so the
- * correct timer is cancelled.
+ * Creates an isolated duel-lifecycle over injected dependencies. The
+ * composition root (DuelContext) supplies every collaborator: the per-server
+ * turn-timer registry, the shared turn cycle, the WS round sub-state store,
+ * and the phase store (so `finalizeDuelSideEffects` can evict the duel's
+ * phase entry — ADR-0005 terminal-state eviction).
  *
- * @param {{ turnTimers?: object, turnCycle?: object, duelRoundState?: object }} [deps]
+ * @param {{ turnTimers: object, turnCycle: object, duelRoundState: object,
+ *           phaseStore: object }} deps
  * @returns {{ finishDuel: Function, finalizeDuelSideEffects: Function }}
  */
-export function createDuelLifecycle({
-  turnTimers = getTurnTimerRegistry(),
-  turnCycle = getTurnCycle(),
-  duelRoundState = getRoundStateStore(),
-} = {}) {
+export function createDuelLifecycle({ turnTimers, turnCycle, duelRoundState, phaseStore }) {
   /**
    * Cleans up a finished duel's per-duel side effects and broadcasts the
    * outcome. Called only after the finish write applied (or by the KO path
@@ -49,7 +50,7 @@ export function createDuelLifecycle({
     turnTimers.cancel(duelId);
     turnCycle.dropBuffer(duelId);
     duelRoundState.delete(duelId);
-    getPhaseStore().delete(duelId);
+    phaseStore.delete(duelId);
     io.to(`duel:${duelId}`).emit('duel:finished', { duelId, winnerId, endReason });
   }
 
@@ -75,36 +76,4 @@ export function createDuelLifecycle({
   }
 
   return { finishDuel, finalizeDuelSideEffects };
-}
-
-let singletonLifecycle = null;
-
-/**
- * Returns the shared process-wide duel lifecycle bound to the default
- * singletons (`getTurnTimerRegistry()`, `getTurnCycle()`,
- * `getRoundStateStore()`).
- * @returns {{ finishDuel: Function, finalizeDuelSideEffects: Function }}
- */
-export function getDuelLifecycle() {
-  if (!singletonLifecycle) {
-    singletonLifecycle = createDuelLifecycle();
-  }
-  return singletonLifecycle;
-}
-
-/**
- * Default singleton accessors (design interface contract). Prefer
- * `createDuelLifecycle({ turnTimers })` when a per-server timer registry must
- * be cancelled.
- */
-export const finalizeDuelSideEffects = (...args) =>
-  getDuelLifecycle().finalizeDuelSideEffects(...args);
-export const finishDuel = (...args) => getDuelLifecycle().finishDuel(...args);
-
-/**
- * Test escape hatch: drops the shared lifecycle singleton. Factory-created
- * lifecycles are unaffected.
- */
-export function resetDuelLifecycle() {
-  singletonLifecycle = null;
 }

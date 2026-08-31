@@ -24,8 +24,9 @@ vi.mock('../ws/tournamentLifecycle.js', () => ({
 
 import { getDuelState, mapDuelStateToCamelCase, mapRoundEventsToCamelCase } from '../repositories/duelRepository.js';
 import { resolverRonda } from '../engine/roundResolver.js';
-import { finalizeDuelSideEffects } from '../ws/duelLifecycle.js';
 import { advanceTournamentOrRematch } from '../ws/tournamentLifecycle.js';
+import { createRoundStateStore } from '../ws/duelRoundState.js';
+import { createPhaseStore } from '../engine/duelPhaseStore.js';
 
 describe('createTurnCycle buffer mechanics', () => {
   let cycle;
@@ -169,15 +170,24 @@ describe('createTurnCycle timeout fill', () => {
 describe('createTurnCycle duel:turn_resolved turnEvents payload (Fase 7, PR7)', () => {
   let cycle;
   let emit;
+  let finalizeMock;
+
+  const io = { to: vi.fn() };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    cycle = createTurnCycle();
+    // A1-3b: turnCycle is factory-injected with the round/phase stores and the
+    // finish lifecycle is wired via bindLifecycle (no module singletons).
+    finalizeMock = vi.fn(async () => {});
+    cycle = createTurnCycle({
+      roundState: createRoundStateStore(),
+      phaseStore: createPhaseStore(),
+      bracketWalkoverTimers: { arm() {}, cancel() {}, has() {}, clear() {} },
+    });
+    cycle.bindLifecycle({ finalizeDuelSideEffects: finalizeMock });
     emit = vi.fn();
     vi.mocked(io.to).mockReturnValue({ emit });
   });
-
-  const io = { to: vi.fn() };
 
   // The repository mapper is mocked; this implementation mirrors the real
   // mapRoundEventsToCamelCase contract (field pick, order preserved, [] on a
@@ -289,7 +299,7 @@ describe('createTurnCycle duel:turn_resolved turnEvents payload (Fase 7, PR7)', 
       { type: 'resolved', playerId: 1, moveIndex: 4, damage: 10, effectiveness: 1, fainted: true, reason: null },
     ]);
     // The finished branch still ran after the emit.
-    expect(finalizeDuelSideEffects).toHaveBeenCalled();
+    expect(finalizeMock).toHaveBeenCalled();
     expect(advanceTournamentOrRematch).toHaveBeenCalled();
   });
 });

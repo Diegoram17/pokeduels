@@ -4,10 +4,7 @@ import { createPlayer } from '../db/players.js';
 import { createRoomWithCreator } from '../db/rooms.js';
 import { selectStarter, selectRoster } from '../db/teamSelections.js';
 import { hasDatabase, ensureSchemaAndSeed, SEED_TIMEOUT } from './helpers.js';
-import { startWsHarness, waitForEvent, waitUntil, joinRoomViaWs } from './wsHelpers.js';
-import { resetPhaseStore } from '../engine/duelPhaseStore.js';
-import { resetRoundStateStore, getRoundStateStore } from '../ws/duelRoundState.js';
-import { resetTurnCycle } from '../ws/turnCycle.js';
+import { startWsHarness, waitForEvent, waitUntil, joinRoomViaWs, readyAll, joinDuelChannel, selectLeads } from './wsHelpers.js';
 
 /**
  * Mid-duel disconnect forfeit (item #6, RF-6.2) over a real Socket.IO
@@ -24,9 +21,6 @@ describe.skipIf(!hasDatabase)('mid-duel disconnect over WS (requires DATABASE_UR
   beforeAll(async () => {
     await ensureSchemaAndSeed(pool);
     await pool.query('SELECT 1'); // warm the Neon cold start
-    resetPhaseStore();
-    resetRoundStateStore();
-    resetTurnCycle();
   }, SEED_TIMEOUT);
 
   const roomIds = [];
@@ -40,9 +34,6 @@ describe.skipIf(!hasDatabase)('mid-duel disconnect over WS (requires DATABASE_UR
 
   afterEach(async () => {
     while (harnesses.length) await harnesses.pop().teardown();
-    resetPhaseStore();
-    resetRoundStateStore();
-    resetTurnCycle();
   });
 
   afterAll(async () => {
@@ -77,68 +68,16 @@ describe.skipIf(!hasDatabase)('mid-duel disconnect over WS (requires DATABASE_UR
     return { p1, p2, room, c1, c2, p1Team, p2Team };
   }
 
-  /** Both players ready over WS; resolves with the `duel:start` payload. */
-  async function readyBoth(ctx) {
-    const { c1, c2 } = ctx;
-    const startP = waitForEvent(c1, 'duel:start');
-
-    c1.emit('room:ready', { ready: true });
-    await waitForEvent(c1, 'room:state');
-    await waitForEvent(c2, 'room:state');
-
-    c2.emit('room:ready', { ready: true });
-    await waitForEvent(c1, 'room:state');
-    await waitForEvent(c2, 'room:state');
-
-    return await startP;
-  }
-
-  /** Both sockets join the duel channel. */
-  async function joinDuel(ctx, duelId) {
-    const { c1, c2 } = ctx;
-    const s1P = waitForEvent(c1, 'duel:state');
-    c1.emit('duel:join', { duelId });
-    await s1P;
-    const s2P = waitForEvent(c2, 'duel:state');
-    c2.emit('duel:join', { duelId });
-    await s2P;
-  }
-
-  /** Both players pick their first lead; waits until both are active in the DB. */
-  async function selectLeads(ctx, duelId) {
-    const { c1, c2, p1Team, p2Team } = ctx;
-    c1.emit('duel:select_lead', { duelId, pokemonId: p1Team[0] });
-    c2.emit('duel:select_lead', { duelId, pokemonId: p2Team[0] });
-    await waitUntil(
-      () =>
-        pool.query(
-          `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
-           WHERE duel_id = $1 AND is_active = TRUE`,
-          [duelId],
-        ).then((r) => r.rows[0].n === 2),
-      20000,
-    );
-    // Both leads are active, but the handler still has to mark the duel live
-    // (status -> in_progress) after its final activateLead. A disconnect right
-    // after would see a still-pending duel and skip the forfeit — wait for the
-    // stable state so the forfeit path is the one under test.
-    await waitUntil(
-      () =>
-        pool.query('SELECT status FROM duels WHERE id = $1', [duelId])
-          .then((r) => r.rows[0].status === 'in_progress'),
-      20000,
-    );
-  }
-
   /**
    * Full acting state: bootstrapped + joined + both leads picked (duel
    * status = in_progress). Resolves with the context plus duelId.
    */
   async function createActingDuel(harness) {
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx);
-    await joinDuel(ctx, duelId);
-    await selectLeads(ctx, duelId);
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]);
+    await joinDuelChannel(ctx.c1, duelId);
+    await joinDuelChannel(ctx.c2, duelId);
+    await selectLeads([ctx.c1, ctx.c2], duelId, [ctx.p1Team[0], ctx.p2Team[0]]);
     return { ...ctx, duelId };
   }
 
@@ -182,13 +121,13 @@ describe.skipIf(!hasDatabase)('mid-duel disconnect over WS (requires DATABASE_UR
     );
     expect(rows[0]).toMatchObject({ status: 'finished', winner_id: p2.id, end_reason: 'disconnect' });
     // The finish cleanup removed the WS round sub-state.
-    expect(getRoundStateStore().get(duelId)).toBeUndefined();
+    expect(harness.ctx.roundState.get(duelId)).toBeUndefined();
   }, 120000);
 
   it('keeps the 60s reconnect grace for a disconnect before the duel is in_progress (regression)', async () => {
     const harness = await startHarness();
     const ctx = await createSeatedAndTeamedRoom(harness);
-    const { duelId } = await readyBoth(ctx); // duel created 'pending'; no leads picked
+    const [{ duelId }] = await readyAll([ctx.c1, ctx.c2]); // duel created 'pending'; no leads picked
 
     ctx.c1.disconnect(); // draft-phase disconnect — duel not yet live
     await waitUntil(() => harness.reconnectTimers.has(ctx.room.id, ctx.p1.id), 15000);

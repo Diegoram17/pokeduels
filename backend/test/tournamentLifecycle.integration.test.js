@@ -3,6 +3,8 @@ import pg from 'pg';
 import { ensureSchemaAndSeed } from './helpers.js';
 import { createDuelFromRoom } from '../repositories/duelRepository.js';
 import { advanceTournamentOrRematch } from '../ws/tournamentLifecycle.js';
+import { createPhaseStore } from '../engine/duelPhaseStore.js';
+import { createRoundStateStore } from '../ws/duelRoundState.js';
 
 /**
  * Integration tests for the 4-player bracket lifecycle (item #7, PR 3) against
@@ -54,6 +56,16 @@ describe.skipIf(!hasDatabase)('tournamentLifecycle 4-player bracket (requires DA
   const io = { to: () => ({ emit() {} }) };
 
   /**
+   * Real in-memory stores for the finals-creation path (A5 latent-bug gate
+   * #2): advanceTournamentOrRematch initializes the created finals' phase/round
+   * state through deps, so every finals-creation call site threads fresh
+   * stores exactly like the production callers do.
+   */
+  function lifecycleDeps() {
+    return { phaseStore: createPhaseStore(), roundState: createRoundStateStore() };
+  }
+
+  /**
    * Finishes a duel with a winner. createDuelFromRoom inserts duels as
    * 'pending', and finishDuelWrite is guarded to 'in_progress', so this direct
    * UPDATE transitions a pending bracket duel to finished (the same effect the
@@ -89,8 +101,8 @@ describe.skipIf(!hasDatabase)('tournamentLifecycle 4-player bracket (requires DA
 
     // Both semifinal finishes trigger the lifecycle in the same window.
     await Promise.all([
-      advanceTournamentOrRematch(io, roomId, semiA.id),
-      advanceTournamentOrRematch(io, roomId, semiB.id),
+      advanceTournamentOrRematch(io, roomId, semiA.id, lifecycleDeps()),
+      advanceTournamentOrRematch(io, roomId, semiB.id, lifecycleDeps()),
     ]);
 
     const { rows: counts } = await pool.query(
@@ -118,7 +130,7 @@ describe.skipIf(!hasDatabase)('tournamentLifecycle 4-player bracket (requires DA
     const semiB = await createDuelFromRoom(roomId, p3, p4, 'semifinal');
     await finishPendingDuel(semiA.id, p1);
     await finishPendingDuel(semiB.id, p3);
-    await advanceTournamentOrRematch(io, roomId, semiA.id);
+    await advanceTournamentOrRematch(io, roomId, semiA.id, lifecycleDeps());
 
     // Finals now exist (winners p1,p3; losers p2,p4). Resolve them: final won
     // by p1, third-place won by p2 -> ranks p1=1, p3=2, p2=3, p4=4.
@@ -131,7 +143,7 @@ describe.skipIf(!hasDatabase)('tournamentLifecycle 4-player bracket (requires DA
     await finishPendingDuel(final.id, p1);
     await finishPendingDuel(third.id, p2);
 
-    await advanceTournamentOrRematch(io, roomId, final.id);
+    await advanceTournamentOrRematch(io, roomId, final.id, lifecycleDeps());
 
     const { rows: roomRows } = await pool.query('SELECT status FROM rooms WHERE id = $1', [roomId]);
     expect(roomRows[0].status).toBe('finished');
@@ -176,7 +188,7 @@ describe.skipIf(!hasDatabase)('tournamentLifecycle 4-player bracket (requires DA
     const { applied } = await finishDuelByWalkover(semiB.id, p3);
     expect(applied).toBe(true);
 
-    await advanceTournamentOrRematch(io, roomId, semiA.id);
+    await advanceTournamentOrRematch(io, roomId, semiA.id, lifecycleDeps());
 
     const { rows: finals } = await pool.query(
       `SELECT round FROM duels WHERE room_id = $1 AND round IN ('final','tercer_puesto')`,
@@ -194,3 +206,4 @@ describe.skipIf(!hasDatabase)('tournamentLifecycle 4-player bracket (requires DA
     expect(finalSeats).toContain(p1);
   });
 });
+

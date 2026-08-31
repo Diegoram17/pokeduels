@@ -1,9 +1,8 @@
 import { Server } from 'socket.io';
 import { touchSession } from '../db/players.js';
-import { createReconnectTimerRegistry } from './reconnectTimers.js';
-import { createTurnTimerRegistry, DEFAULT_TURN_TIMEOUT_MS } from './turnTimers.js';
+import { DEFAULT_TURN_TIMEOUT_MS } from './turnTimers.js';
 import { createBracketWalkoverTimerRegistry } from './bracketWalkoverTimers.js';
-import { getTurnCycle } from './turnCycle.js';
+import { createDuelContext } from './duelContext.js';
 import { registerRoomHandlers } from './roomHandlers.js';
 import { registerTeamHandlers } from './teamHandlers.js';
 import { registerDuelHandlers } from './duelHandlers.js';
@@ -19,23 +18,23 @@ import { createWsRateLimiter } from '../middleware/wsRateLimit.js';
  * @param {import('node:http').Server} httpServer - shared listener
  * @param {{ reconnectGraceMs?: number, turnTimeoutMs?: number, corsOrigin?: string }} [options]
  * @returns {{ io: Server, reconnectTimers: object, turnTimers: object,
- *             bracketWalkoverTimers: object }} — all exposed for test
- *   teardown/assertions (design interface contract)
+ *             bracketWalkoverTimers: object, ctx: object }} — all exposed for
+ *   test teardown/assertions (design interface contract); `ctx` is the
+ *   DuelContext composition root (spec A1)
  */
 export function createSocketServer(
   httpServer,
   { reconnectGraceMs, turnTimeoutMs = DEFAULT_TURN_TIMEOUT_MS, corsOrigin = '*' } = {},
 ) {
   const io = new Server(httpServer, { cors: { origin: corsOrigin } });
-  const reconnectTimers = createReconnectTimerRegistry({ graceMs: reconnectGraceMs });
-  const turnTimers = createTurnTimerRegistry({ timeoutMs: turnTimeoutMs });
   const bracketWalkoverTimers = createBracketWalkoverTimerRegistry();
-  // Initialize the shared turn-cycle singleton with the walkover registry
-  // BEFORE any handler registers (registerRoomHandlers' createDuelLifecycle
-  // calls getTurnCycle() with no args and would otherwise cache a registry-less
-  // singleton). The KO path's advanceTournamentOrRematch needs the registry to
-  // arm walkovers when it creates the bracket finals.
-  const turnCycle = getTurnCycle({ bracketWalkoverTimers });
+  // One DuelContext per server, built BEFORE any handler registers (spec A1 —
+  // the ordering hazard is enforced by construction, not by comment). Slice 3a:
+  // the context delegates to the module singletons and owns the fresh
+  // per-server timer registries; the KO path's advanceTournamentOrRematch
+  // still receives the walkover registry through it.
+  const ctx = createDuelContext({ turnTimeoutMs, reconnectGraceMs, bracketWalkoverTimers });
+  const { reconnectTimers } = ctx;
 
   // Auth: one touchSession() per connection (not per event). The resolved
   // player becomes socket.data.player; unknown tokens and DB faults reject
@@ -59,14 +58,10 @@ export function createSocketServer(
     // product decision (disconnect, not drop-only).
     socket.onAny(createWsRateLimiter({ windowMs: 10000, limit: 40 }));
 
-    registerRoomHandlers(io, socket, reconnectTimers, turnTimers, bracketWalkoverTimers);
+    registerRoomHandlers(io, socket, ctx, reconnectTimers);
     registerTeamHandlers(io, socket);
-    registerDuelHandlers(io, socket, {
-      turnTimers,
-      turnCycle,
-      bracketWalkoverTimers,
-    });
+    registerDuelHandlers(io, socket, ctx);
   });
 
-  return { io, reconnectTimers, turnTimers, bracketWalkoverTimers };
+  return { io, reconnectTimers, turnTimers: ctx.turnTimers, bracketWalkoverTimers, ctx };
 }

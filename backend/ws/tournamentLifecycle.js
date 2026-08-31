@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { createDuelFromRoom, findPendingBracketDuelForPlayer, finishDuelByWalkover } from '../repositories/duelRepository.js';
-import { finalizeDuelSideEffects } from './duelLifecycle.js';
+import { PHASES, EVENTS, transition } from '../engine/stateMachine.js';
+import { ROUND_SUB_STATES } from './duelRoundState.js';
 
 /**
  * Pure 4-player bracket ranking decision (item #7, PR 3, "assignFinalRank").
@@ -40,12 +41,15 @@ export function computeFourPlayerRanks({ final, thirdPlace }) {
  *
  * `deps.advance` is an injectable advance function (defaults to the real
  * `advanceTournamentOrRematch`) so the finish->advance chain is unit-testable
- * without stubbing the module's own self-referential call.
+ * without stubbing the module's own self-referential call. A1-3b: the finish
+ * cleanup runs through `deps.lifecycle.finalizeDuelSideEffects` (the
+ * context-owned lifecycle, threaded through the deps object by every caller —
+ * the module-level duelLifecycle shims are deleted).
  *
  * @param {import('socket.io').Server} io
  * @param {number} roomId
  * @param {number} playerId - the walked-over (absent) player
- * @param {{ bracketWalkoverTimers?: object, advance?: Function }} [deps]
+ * @param {{ bracketWalkoverTimers?: object, lifecycle?: object, advance?: Function }} [deps]
  * @returns {Promise<{ applied: boolean }>}
  */
 export async function walkoverPendingDuel(io, roomId, playerId, deps = {}) {
@@ -54,7 +58,10 @@ export async function walkoverPendingDuel(io, roomId, playerId, deps = {}) {
   const opponentId = playerId === pending.player1_id ? pending.player2_id : pending.player1_id;
   const { applied } = await finishDuelByWalkover(pending.id, opponentId);
   if (!applied) return { applied: false };
-  await finalizeDuelSideEffects(io, pending.id, opponentId, 'walkover');
+  if (!deps.lifecycle?.finalizeDuelSideEffects) {
+    throw new Error('walkoverPendingDuel requires deps.lifecycle (finalize path)');
+  }
+  await deps.lifecycle.finalizeDuelSideEffects(io, pending.id, opponentId, 'walkover');
   const advance = deps.advance ?? advanceTournamentOrRematch;
   await advance(io, roomId, pending.id, deps);
   return { applied: true };
@@ -71,7 +78,8 @@ export async function walkoverPendingDuel(io, roomId, playerId, deps = {}) {
  * @param {number} roomId
  * @param {{ bracketWalkoverTimers: object }} deps
  */
-async function armWalkoversForDisconnected(io, roomId, { bracketWalkoverTimers }) {
+async function armWalkoversForDisconnected(io, roomId, deps) {
+  const { bracketWalkoverTimers } = deps ?? {};
   if (!bracketWalkoverTimers) return;
   const { rows: seats } = await pool.query(
     'SELECT player_id, connected FROM room_players WHERE room_id = $1',
@@ -80,7 +88,7 @@ async function armWalkoversForDisconnected(io, roomId, { bracketWalkoverTimers }
   for (const seat of seats) {
     if (seat.connected) continue;
     bracketWalkoverTimers.arm(roomId, seat.player_id, () =>
-      walkoverPendingDuel(io, roomId, seat.player_id, { bracketWalkoverTimers }),
+      walkoverPendingDuel(io, roomId, seat.player_id, deps),
     );
   }
 }
@@ -195,6 +203,19 @@ export async function advanceTournamentOrRematch(io, roomId, duelId, deps = {}) 
 
       const finalDuel = await createDuelFromRoom(roomId, finalists[0], finalists[1], 'final');
       const thirdDuel = await createDuelFromRoom(roomId, thirdPlaceSeats[0], thirdPlaceSeats[1], 'tercer_puesto');
+
+      // Both finals duels enter the same lead-selection window as the semis
+      // (A5 latent-bug gate #2): without phase/round init, the F1 phase guard
+      // rejects every bracket duel:select_lead. The stores come from the deps
+      // threaded by every production caller (turnCycle / roomHandlers /
+      // duelHandlers) — the bracket is unplayable over WS without them.
+      if (!deps.phaseStore || !deps.roundState) {
+        throw new Error('advanceTournamentOrRematch requires deps.phaseStore + deps.roundState (finals init)');
+      }
+      deps.phaseStore.set(finalDuel.id, transition(PHASES.PENDING, EVENTS.START));
+      deps.roundState.set(finalDuel.id, ROUND_SUB_STATES.AWAITING_LEAD);
+      deps.phaseStore.set(thirdDuel.id, transition(PHASES.PENDING, EVENTS.START));
+      deps.roundState.set(thirdDuel.id, ROUND_SUB_STATES.AWAITING_LEAD);
 
       // Arm site (b): a participant who is already disconnected gets a walkover
       // window over their freshly-created pending duel (the "gap" case).

@@ -53,6 +53,7 @@ vi.mock('../ws/duelLifecycle.js', () => ({
 describe('registerRoomHandlers', () => {
   let io;
   let socket;
+  let ctx;
   let reconnectTimers;
   let bracketWalkoverTimers;
   let errorSpy;
@@ -97,7 +98,11 @@ describe('registerRoomHandlers', () => {
     // lobby grace path (the pre-change behavior).
     findActiveDuelForPlayer.mockResolvedValue(null);
 
-    registerRoomHandlers(io, socket, reconnectTimers, undefined, bracketWalkoverTimers);
+    // DuelContext composition root (spec A1): the handlers resolve the finish
+    // lifecycle and the bracket-walkover registry from it. phaseStore/roundState
+    // are threaded into the bracket-advance deps (A5 latent-bug gate #2).
+    ctx = { lifecycle: mockLifecycle, bracketWalkoverTimers, phaseStore: { set: vi.fn(), get: vi.fn() }, roundState: { set: vi.fn(), get: vi.fn() } };
+    registerRoomHandlers(io, socket, ctx, reconnectTimers);
   });
 
   afterEach(() => {
@@ -205,7 +210,7 @@ describe('registerRoomHandlers', () => {
       await vi.waitFor(() => expect(bootstrapDuelIfReady).toHaveBeenCalled());
 
       expect(broadcastRoomState).toHaveBeenCalledWith(io, 7);
-      expect(bootstrapDuelIfReady).toHaveBeenCalledWith(io, 7);
+      expect(bootstrapDuelIfReady).toHaveBeenCalledWith(io, 7, ctx);
     });
 
     it('also runs the bracket bootstrap so a full ready 4-player room opens its bracket', async () => {
@@ -213,7 +218,7 @@ describe('registerRoomHandlers', () => {
       socket.emit('room:ready', { ready: true });
       await vi.waitFor(() => expect(bootstrapBracketIfReady).toHaveBeenCalled());
 
-      expect(bootstrapBracketIfReady).toHaveBeenCalledWith(io, 7);
+      expect(bootstrapBracketIfReady).toHaveBeenCalledWith(io, 7, ctx);
     });
 
     it('persists ready=false when the client un-readies', async () => {
@@ -285,7 +290,12 @@ describe('registerRoomHandlers', () => {
       socket.emit('room:leave');
       await vi.waitFor(() => expect(walkoverPendingDuel).toHaveBeenCalled());
 
-      expect(walkoverPendingDuel).toHaveBeenCalledWith(io, 7, 5, { bracketWalkoverTimers });
+      expect(walkoverPendingDuel).toHaveBeenCalledWith(io, 7, 5, {
+        bracketWalkoverTimers,
+        lifecycle: mockLifecycle,
+        phaseStore: ctx.phaseStore,
+        roundState: ctx.roundState,
+      });
       expect(leaveOrCloseRoom).not.toHaveBeenCalled();
       // The walkover timer (if any) is cancelled for the leaving player.
       expect(bracketWalkoverTimers.cancel).toHaveBeenCalledWith(7, 5);
@@ -336,6 +346,9 @@ describe('registerRoomHandlers', () => {
       // disconnect-forfeited semifinal/final.
       expect(advanceTournamentOrRematch).toHaveBeenCalledWith(io, 7, 9, {
         bracketWalkoverTimers,
+        lifecycle: mockLifecycle,
+        phaseStore: ctx.phaseStore,
+        roundState: ctx.roundState,
       });
       // The lobby grace path is NOT taken for a mid-duel forfeit.
       expect(markPlayerDisconnected).not.toHaveBeenCalled();

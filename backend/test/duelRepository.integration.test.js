@@ -25,7 +25,7 @@ import {
   loadTypeEffectivenessCache,
   resetEffectivenessCache,
 } from '../engine/typeEffectiveness.js';
-import { resetPhaseStore } from '../engine/duelPhaseStore.js';
+import { createPhaseStore } from '../engine/duelPhaseStore.js';
 
 /**
  * duelRepository + resolverRonda I/O orchestrator integration tests against a
@@ -171,7 +171,6 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
   beforeAll(async () => {
     await ensureSchemaAndSeed(pool);
     await loadTypeEffectivenessCache(pool);
-    resetPhaseStore();
   });
 
   afterAll(async () => {
@@ -544,6 +543,7 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
       duelId,
       { moveIndex: 2, wasTimeout: false },
       { moveIndex: 2, wasTimeout: false },
+      { phaseStore: createPhaseStore() },
     );
 
     expect(result.events).toHaveLength(2);
@@ -592,6 +592,7 @@ describe.skipIf(!hasDatabase)('duelRepository + resolverRonda (requires DATABASE
         duelId,
         { moveIndex: 2, wasTimeout: false },
         { moveIndex: 2, wasTimeout: false },
+        { phaseStore: createPhaseStore() },
       ),
     );
 

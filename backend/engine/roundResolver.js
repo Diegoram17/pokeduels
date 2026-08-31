@@ -1,7 +1,6 @@
 import { calcularDaño } from './damageCalc.js';
 import { getMultiplier, getEffectivenessCache } from './typeEffectiveness.js';
 import { PHASES, EVENTS, transition } from './stateMachine.js';
-import { getPhaseStore } from './duelPhaseStore.js';
 import { getDuelState, applyRoundResult } from '../repositories/duelRepository.js';
 
 /**
@@ -212,11 +211,18 @@ export function resolveRoundLogic(
  * @param {number} duelId
  * @param {{ moveIndex: number, wasTimeout?: boolean }} accionP1 - P1's action
  * @param {{ moveIndex: number, wasTimeout?: boolean }} accionP2 - P2's action
- * @param {{ rng?: () => number }} [options] - injectable RNG (default Math.random)
+ * @param {{ rng?: () => number, phaseStore: object }} [options] - injectable
+ *        RNG (default Math.random) and the REQUIRED phase store (A1-3b: the
+ *        getPhaseStore() singleton is deleted, so the caller must inject the
+ *        context-owned store — fail-loud on any missed call site)
  * @returns {Promise<{ events: object[], phase: string, winnerId?: number }>}
  * @throws {Error} when the duel does not exist or the cache is not loaded
  */
-export async function resolverRonda(duelId, accionP1, accionP2, { rng = Math.random } = {}) {
+export async function resolverRonda(duelId, accionP1, accionP2, { rng = Math.random, phaseStore } = {}) {
+  if (!phaseStore) {
+    throw new Error('resolverRonda requires an injected phaseStore');
+  }
+
   const state = await getDuelState(duelId);
   if (state === null) {
     throw new Error(`Duel ${duelId} not found`);
@@ -240,7 +246,7 @@ export async function resolverRonda(duelId, accionP1, accionP2, { rng = Math.ran
   );
 
   await applyRoundResult(duelId, nextDuelState, moveRows);
-  getPhaseStore().set(duelId, nextPhase);
+  phaseStore.set(duelId, nextPhase);
 
   return {
     events,

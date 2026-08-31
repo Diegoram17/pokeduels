@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { resolveRoundLogic, resolverRonda } from '../engine/roundResolver.js';
 import { createCache, resetEffectivenessCache } from '../engine/typeEffectiveness.js';
-import { resetPhaseStore, getPhaseStore } from '../engine/duelPhaseStore.js';
+import { createPhaseStore } from '../engine/duelPhaseStore.js';
 
 // resolverRonda (the I/O orchestrator) fetches canonical state via the
 // repository and persists via applyRoundResult. For the finished-duel guard
@@ -434,11 +434,21 @@ describe('purity', () => {
 // ---------- resolverRonda finished-duel guard ----------
 
 describe('resolverRonda finished-duel guard', () => {
+  let phaseStore;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    resetPhaseStore();
     resetEffectivenessCache();
-    vi.spyOn(getPhaseStore(), 'set');
+    phaseStore = createPhaseStore();
+    vi.spyOn(phaseStore, 'set');
+  });
+
+  it('throws when phaseStore is not injected (required dependency, A1-3b)', async () => {
+    // The I/O orchestrator must fail loudly on any missed call site once the
+    // getPhaseStore() singleton shim is deleted (design Q6).
+    await expect(resolverRonda(7, { moveIndex: 4 }, { moveIndex: 4 })).rejects.toThrow(
+      'resolverRonda requires an injected phaseStore',
+    );
   });
 
   it('returns {applied:false} without resolving or persisting when the duel status is not in_progress', async () => {
@@ -448,13 +458,13 @@ describe('resolverRonda finished-duel guard', () => {
       pokemonStates: [],
     });
 
-    const result = await resolverRonda(7, { moveIndex: 4 }, { moveIndex: 4 });
+    const result = await resolverRonda(7, { moveIndex: 4 }, { moveIndex: 4 }, { phaseStore });
 
     expect(result).toEqual({ applied: false });
     // The resolution/persistence path was never entered: no round persisted
     // (no moves row), no duel_pokemon_state mutation, no FSM advance.
     expect(applyRoundResult).not.toHaveBeenCalled();
-    expect(getPhaseStore().set).not.toHaveBeenCalled();
+    expect(phaseStore.set).not.toHaveBeenCalled();
   });
 
   it('does not call resolveRoundLogic on a finished duel (guard fires before resolution)', async () => {
@@ -469,15 +479,15 @@ describe('resolverRonda finished-duel guard', () => {
       pokemonStates: [],
     });
 
-    const result = await resolverRonda(8, { moveIndex: 2 }, { moveIndex: 2 });
+    const result = await resolverRonda(8, { moveIndex: 2 }, { moveIndex: 2 }, { phaseStore });
     expect(result).toEqual({ applied: false });
     expect(applyRoundResult).not.toHaveBeenCalled();
   });
 
   it('still throws for a missing duel (guard only short-circuits non-in_progress, not not-found)', async () => {
     getDuelState.mockResolvedValue(null);
-    await expect(resolverRonda(999, { moveIndex: 4 }, { moveIndex: 4 })).rejects.toThrow(
-      'not found',
-    );
+    await expect(
+      resolverRonda(999, { moveIndex: 4 }, { moveIndex: 4 }, { phaseStore }),
+    ).rejects.toThrow('not found');
   });
 });

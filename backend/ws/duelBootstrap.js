@@ -1,8 +1,7 @@
 import { getRoomState } from '../db/rooms.js';
 import { createDuelFromRoom } from '../repositories/duelRepository.js';
 import { PHASES, EVENTS, transition } from '../engine/stateMachine.js';
-import { getPhaseStore } from '../engine/duelPhaseStore.js';
-import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
+import { ROUND_SUB_STATES } from './duelRoundState.js';
 
 /**
  * Duel bootstrap (item #5, design: "bootstrap trigger & scope"). Called by the
@@ -25,10 +24,12 @@ import { getRoundStateStore, ROUND_SUB_STATES } from './duelRoundState.js';
  *
  * @param {import('socket.io').Server} io
  * @param {number} roomId
+ * @param {object} ctx - the DuelContext composition root (spec A1): the phase
+ *        store and round sub-state store resolve from it
  * @returns {Promise<{ id: number, status: string } | undefined>} the duel, or
  *          undefined when the readiness gate did not open
  */
-export async function bootstrapDuelIfReady(io, roomId) {
+export async function bootstrapDuelIfReady(io, roomId, ctx) {
   const roomState = await getRoomState(roomId);
   if (!roomState) return undefined;
 
@@ -51,8 +52,8 @@ export async function bootstrapDuelIfReady(io, roomId) {
   const [player1, player2] = players;
   const duel = await createDuelFromRoom(roomId, player1.playerId, player2.playerId);
 
-  getPhaseStore().set(duel.id, transition(PHASES.PENDING, EVENTS.START));
-  getRoundStateStore().set(duel.id, ROUND_SUB_STATES.AWAITING_LEAD);
+  ctx.phaseStore.set(duel.id, transition(PHASES.PENDING, EVENTS.START));
+  ctx.roundState.set(duel.id, ROUND_SUB_STATES.AWAITING_LEAD);
 
   io.to(`room:${roomId}`).emit('duel:start', { duelId: duel.id });
   return duel;
@@ -93,10 +94,13 @@ export function fisherYatesShuffle(arr) {
  *
  * @param {import('socket.io').Server} io
  * @param {number} roomId
+ * @param {object} ctx - the DuelContext composition root (spec A1); threaded
+ *        for the caller contract (3b consumes it — the bracket path writes no
+ *        phase/round state in 3a)
  * @param {(arr: number[]) => number[]} [shuffle]
  * @returns {Promise<{ semiA: object, semiB: object } | undefined>}
  */
-export async function bootstrapBracketIfReady(io, roomId, shuffle = fisherYatesShuffle) {
+export async function bootstrapBracketIfReady(io, roomId, ctx, shuffle = fisherYatesShuffle) {
   const roomState = await getRoomState(roomId);
   if (!roomState) return undefined;
 
@@ -114,6 +118,15 @@ export async function bootstrapBracketIfReady(io, roomId, shuffle = fisherYatesS
   const [p1, p2, p3, p4] = shuffle(players.map((p) => p.playerId));
   const semiA = await createDuelFromRoom(roomId, p1, p2, 'semifinal');
   const semiB = await createDuelFromRoom(roomId, p3, p4, 'semifinal');
+
+  // Both semifinals enter the same lead-selection window as the 1v1 path
+  // (A5 latent-bug gate #2): without phase/round init, the F1 phase guard in
+  // duel:select_lead rejects every bracket duel — the 4-player bracket was
+  // unplayable over WS.
+  ctx.phaseStore.set(semiA.id, transition(PHASES.PENDING, EVENTS.START));
+  ctx.roundState.set(semiA.id, ROUND_SUB_STATES.AWAITING_LEAD);
+  ctx.phaseStore.set(semiB.id, transition(PHASES.PENDING, EVENTS.START));
+  ctx.roundState.set(semiB.id, ROUND_SUB_STATES.AWAITING_LEAD);
 
   io.to(`room:${roomId}`).emit('tournament:bracket', {
     roomId,

@@ -61,7 +61,10 @@ export async function waitUntil(predicate, timeoutMs = 5000, intervalMs = 10) {
 
 /**
  * Starts an ephemeral WS harness on an OS-assigned port. Returns
- * `{ httpServer, io, reconnectTimers, port, url, connect, teardown }`:
+ * `{ httpServer, io, reconnectTimers, turnTimers, ctx, port, url, connect,
+ * teardown }`:
+ * - ctx — the DuelContext composition root (spec A1), so suites can reach the
+ *   phase/round stores, turn cycle and lifecycle the handlers use.
  * - connect(sessionToken) — opens a socket.io-client connection authenticated
  *   with the player's session token (reconnection disabled; tests drive
  *   reconnects explicitly).
@@ -79,7 +82,7 @@ export async function startWsHarness({
   // teardown never starves this one.
   await loadTypeEffectivenessCache(pool);
   const httpServer = createServer(createApp());
-  const { io, reconnectTimers, turnTimers } = createSocketServer(httpServer, {
+  const { io, reconnectTimers, turnTimers, ctx } = createSocketServer(httpServer, {
     reconnectGraceMs,
     ...(turnTimeoutMs !== undefined ? { turnTimeoutMs } : {}),
     ...(corsOrigin !== undefined ? { corsOrigin } : {}),
@@ -114,7 +117,7 @@ export async function startWsHarness({
     await new Promise((resolve) => httpServer.close(resolve));
   }
 
-  return { httpServer, io, reconnectTimers, turnTimers, port, url, connect, teardown };
+  return { httpServer, io, reconnectTimers, turnTimers, ctx, port, url, connect, teardown };
 }
 
 /**
@@ -128,4 +131,163 @@ export async function joinRoomViaWs(harness, player, code) {
   client.emit('room:join', { code, nickname: player.nickname });
   const state = await stateP;
   return { client, state };
+}
+
+/**
+ * Marks every client ready over WS (`room:ready`), one client at a time, and
+ * drains the whole-room `room:state` broadcast after each emit — one event per
+ * seated client in client order (the exact drain sequence the 1v1 suites
+ * relied on). When `expectStart` is true (default), also collects every
+ * `duel:start` payload broadcast to the FIRST client and resolves once
+ * `expectedStarts` of them arrived (1 for a 1v1 room, 2 for a 4-player
+ * bracket). Resolves with the collected `duel:start` payloads ([] when
+ * expectStart is false).
+ *
+ * @param {import('socket.io-client').Socket[]} clients
+ * @param {{ expectStart?: boolean, expectedStarts?: number }} [options]
+ * @returns {Promise<object[]>}
+ */
+export async function readyAll(clients, { expectStart = true, expectedStarts = 1 } = {}) {
+  const starts = [];
+  let resolveStarts = () => {};
+  const startsP = expectStart
+    ? new Promise((resolve) => {
+        resolveStarts = resolve;
+      })
+    : Promise.resolve();
+  if (expectStart) {
+    clients[0].on('duel:start', (payload) => {
+      starts.push(payload);
+      if (starts.length >= expectedStarts) resolveStarts();
+    });
+  }
+  try {
+    for (const client of clients) {
+      client.emit('room:ready', { ready: true });
+      // One room:state per seated client (the emitter's own copy first, then
+      // every other client's copy — the same order the 1v1 readyBoth drained).
+      for (const other of clients) {
+        await waitForEvent(other, 'room:state');
+      }
+    }
+    if (expectStart) await startsP;
+  } finally {
+    if (expectStart) clients[0].off('duel:start');
+  }
+  return starts;
+}
+
+/**
+ * Subscribes one socket to the `duel:{duelId}` channel via `duel:join` and
+ * resolves with the `duel:state` snapshot it receives. The server rejects the
+ * join for a non-participant, so this also doubles as a participant check.
+ *
+ * @param {import('socket.io-client').Socket} client
+ * @param {number} duelId
+ * @returns {Promise<object>} the camelCase duel snapshot
+ */
+export async function joinDuelChannel(client, duelId) {
+  const stateP = waitForEvent(client, 'duel:state');
+  client.emit('duel:join', { duelId });
+  return await stateP;
+}
+
+/**
+ * Picks the first lead for every client (one pokemonId per client, in the same
+ * order), then waits until both leads are active in the DB and the duel is
+ * LIVE. The live check targets `phaseStore.get(duelId) === 'in_progress'`
+ * when a phaseStore is given (the duelHandlers suite's wait), else the coarse
+ * `duels.status` column (the duelDisconnect suite's wait) — both transition in
+ * the same handler completion, so either wait leaves the duel ready for
+ * actions. Both semifinals of a 4-player bracket can be driven with separate
+ * calls: every wait is per-duel.
+ *
+ * @param {import('socket.io-client').Socket[]} clients
+ * @param {number} duelId
+ * @param {number[]} pokemonIds - one lead per client, in client order
+ * @param {object} [phaseStore] - when given, the live wait targets it
+ */
+export async function selectLeads(clients, duelId, pokemonIds, phaseStore) {
+  for (let i = 0; i < clients.length; i += 1) {
+    clients[i].emit('duel:select_lead', { duelId, pokemonId: pokemonIds[i] });
+  }
+  await waitUntil(
+    () =>
+      pool.query(
+        `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
+         WHERE duel_id = $1 AND is_active = TRUE`,
+        [duelId],
+      ).then((r) => r.rows[0].n === 2),
+    20000,
+  );
+  if (phaseStore) {
+    await waitUntil(() => phaseStore.get(duelId) === 'in_progress', 20000);
+  } else {
+    await waitUntil(
+      () =>
+        pool.query('SELECT status FROM duels WHERE id = $1', [duelId])
+          .then((r) => r.rows[0].status === 'in_progress'),
+      20000,
+    );
+  }
+}
+
+/**
+ * Plays one full round: every client emits `duel:select_action` with
+ * `moveIndex` (default 4 — the always-eligible, no-PP-cost move), resolving
+ * with the `duel:turn_resolved` payload on the first client.
+ *
+ * @param {import('socket.io-client').Socket[]} clients
+ * @param {number} duelId
+ * @param {number} [moveIndex=4]
+ * @returns {Promise<object>} the `duel:turn_resolved` payload
+ */
+export async function playRoundToResolve(clients, duelId, moveIndex = 4) {
+  const resolvedP = waitForEvent(clients[0], 'duel:turn_resolved', 45000);
+  for (const client of clients) {
+    client.emit('duel:select_action', { duelId, moveIndex });
+  }
+  return await resolvedP;
+}
+
+/**
+ * Plays a duel to KO by stacking one side's team at the brink and looping
+ * rounds (move 4 — 10 base dmg, no PP cost) until `duel:finished` arrives.
+ * Mirrors the 1v1 KO test's DB stack: the `hpStack` side's whole team is
+ * fainted except its active lead at 1 HP, so ANY hit (min 5 dmg) knocks it out
+ * and wipes the team — the stacked side loses, the other client wins. The
+ * `duel:finished` listener is registered before the first round and short-
+ * circuits the race once the finish broadcast lands (after the KO round the
+ * server emits turn_resolved then finished, in that order).
+ *
+ * @param {import('socket.io-client').Socket[]} clients - the duel's two sockets
+ * @param {number} duelId
+ * @param {{ playerId: number, leadPokemonId: number }} hpStack - the side
+ *        stacked at the brink (their opponent wins)
+ * @returns {Promise<object>} the `duel:finished` payload
+ */
+export async function playDuelToKO(clients, duelId, { hpStack }) {
+  await pool.query(
+    `UPDATE duel_pokemon_state SET fainted = TRUE, current_hp = 0, is_active = FALSE
+     WHERE duel_id = $1 AND player_id = $2`,
+    [duelId, hpStack.playerId],
+  );
+  await pool.query(
+    `UPDATE duel_pokemon_state SET fainted = FALSE, current_hp = 1, is_active = TRUE
+     WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3`,
+    [duelId, hpStack.playerId, hpStack.leadPokemonId],
+  );
+
+  let finishedPayload;
+  const finishedP = waitForEvent(clients[0], 'duel:finished', 45000).then((p) => {
+    finishedPayload = p;
+    return 'finished';
+  });
+  for (;;) {
+    const kind = await Promise.race([
+      finishedP,
+      playRoundToResolve(clients, duelId, 4).then(() => 'resolved'),
+    ]);
+    if (kind === 'finished') return finishedPayload;
+  }
 }

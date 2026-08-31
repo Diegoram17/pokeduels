@@ -7,8 +7,12 @@
  * their first lead (only then does the engine FSM advance
  * LEAD_SELECTION -> IN_PROGRESS).
  *
- * Same factory + singleton shape as engine/duelPhaseStore.js. Ephemeral:
- * dies with the process (restart reconciliation is #8, out of scope).
+ * A1-3b: factory-only (same shape as engine/duelPhaseStore.js). The module
+ * singleton trio (`singletonRoundStateStore` / `getRoundStateStore()` /
+ * `resetRoundStateStore()`) is DELETED — the DuelContext composition root owns
+ * the store via `createRoundStateStore()` and injects it into every
+ * collaborator. Ephemeral: dies with the process (restart reconciliation is
+ * #8, out of scope).
  */
 
 export const ROUND_SUB_STATES = Object.freeze({
@@ -61,26 +65,4 @@ export function createRoundStateStore() {
       return set !== undefined && set.size >= 2;
     },
   };
-}
-
-let singletonRoundStateStore = null;
-
-/**
- * Returns the shared process-wide round sub-state store, creating it on first
- * use.
- * @returns {ReturnType<typeof createRoundStateStore>}
- */
-export function getRoundStateStore() {
-  if (!singletonRoundStateStore) {
-    singletonRoundStateStore = createRoundStateStore();
-  }
-  return singletonRoundStateStore;
-}
-
-/**
- * Test escape hatch: drops the shared singleton. Factory-created stores are
- * unaffected (they own their own Maps).
- */
-export function resetRoundStateStore() {
-  singletonRoundStateStore = null;
 }

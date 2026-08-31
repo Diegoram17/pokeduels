@@ -1,8 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   createRoundStateStore,
-  getRoundStateStore,
-  resetRoundStateStore,
   ROUND_SUB_STATES,
 } from '../ws/duelRoundState.js';
 
@@ -96,36 +94,5 @@ describe('lead readiness', () => {
     store.markLeadReady(6, 2);
     expect(store.bothLeadsReady(5)).toBe(false);
     expect(store.bothLeadsReady(6)).toBe(true);
-  });
-});
-
-describe('module singleton', () => {
-  beforeEach(() => {
-    resetRoundStateStore();
-  });
-
-  it('getRoundStateStore returns the same shared instance every call', () => {
-    expect(getRoundStateStore()).toBe(getRoundStateStore());
-  });
-
-  it('shares entries across callers of the singleton', () => {
-    getRoundStateStore().set(5, ROUND_SUB_STATES.AWAITING_ACTIONS);
-    expect(getRoundStateStore().get(5)).toBe('AWAITING_ACTIONS');
-  });
-
-  it('singleton is independent from factory-created stores', () => {
-    const standalone = createRoundStateStore();
-    getRoundStateStore().set(2, ROUND_SUB_STATES.AWAITING_LEAD);
-    expect(standalone.get(2)).toBeUndefined();
-    expect(getRoundStateStore().get(2)).toBe('AWAITING_LEAD');
-  });
-
-  it('resetRoundStateStore clears the singleton without touching factory stores', () => {
-    const standalone = createRoundStateStore();
-    standalone.set(9, ROUND_SUB_STATES.AWAITING_SWITCH);
-    getRoundStateStore().set(9, ROUND_SUB_STATES.AWAITING_SWITCH);
-    resetRoundStateStore();
-    expect(getRoundStateStore().get(9)).toBeUndefined();
-    expect(standalone.get(9)).toBe('AWAITING_SWITCH');
   });
 });
