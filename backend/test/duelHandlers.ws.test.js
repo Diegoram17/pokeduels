@@ -531,17 +531,25 @@ describe.skipIf(!hasDatabase)('duel cycle over WS (requires DATABASE_URL)', () =
     getRoundStateStore().set(duelId, 'AWAITING_SWITCH');
 
     ctx.c1.emit('duel:switch_decision', { duelId, switchTo: ctx.p1Team[1] });
-    await waitUntil(
-      () =>
-        pool.query(
-          `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
-           WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3 AND is_active = TRUE`,
-          [duelId, ctx.p1.id, ctx.p1Team[1]],
-        ).then((r) => r.rows[0].n === 1),
-      20000,
-    );
+
+    // The handler COMMITs the switch and THEN, on its next line, flips the
+    // sub-state back to AWAITING_ACTIONS. Polling the DB row alone races that
+    // second step: the row is visible to other pooled connections the moment
+    // applySwitchDecision commits, before the handler continuation runs the
+    // store .set(). Wait on the sub-state transition itself -- that is what
+    // this test asserts -- so the check is deterministic.
+    await waitUntil(() => getRoundStateStore().get(duelId) === 'AWAITING_ACTIONS', 20000);
 
     expect(getRoundStateStore().get(duelId)).toBe('AWAITING_ACTIONS');
+
+    // The switch also landed in the DB (guaranteed committed by the time the
+    // sub-state flipped, since the handler commits before it).
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM duel_pokemon_state
+       WHERE duel_id = $1 AND player_id = $2 AND pokemon_id = $3 AND is_active = TRUE`,
+      [duelId, ctx.p1.id, ctx.p1Team[1]],
+    );
+    expect(rows[0].n).toBe(1);
   }, 60000);
 
   /**
