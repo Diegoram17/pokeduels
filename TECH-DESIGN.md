@@ -120,7 +120,7 @@ CREATE TABLE duels (
   round      VARCHAR(20) NOT NULL,        -- unica|semifinal|final|tercer_puesto
   winner_id  INTEGER REFERENCES players(id),
   status     VARCHAR(20) DEFAULT 'pending', -- pending|in_progress|finished
-  end_reason VARCHAR(20),                  -- ko|disconnect|surrender|server_restart
+  end_reason VARCHAR(20),                  -- ko|disconnect|surrender|server_restart|walkover
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -356,9 +356,9 @@ function resolverRonda(duel, accionP1, accionP2) {
 
 Sin auth tradicional, el modelo de amenazas cambia: no hay credenciales que proteger, pero sí hay que evitar que un jugador actúe en nombre de otro o manipule el combate.
 
-- **Token de sesión efímero:** al ingresar el nickname, el servidor emite un `sessionToken` (UUID). Ese token —no el nickname— identifica al jugador en cada evento. El nickname es solo una etiqueta visual y **nunca** se usa como identificador de autoridad.
+- **Token de sesión efímero:** al ingresar el nickname, el servidor emite un `sessionToken` (UUID). Ese token —no el nickname— identifica al jugador. La validación ocurre **una sola vez, en el handshake de Socket.IO** (`ws/index.js`, `io.use`): el `sessionToken` se presenta al conectar, se resuelve contra `players`, y el resultado queda ligado al socket autenticado (`socket.data.player.id`) para toda la vida de la conexión. Los handlers WS confían en esa identidad ligada al socket — el token **no** se re-deriva ni se re-valida por evento, y no puede intercambiarse a mitad de conexión. El nickname es solo una etiqueta visual y **nunca** se usa como identificador de autoridad. En REST, en cambio, cada request autenticado resuelve su `Authorization: Bearer <sessionToken>` por request (`requireAuth`).
 - **Autoridad del servidor:** el cliente nunca envía daño ni HP. Envía `moveIndex`; el servidor valida que ese movimiento exista, que tenga PP, y que el pokémon esté activo y vivo.
-- **Validación de pertenencia:** cada evento de duelo verifica que el `playerId` derivado del `sessionToken` sea participante de ese `duelId`.
+- **Validación de pertenencia:** cada evento de duelo verifica que el `playerId` ligado al socket autenticado sea participante de ese `duelId` (`fetchDuelForParticipant`).
 - **Anti-anticipación:** las acciones de ronda se almacenan en servidor sin emitirse hasta que ambos jugadores enviaron la suya (o expiró el timeout). Esto garantiza la simultaneidad real.
 - **Nickname sanitizado:** limitar longitud, escapar HTML al renderizar (evita XSS por nickname) y validar unicidad dentro de la sala.
 - **Rate limiting** en `POST /api/session` y `POST /api/rooms` para evitar creación masiva de salas o sesiones.
@@ -432,6 +432,14 @@ las alternativas reales consideradas y el trade-off aceptado, no solo la decisi�
 | [ADR-0006](adrs/0006-resiliencia-cold-start.md) | Resiliencia — mitigación del cold start de Render | Aceptado |
 | [ADR-0007](adrs/0007-arrastre-estado-y-matriz-tipos.md) | Arrastre de estado entre duelos y cobertura de la matriz de tipos | Aceptado |
 | [ADR-0008](adrs/0008-reconciliacion-duelos-huerfanos.md) | Reconciliación de duelos y torneos huérfanos tras reinicio del backend | Aceptado |
+| [ADR-0009](adrs/0009-token-oidc-vercel.md) | Token OIDC de Vercel — exclusión y aceptación de riesgo | Aceptado |
+| [ADR-0010](adrs/0010-rematch-1v1.md) | Revancha en duelos 1v1 | Aceptado |
+| [ADR-0011](adrs/0011-walkover-end-reason.md) | `end_reason='walkover'` para duelos de bracket no iniciados | Aceptado |
+| [ADR-0012](adrs/0012-separacion-dev-prod-db.md) | Separación dev/prod de base de datos vía Neon branching | Aceptado |
+
+> **Nota:** la tabla quedó desactualizada entre ADR-0009 y ADR-0012 (hueco de 0009–0012
+> corregido el 2026-08-31, ítem #17 del backlog) — las filas anteriores a esta corrección
+> no se mantenían al ritmo de creación de ADRs.
 
 ## 12. Criterios de aceptación por flujo
 
