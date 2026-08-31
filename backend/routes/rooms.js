@@ -6,9 +6,9 @@ import { createRoomCreateLimiter } from '../middleware/rateLimit.js';
 import { createRoomWithCreator, listWaitingRooms, joinRoom, getRoomByCode } from '../db/rooms.js';
 import { createBot, removeBot } from '../ws/botManager.js';
 import { broadcastRoomState } from '../ws/roomState.js';
+import { sanitizeNickname } from '../lib/sanitizeNickname.js';
 
 const VALID_MAX_PLAYERS = new Set([2, 4]);
-const MAX_NICKNAME_LENGTH = 30;
 
 /**
  * Factory returning a FRESH router (and a FRESH room-create limiter) per
@@ -51,14 +51,11 @@ export function createRoomsRouter() {
     requireAuth,
     asyncHandler(async (req, res) => {
       const { nickname } = req.body ?? {};
-      if (
-        typeof nickname !== 'string' ||
-        nickname.trim().length === 0 ||
-        nickname.length > MAX_NICKNAME_LENGTH
-      ) {
-        throw new HttpError(400, 'nickname is required and must be at most 30 characters');
+      const result = sanitizeNickname(nickname);
+      if (!result.ok) {
+        throw new HttpError(400, 'nickname must be 3–30 characters and free of control characters');
       }
-      const room = await joinRoom(req.params.code, req.player.id, nickname);
+      const room = await joinRoom(req.params.code, req.player.id, result.value);
       res.status(201).json(room);
     }),
   );
