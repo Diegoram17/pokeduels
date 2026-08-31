@@ -4,7 +4,7 @@
 // — the server owns the new active pokemon.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
 import { useMockState } from '../../state/useMockState'
@@ -156,6 +156,29 @@ function buildLiveVoluntaryState(): MockState {
       makePokemon(10, 25, 'Pikachu', { isActive: true }),
       makePokemon(10, 5, 'Snorlax'),
       makePokemon(10, 6, 'Eevee'),
+      makePokemon(11, 23, 'Pidgeot', { isActive: true }),
+    ],
+  )
+}
+
+// Covers the .unit-card--active / .flag--danger / .unit-card--ko trio in one
+// bench: a live active, a low-HP bench unit and a fainted bench unit.
+function buildDangerState(): MockState {
+  return baseState(
+    {
+      duelId: '42',
+      slot: '1v1',
+      phase: 'awaiting_switch',
+      turnNumber: 2,
+      winnerId: null,
+      endReason: null,
+      opponentDisconnected: false,
+      lastRejection: null,
+    },
+    [
+      makePokemon(10, 25, 'Pikachu', { currentHp: 100, isActive: true }),
+      makePokemon(10, 5, 'Snorlax', { currentHp: 10 }),
+      makePokemon(10, 6, 'Eevee', { currentHp: 0, fainted: true }),
       makePokemon(11, 23, 'Pidgeot', { isActive: true }),
     ],
   )
@@ -346,5 +369,29 @@ describe('SwapScreen — voluntary mode', () => {
     })
 
     expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
+  })
+})
+
+describe('SwapScreen — bench card state classes (Fase 7 PR10)', () => {
+  it('classes the cards: active glow, danger flag on low HP, KO overlay on fainted', () => {
+    const { container } = renderSwapFromState(buildDangerState(), '/swap?mode=voluntary')
+
+    expect(container.querySelector('.unit-card--active')).not.toBeNull()
+    expect(screen.getByText('EN CAMPO')).toBeInTheDocument()
+    expect(container.querySelector('.flag--danger')).not.toBeNull()
+    expect(screen.getByText('EN PELIGRO')).toBeInTheDocument()
+    expect(container.querySelector('.unit-card--ko')).not.toBeNull()
+    expect(container.querySelector('.ko-flag')).not.toBeNull()
+    expect(screen.getByText('K.O.')).toBeInTheDocument()
+  })
+
+  it('keeps the cancel control in the topbar action slot in voluntary mode', () => {
+    const { container } = renderSwapFromState(buildLiveVoluntaryState(), '/swap?mode=voluntary')
+
+    const actionSlot = container.querySelector('.pd-topbar__end')
+    expect(actionSlot).not.toBeNull()
+    expect(
+      within(actionSlot as HTMLElement).getByRole('button', { name: /volver al combate/i }),
+    ).toBeInTheDocument()
   })
 })

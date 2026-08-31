@@ -6,6 +6,9 @@ import type { MoveIndex } from './moveIndex'
 
 export const MAX_HP = 100
 export const TURN_TIMEOUT_SECONDS = 8
+// Swap screen "EN PELIGRO" threshold: a live unit at or below 20% HP gets the
+// danger flag (matches HpBar's low tier at pct <= 20).
+export const LOW_HP_THRESHOLD = MAX_HP * 0.2
 // Lead-selection countdown (spec: "The countdown shown MUST be cosmetic and
 // MUST NOT auto-submit on expiry"). Unspecified duration — picked here; the
 // server owns lead selection, so expiry only leaves the pick available.

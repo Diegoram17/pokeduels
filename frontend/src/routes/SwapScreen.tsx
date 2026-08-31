@@ -5,7 +5,7 @@ import ScreenTopbar from '../components/ScreenTopbar'
 import HpBar from '../components/HpBar'
 import GlowBlob from '../components/GlowBlob'
 import type { DuelPokemonState, DuelState } from '../state/schema'
-import { MAX_HP } from '../lib/duelBoard'
+import { LOW_HP_THRESHOLD, MAX_HP } from '../lib/duelBoard'
 
 /**
  * Screen 6: Pokémon Swap. In forced mode (after a KO) the player MUST pick a
@@ -27,55 +27,44 @@ function BenchPokemonCard({
 }) {
   const isActive = pokemon.isActive
   const isKo = pokemon.fainted || pokemon.currentHp === 0
+  const isLowHp = !isKo && pokemon.currentHp <= LOW_HP_THRESHOLD
   const selectable = !isActive && !isKo
 
   return (
     <div
-      className={`pd-card pd-card--flush${selectable ? ' pd-card--interactive' : ''}${isActive ? ' pd-card--active' : ''}`}
+      className={`pd-card pd-card--flush unit-card${selectable ? ' pd-card--interactive' : ''}${isActive ? ' unit-card--active' : ''}${isKo ? ' unit-card--ko' : ''}`}
       data-testid={`bench-card-${pokemon.pokemonId}`}
-      style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}
     >
-      {isActive && (
-        <span
-          style={{
-            position: 'absolute',
-            top: 10,
-            right: 10,
-            zIndex: 5,
-            padding: '4px 8px',
-            borderRadius: 'var(--pd-radius-sm)',
-            font: '700 10px/1 var(--pd-font-mono)',
-            letterSpacing: '.1em',
-            textTransform: 'uppercase',
-            background: 'var(--pd-yellow)',
-            color: '#1a1400',
-          }}
-        >
-          EN CAMPO
+      {isActive && <span className="flag flag--active">EN CAMPO</span>}
+      {isLowHp && (
+        <span className="flag flag--danger">
+          <span className="material-symbols-outlined" aria-hidden="true">
+            warning
+          </span>
+          EN PELIGRO
         </span>
       )}
-      <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(6,12,30,.5)' }}>
+      {isKo && (
+        <div className="ko-flag">
+          <span>K.O.</span>
+        </div>
+      )}
+      <div className="art">
         {pokemon.spriteUrl ? (
-          <img
-            src={pokemon.spriteUrl}
-            alt={pokemon.name}
-            style={{ width: 96, height: 96, objectFit: 'contain', imageRendering: 'pixelated' }}
-          />
+          <img src={pokemon.spriteUrl} alt={pokemon.name} />
         ) : (
           <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 56, color: 'var(--pd-text-dim)' }}>
             pets
           </span>
         )}
       </div>
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <h2 style={{ margin: 0, font: '800 19px/1.2 var(--pd-font-display)', color: '#fff', textTransform: 'uppercase' }}>
-            {pokemon.name.toUpperCase()}
-          </h2>
+      <div className="body">
+        <div className="top-row">
+          <h2>{pokemon.name.toUpperCase()}</h2>
           <span className={`pd-badge pd-badge--${pokemon.type}`}>{pokemon.type.toUpperCase()}</span>
         </div>
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', font: '700 13px/1 var(--pd-font-mono)', color: isKo ? 'var(--pd-danger)' : 'var(--pd-text-meta)', marginBottom: 4 }}>
+          <div className={`hp-row${isLowHp ? ' hp-row--danger' : ''}`}>
             <span>HP</span>
             <span>
               {pokemon.currentHp} / {MAX_HP}
@@ -220,8 +209,8 @@ function SwapScreen() {
         {mode === 'voluntary' && <CancelSwapButton onClick={() => navigate('/duel')} />}
       </ScreenTopbar>
 
-      <main id="main-content" style={{ position: 'relative', zIndex: 2, padding: 32, maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+      <main id="main-content" className="switch-main">
+        <div className="switch-head">
           <h1
             className="pd-title pd-title--lg"
             style={{

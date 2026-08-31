@@ -643,3 +643,36 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .champion-badge{display:inline-block;padding:var(--pd-space-1) var(--pd-space-2);border-radius:var(--pd-radius-sm);margin-bottom:var(--pd-space-2);
   background:rgba(255,203,5,.14);color:var(--pd-yellow);border:1px solid rgba(255,203,5,.4);
   font:700 11px/1 var(--pd-font-mono);letter-spacing:.12em;text-transform:uppercase}
+
+/* ============ Screen: Swap — ported from Prototipos/6 ============
+   Verbatim from Prototipos/6.Cambio_pokemon.html <style> (minus
+   .switch-topbar, which styled the bare header deleted in PR1 — .pd-topbar
+   covers it). .roster-grid is ported verbatim but the React roster keeps its
+   existing .bench-grid name (spec: "bench-grid stays the roster grid").
+   .flag--danger .material-symbols-outlined is a React-side addition (the
+   prototype sized the warning icon inline). */
+.switch-main{position:relative;z-index:2;padding:var(--pd-space-6);max-width:1200px;margin:0 auto}
+.switch-head{text-align:center;margin-bottom:var(--pd-space-5)}
+.roster-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--pd-space-4)}
+.unit-card{display:flex;flex-direction:column;position:relative}
+.unit-card .art{height:190px;position:relative;border-bottom:1px solid var(--pd-border-blue-dim);
+  display:flex;align-items:center;justify-content:center;padding:var(--pd-space-2);background:rgba(6,12,30,.5)}
+.unit-card .art img{width:100%;height:100%;object-fit:contain}
+/* React-side addition: pixelated sprite rendering (was inline on the img). */
+.unit-card .art img{image-rendering:pixelated}
+.unit-card .body{padding:var(--pd-space-4);display:flex;flex-direction:column;gap:var(--pd-space-3);flex:1}
+.unit-card .top-row{display:flex;justify-content:space-between;align-items:flex-start}
+.unit-card h2{margin:0;font:800 19px/1.2 var(--pd-font-display);color:#fff;text-transform:uppercase}
+.flag{position:absolute;top:10px;right:10px;z-index:5;padding:var(--pd-space-1) var(--pd-space-2);border-radius:var(--pd-radius-sm);
+  font:700 10px/1 var(--pd-font-mono);letter-spacing:.1em;text-transform:uppercase}
+.flag--active{background:var(--pd-yellow);color:#1a1400}
+.flag--danger{display:flex;align-items:center;gap:var(--pd-space-1);background:transparent;color:var(--pd-danger)}
+.flag--danger .material-symbols-outlined{font-size:16px}
+.hp-row{display:flex;justify-content:space-between;font:700 13px/1 var(--pd-font-mono);color:var(--pd-text-meta);margin-bottom:var(--pd-space-1)}
+.hp-row--danger{color:var(--pd-danger)}
+.ko-flag{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:none;
+  background:repeating-linear-gradient(45deg, rgba(0,0,0,.45),rgba(0,0,0,.45) 10px, rgba(0,0,0,.65) 10px, rgba(0,0,0,.65) 20px)}
+.ko-flag span{transform:rotate(-10deg);border-top:3px solid rgba(255,180,171,.6);border-bottom:3px solid rgba(255,180,171,.6);
+  padding:var(--pd-space-1) var(--pd-space-4);font:800 20px/1 var(--pd-font-display);letter-spacing:.2em;color:var(--pd-danger);text-transform:uppercase}
+.unit-card--ko{opacity:.6;filter:grayscale(1)}
+.unit-card--active{border-color:var(--pd-yellow);box-shadow:0 0 0 1px var(--pd-yellow),0 26px 70px rgba(0,0,0,.72)}
