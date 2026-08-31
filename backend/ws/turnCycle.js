@@ -1,6 +1,7 @@
 import {
   getDuelState,
   mapDuelStateToCamelCase,
+  mapRoundEventsToCamelCase,
 } from '../repositories/duelRepository.js';
 import { resolverRonda } from '../engine/roundResolver.js';
 import { withDuelFaultIsolation } from '../engine/faultIsolation.js';
@@ -101,7 +102,15 @@ export function createTurnCycle({ bracketWalkoverTimers } = {}) {
       }
 
       const fresh = await getDuelState(duelId);
-      io.to(`duel:${duelId}`).emit('duel:turn_resolved', mapDuelStateToCamelCase(fresh));
+      // Fase 7 (PR7): forward the round resolver's ordered `events` list as the
+      // additive `turnEvents` payload field (server-authoritative attack
+      // replay). The no-op guard path (resolverRonda returns { applied:false })
+      // has no events — mapRoundEventsToCamelCase yields [].
+      const resolvedEvents = isolated.result?.events;
+      io.to(`duel:${duelId}`).emit('duel:turn_resolved', {
+        ...mapDuelStateToCamelCase(fresh),
+        turnEvents: mapRoundEventsToCamelCase(resolvedEvents),
+      });
 
       if (fresh.duel.status === 'finished') {
         // Team wipe — the round resolution already persisted the finish

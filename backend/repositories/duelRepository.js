@@ -474,3 +474,32 @@ export function mapDuelStateToCamelCase({ duel, pokemonStates }) {
     })),
   };
 }
+
+/**
+ * Pure mapping helper (Fase 7, PR7): turns the round engine's ordered `events`
+ * list (backend/engine/roundResolver.js — { resolved, skipped, rejected })
+ * into the additive `turnEvents` field of the `duel:turn_resolved` payload,
+ * preserving the exact server resolution order. `skipped`/`rejected` events
+ * only carry what the engine emitted, so the absent numeric fields default to
+ * null (the frontend AttackEvent schema uses `null` for "no value").
+ *
+ * @param {Array<{ type: string, playerId: number, moveIndex?: number,
+ *                 damage?: number, effectiveness?: number, fainted?: boolean,
+ *                 reason?: string }>|undefined} events - resolverRonda's
+ *        events, or undefined/null on the no-op path ({ applied:false })
+ * @returns {Array<{ type: string, playerId: number, moveIndex: number|null,
+ *                   damage: number|null, effectiveness: number|null,
+ *                   fainted: boolean, reason: string|null }>}
+ */
+export function mapRoundEventsToCamelCase(events) {
+  if (!Array.isArray(events)) return [];
+  return events.map((event) => ({
+    type: event.type,
+    playerId: event.playerId,
+    moveIndex: event.moveIndex ?? null,
+    damage: event.damage ?? null,
+    effectiveness: event.effectiveness ?? null,
+    fainted: event.fainted ?? false,
+    reason: event.reason ?? null,
+  }));
+}

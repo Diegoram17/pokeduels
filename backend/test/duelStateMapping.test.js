@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapDuelStateToCamelCase } from '../repositories/duelRepository.js';
+import { mapDuelStateToCamelCase, mapRoundEventsToCamelCase } from '../repositories/duelRepository.js';
 
 // Pure mapping tests (item #5): mapDuelStateToCamelCase transforms the
 // canonical snake_case repository state into the camelCase shape the frontend
@@ -103,5 +103,58 @@ describe('mapDuelStateToCamelCase', () => {
     const before = JSON.stringify(snakeState);
     mapDuelStateToCamelCase(snakeState);
     expect(JSON.stringify(snakeState)).toBe(before);
+  });
+});
+
+// Pure mapping tests (Fase 7, PR7): mapRoundEventsToCamelCase turns the
+// engine's round `events` list (backend/engine/roundResolver.js —
+// { resolved, skipped, rejected }) into the additive `turnEvents` payload
+// field of duel:turn_resolved, preserving the exact server resolution order.
+describe('mapRoundEventsToCamelCase', () => {
+  it('picks exactly the seven payload fields per event, defaulting the absent ones', () => {
+    const events = [
+      { type: 'resolved', playerId: 2, moveIndex: 2, damage: 25, effectiveness: 1, fainted: false },
+      { type: 'skipped', playerId: 1, reason: 'target_fainted' },
+      { type: 'rejected', playerId: 2, moveIndex: 1, reason: 'insufficient_pp' },
+    ];
+
+    const mapped = mapRoundEventsToCamelCase(events);
+
+    expect(mapped).toEqual([
+      { type: 'resolved', playerId: 2, moveIndex: 2, damage: 25, effectiveness: 1, fainted: false, reason: null },
+      { type: 'skipped', playerId: 1, moveIndex: null, damage: null, effectiveness: null, fainted: false, reason: 'target_fainted' },
+      { type: 'rejected', playerId: 2, moveIndex: 1, damage: null, effectiveness: null, fainted: false, reason: 'insufficient_pp' },
+    ]);
+  });
+
+  it('preserves the server resolution order', () => {
+    const events = [
+      { type: 'resolved', playerId: 2, moveIndex: 4, damage: 10, effectiveness: 1, fainted: false },
+      { type: 'resolved', playerId: 1, moveIndex: 2, damage: 20, effectiveness: 2, fainted: true },
+    ];
+
+    const mapped = mapRoundEventsToCamelCase(events);
+
+    expect(mapped.map((e) => e.playerId)).toEqual([2, 1]);
+    expect(mapped[0].fainted).toBe(false);
+    expect(mapped[1].fainted).toBe(true);
+  });
+
+  it('passes the rejection/skip reason through unchanged', () => {
+    const events = [
+      { type: 'rejected', playerId: 1, moveIndex: 3, reason: 'insufficient_pp' },
+      { type: 'skipped', playerId: 2, reason: 'target_fainted' },
+    ];
+
+    const mapped = mapRoundEventsToCamelCase(events);
+
+    expect(mapped[0].reason).toBe('insufficient_pp');
+    expect(mapped[1].reason).toBe('target_fainted');
+  });
+
+  it('returns an empty array for a non-array input (resolverRonda no-op path)', () => {
+    expect(mapRoundEventsToCamelCase(undefined)).toEqual([]);
+    expect(mapRoundEventsToCamelCase(null)).toEqual([]);
+    expect(mapRoundEventsToCamelCase([])).toEqual([]);
   });
 });

@@ -10,9 +10,22 @@ import { createTurnCycle } from '../ws/turnCycle.js';
 vi.mock('../repositories/duelRepository.js', () => ({
   getDuelState: vi.fn(),
   mapDuelStateToCamelCase: vi.fn(),
+  mapRoundEventsToCamelCase: vi.fn(),
+}));
+vi.mock('../engine/roundResolver.js', () => ({
+  resolverRonda: vi.fn(),
+}));
+vi.mock('../ws/duelLifecycle.js', () => ({
+  finalizeDuelSideEffects: vi.fn(async () => {}),
+}));
+vi.mock('../ws/tournamentLifecycle.js', () => ({
+  advanceTournamentOrRematch: vi.fn(async () => {}),
 }));
 
-import { getDuelState } from '../repositories/duelRepository.js';
+import { getDuelState, mapDuelStateToCamelCase, mapRoundEventsToCamelCase } from '../repositories/duelRepository.js';
+import { resolverRonda } from '../engine/roundResolver.js';
+import { finalizeDuelSideEffects } from '../ws/duelLifecycle.js';
+import { advanceTournamentOrRematch } from '../ws/tournamentLifecycle.js';
 
 describe('createTurnCycle buffer mechanics', () => {
   let cycle;
@@ -150,5 +163,133 @@ describe('createTurnCycle timeout fill', () => {
     cycle.bufferAction(7, 1, { moveIndex: 4 });
     cycle.bufferAction(7, 2, { moveIndex: 4 });
     expect(await cycle.bufferTimeoutAction(7)).toBeNull();
+  });
+});
+
+describe('createTurnCycle duel:turn_resolved turnEvents payload (Fase 7, PR7)', () => {
+  let cycle;
+  let emit;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cycle = createTurnCycle();
+    emit = vi.fn();
+    vi.mocked(io.to).mockReturnValue({ emit });
+  });
+
+  const io = { to: vi.fn() };
+
+  // The repository mapper is mocked; this implementation mirrors the real
+  // mapRoundEventsToCamelCase contract (field pick, order preserved, [] on a
+  // non-array — i.e. the resolverRonda no-op path).
+  const identityMapper = (events) =>
+    (Array.isArray(events) ? events : []).map((e) => ({
+      type: e.type,
+      playerId: e.playerId,
+      moveIndex: e.moveIndex ?? null,
+      damage: e.damage ?? null,
+      effectiveness: e.effectiveness ?? null,
+      fainted: e.fainted ?? false,
+      reason: e.reason ?? null,
+    }));
+
+  function bufferBoth() {
+    cycle.bufferAction(7, 1, { moveIndex: 4 });
+    cycle.bufferAction(7, 2, { moveIndex: 2 });
+  }
+
+  it('includes turnEvents in server resolution order alongside all prior snapshot fields', async () => {
+    const events = [
+      { type: 'resolved', playerId: 2, moveIndex: 2, damage: 25, effectiveness: 1, fainted: false },
+      { type: 'resolved', playerId: 1, moveIndex: 4, damage: 10, effectiveness: 2, fainted: true },
+    ];
+    mapRoundEventsToCamelCase.mockImplementation(identityMapper);
+    resolverRonda.mockResolvedValue({ events, phase: 'awaiting_actions' });
+    getDuelState.mockResolvedValue({
+      duel: { id: 7, player1_id: 1, player2_id: 2, status: 'in_progress' },
+      pokemonStates: [],
+    });
+    mapDuelStateToCamelCase.mockReturnValue({
+      duelId: 7,
+      turnNumber: 3,
+      winnerId: null,
+      endReason: null,
+      pokemonStates: [],
+    });
+
+    bufferBoth();
+    expect(await cycle.attemptResolveTurn(io, 7)).toBe(true);
+
+    expect(mapRoundEventsToCamelCase).toHaveBeenCalledWith(events);
+    const [eventName, payload] = emit.mock.calls[0];
+    expect(eventName).toBe('duel:turn_resolved');
+    // All prior snapshot fields present, plus the additive turnEvents in the
+    // exact server resolution order (P2 resolved first, then P1).
+    expect(payload).toEqual({
+      duelId: 7,
+      turnNumber: 3,
+      winnerId: null,
+      endReason: null,
+      pokemonStates: [],
+      turnEvents: [
+        { type: 'resolved', playerId: 2, moveIndex: 2, damage: 25, effectiveness: 1, fainted: false, reason: null },
+        { type: 'resolved', playerId: 1, moveIndex: 4, damage: 10, effectiveness: 2, fainted: true, reason: null },
+      ],
+    });
+  });
+
+  it('emits turnEvents: [] when resolverRonda no-ops (duel no longer in_progress)', async () => {
+    mapRoundEventsToCamelCase.mockImplementation(identityMapper);
+    resolverRonda.mockResolvedValue({ applied: false });
+    getDuelState.mockResolvedValue({
+      duel: { id: 7, player1_id: 1, player2_id: 2, status: 'pending' },
+      pokemonStates: [],
+    });
+    mapDuelStateToCamelCase.mockReturnValue({
+      duelId: 7,
+      turnNumber: 1,
+      winnerId: null,
+      endReason: null,
+      pokemonStates: [],
+    });
+
+    bufferBoth();
+    expect(await cycle.attemptResolveTurn(io, 7)).toBe(true);
+
+    const [eventName, payload] = emit.mock.calls[0];
+    expect(eventName).toBe('duel:turn_resolved');
+    expect(payload.turnEvents).toEqual([]);
+    expect(payload.duelId).toBe(7); // snapshot fields still present
+  });
+
+  it('still carries turnEvents on a team-wipe turn (emit precedes the finished branch)', async () => {
+    const events = [
+      { type: 'resolved', playerId: 1, moveIndex: 4, damage: 10, effectiveness: 1, fainted: true },
+    ];
+    mapRoundEventsToCamelCase.mockImplementation(identityMapper);
+    resolverRonda.mockResolvedValue({ events, phase: 'finished', winnerId: 1 });
+    getDuelState.mockResolvedValue({
+      duel: { id: 7, player1_id: 1, player2_id: 2, room_id: 99, status: 'finished', winner_id: 1 },
+      pokemonStates: [],
+    });
+    mapDuelStateToCamelCase.mockReturnValue({
+      duelId: 7,
+      turnNumber: 3,
+      winnerId: 1,
+      endReason: 'ko',
+      pokemonStates: [],
+    });
+
+    bufferBoth();
+    expect(await cycle.attemptResolveTurn(io, 7)).toBe(true);
+
+    const [eventName, payload] = emit.mock.calls[0];
+    expect(eventName).toBe('duel:turn_resolved');
+    expect(payload.turnEvents).toEqual([
+      { type: 'resolved', playerId: 1, moveIndex: 4, damage: 10, effectiveness: 1, fainted: true, reason: null },
+    ]);
+    // The finished branch still ran after the emit.
+    expect(finalizeDuelSideEffects).toHaveBeenCalled();
+    expect(advanceTournamentOrRematch).toHaveBeenCalled();
   });
 });
