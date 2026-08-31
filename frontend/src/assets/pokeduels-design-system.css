@@ -396,3 +396,49 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 /* Fase 7: size="lg" modal scroll body — long content (Lobby rules text) stays
    reachable without scrolling the page. */
 .pd-modal-body{max-height:70vh;overflow-y:auto}
+
+/* ============ Screen: Lobby — ported from Prototipos/2 ============
+   Verbatim from Prototipos/2.Lobby_de_salas.html <style> (minus .lobby-topbar,
+   which only styled the bare header deleted in PR1 — .pd-topbar covers it). */
+.lobby-shell{position:relative;z-index:2;display:flex;flex-direction:column;min-height:100vh}
+.lobby-body{flex:1;display:flex;flex-direction:column;gap:var(--pd-space-6);padding:var(--pd-space-6);max-width:1440px;margin:0 auto;width:100%}
+@media(min-width:960px){.lobby-body{flex-direction:row}}
+.lobby-main{flex:1;display:flex;flex-direction:column;gap:var(--pd-space-5)}
+.lobby-header-row{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--pd-space-4);flex-wrap:wrap}
+.view-toggle{display:flex;gap:var(--pd-space-2)}
+.view-toggle button{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:var(--pd-radius-sm);border:1px solid var(--pd-border-blue);background:rgba(6,12,30,.5);
+  color:var(--pd-text-meta);cursor:pointer;transition:border-color var(--pd-fast),color var(--pd-fast)}
+.view-toggle button:hover{color:#fff;border-color:var(--pd-border-blue-soft)}
+.view-toggle button.active{color:var(--pd-yellow);border-color:var(--pd-yellow)}
+.room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--pd-space-4)}
+.room-card{display:flex;flex-direction:column;gap:var(--pd-space-3);padding:var(--pd-space-4)}
+.room-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--pd-space-2)}
+.room-code{font:700 20px/1 var(--pd-font-mono);color:var(--pd-yellow)}
+.room-code--dim{color:var(--pd-text-meta)}
+.room-mode-label{display:block;margin-top:var(--pd-space-1)}
+.stack{display:flex;-webkit-box-orient:horizontal}
+.avatar-stack{display:flex}
+.avatar-stack .pd-avatar{width:32px;height:32px;margin-left:-8px}
+.avatar-stack .pd-avatar:first-child{margin-left:0}
+.avatar-slot-empty{width:32px;height:32px;margin-left:-8px;border-radius:50%;border:2px dashed var(--pd-border-blue-soft);
+  background:rgba(6,12,30,.5);display:flex;align-items:center;justify-content:center;color:var(--pd-text-meta)}
+.avatar-slot-empty .material-symbols-outlined{font-size:16px}
+.room-card-foot{display:flex;justify-content:space-between;align-items:center}
+.room-card--empty{align-items:center;justify-content:center;min-height:160px;opacity:.6}
+.room-card--full{opacity:.6}
+
+.lobby-side{width:100%;display:flex;flex-direction:column;gap:var(--pd-space-5);padding:var(--pd-space-5)}
+@media(min-width:960px){.lobby-side{width:340px;flex:none}}
+.side-heading{display:flex;align-items:center;gap:var(--pd-space-2);margin:0 0 var(--pd-space-3)}
+.quick-join-wrap{position:relative;display:flex;align-items:center}
+.quick-join-wrap .pd-input{text-transform:uppercase;padding-right:48px}
+.quick-join-submit{position:absolute;right:8px;width:32px;height:32px;border-radius:var(--pd-radius-sm);
+  border:none;background:transparent;color:var(--pd-yellow);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.create-room-btn{position:relative;display:flex;align-items:center;justify-content:space-between;gap:var(--pd-space-3);
+  width:100%;text-align:left;padding:var(--pd-space-4);border-radius:var(--pd-radius-md);cursor:pointer;
+  background:rgba(6,12,30,.5);transition:border-color var(--pd-fast),transform var(--pd-fast)}
+.create-room-btn:hover{transform:translateY(-2px)}
+.create-room-btn__title{font:800 16px/1.3 var(--pd-font-display);color:#fff}
+.create-room-btn__desc{display:block;margin-top:var(--pd-space-1);font:400 11px/1.4 var(--pd-font-mono);letter-spacing:.1em;color:var(--pd-text-meta);text-transform:uppercase}
+.create-room-btn__icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}

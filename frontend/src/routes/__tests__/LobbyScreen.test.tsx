@@ -377,3 +377,48 @@ describe('LobbyScreen — room list loading state', () => {
     expect(screen.queryByRole('status', { name: /cargando salas/i })).not.toBeInTheDocument()
   })
 })
+
+describe('LobbyScreen — lobby re-skin (PR3)', () => {
+  it('applies the two-column lobby-body layout with the side rail and room grid', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, waitingRooms))
+    const { container } = renderLobby()
+    await screen.findByText('#AB12')
+
+    expect(container.querySelector('.lobby-body')).not.toBeNull()
+    expect(container.querySelector('.lobby-side')).not.toBeNull()
+    expect(container.querySelector('.room-grid')).not.toBeNull()
+  })
+
+  it('keeps every room card inside .room-grid with data-testid="room-card" preserved', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, waitingRooms))
+    const { container } = renderLobby()
+    await screen.findByText('#AB12')
+
+    const cards = container.querySelectorAll('.room-grid [data-testid="room-card"]')
+    expect(cards).toHaveLength(2)
+  })
+
+  it('keeps the .pd-sprite-slot skeleton count at 5 while rooms load (unchanged)', async () => {
+    let resolveFetch!: (value: Response) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve
+          }),
+      ),
+    )
+
+    const { container } = renderLobby()
+
+    const status = screen.getByRole('status', { name: /cargando salas/i })
+    expect(status).toHaveAttribute('aria-busy', 'true')
+    expect(status.querySelectorAll('.pd-sprite-slot')).toHaveLength(5)
+    expect(container.querySelectorAll('.pd-sprite-slot')).toHaveLength(5)
+
+    await act(async () => {
+      resolveFetch(jsonResponse(200, waitingRooms))
+    })
+  })
+})
