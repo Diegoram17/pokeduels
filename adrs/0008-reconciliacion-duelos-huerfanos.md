@@ -43,6 +43,9 @@ vuelve a P2 (lobby).
 
 - Cierra el hallazgo crítico de la revisión adversarial: ya no quedan duelos/salas en un estado
   `in_progress` indefinido tras un reinicio del backend.
+- (Actualización 2026-08-31, Fase 6): la reconciliación de arranque se extendió con
+  `reconcileStaleWaitingRooms` (`backend/db/reconciliation.js`) — las salas `waiting` que
+  sobreviven a un reinicio también se limpian, no solo los duelos huérfanos.
 - Comportamiento determinista y simple de implementar: una query de arranque, un nuevo estado de
   `rooms`, un evento WS nuevo.
 - Trade-off real: un torneo de 4 jugadores donde uno de los dos duelos ya había terminado se anula

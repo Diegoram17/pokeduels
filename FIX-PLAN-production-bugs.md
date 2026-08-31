@@ -1,5 +1,7 @@
 # Fix Plan — Production Bugs (Render)
 
+> **Estado (corrección 2026-08-31, `master` `ab7a0c1`):** Bug  resuelto — `reconcileStaleWaitingRooms` existe en `backend/db/reconciliation.js`. Bug  resuelto — `useDuelSocket.ts` re-emite `room:join` al reconectar y `store.ts` limpia estado huérfano. Bug 3 parcialmente abordado — el botón "AGREGAR BOT" existe y agrega un bot por click; no hay botón "INICIAR PARTIDA" explícito (la partida arranca cuando la sala está llena y todos listos). Este documento se conserva como registro histórico del análisis de causa raíz.
+
 Audience: the implementing agent. Execute every step in order.
 
 Root-cause analysis was done via CodeGraph + direct source reads against the
