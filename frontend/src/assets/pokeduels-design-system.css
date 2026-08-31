@@ -333,7 +333,7 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 /* ============ HP / progress bars ============ */
 .pd-hp-bar{position:relative;height:14px;border-radius:999px;background:rgba(255,255,255,.08);
   border:1px solid var(--pd-border-blue);overflow:hidden;}
-.pd-hp-fill{height:100%;border-radius:999px;transition:width .5s cubic-bezier(.175,.885,.32,1.275)}
+.pd-hp-fill{height:100%;border-radius:999px;transition:width .16s linear}
 .pd-hp-fill--high{background:linear-gradient(90deg,var(--pd-hp-high-a),var(--pd-hp-high-b));box-shadow:0 0 8px rgba(55,214,122,.5)}
 .pd-hp-fill--mid{background:linear-gradient(90deg,var(--pd-hp-mid-a),var(--pd-hp-mid-b));box-shadow:0 0 8px rgba(255,203,5,.5)}
 .pd-hp-fill--low{background:linear-gradient(90deg,var(--pd-hp-low-a),var(--pd-hp-low-b));box-shadow:0 0 8px rgba(255,59,34,.5)}
@@ -624,17 +624,20 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .lead-card__cta .material-symbols-outlined{font-size:16px}
 .lead-card:hover{border-color:var(--pd-yellow);transform:translateY(-2px)}
 
-/* Fase 7 (PR8): attack-replay keyframes on the arena field sprites — ~1s
+/* Fase 7 (PR8 + 7.1): attack-replay keyframes on the arena field sprites.
+   Timing is tuned to Game Boy Pokemon Red/Blue snappiness — a ~0.3s
    out/back lunge for the attacker (.pd-lunge--human/.pd-lunge--rival, added by
-   useAttackReplay) and ~1s shake for the defender (.pd-shake). Every keyframe
-   set anchors to the sprite's resting transform (.sprite-wrap -50% /
-   .sprite-wrap--rival +50%) so the sprite never snaps back. The Phase-5
-   prefers-reduced-motion blanket collapses these — every animationend fires
-   ~immediately and the sequence self-completes with state updating instantly. */
-.pd-lunge--human{animation:pd-lunge-human 1s ease-in-out}
-.pd-lunge--rival{animation:pd-lunge-rival 1s ease-in-out}
-.sprite-wrap.pd-shake{animation:pd-shake 1s ease-in-out}
-.sprite-wrap--rival.pd-shake{animation:pd-shake--rival 1s ease-in-out}
+   useAttackReplay) and a ~0.3s shake + hard hit-blink for the defender
+   (.pd-shake). Every keyframe set anchors to the sprite's resting transform
+   (.sprite-wrap -50% / .sprite-wrap--rival +50%) so the sprite never snaps
+   back. The Phase-5 prefers-reduced-motion blanket collapses these — every
+   animationend fires ~immediately and the sequence self-completes with state
+   updating instantly. */
+.pd-lunge--human{animation:pd-lunge-human .3s ease-in-out}
+.pd-lunge--rival{animation:pd-lunge-rival .3s ease-in-out}
+.sprite-wrap.pd-shake{animation:pd-shake .3s ease-in-out, pd-hit-blink .3s steps(1,end) 2}
+.sprite-wrap--rival.pd-shake{animation:pd-shake--rival .3s ease-in-out, pd-hit-blink .3s steps(1,end) 2}
+@keyframes pd-hit-blink{0%,100%{opacity:1}50%{opacity:.15}}
 @keyframes pd-lunge-human{0%,100%{transform:translateX(-50%)}30%{transform:translateX(0) translateY(-12px)}55%{transform:translateX(0)}}
 @keyframes pd-lunge-rival{0%,100%{transform:translateX(50%)}30%{transform:translateX(0) translateY(-12px)}55%{transform:translateX(0)}}
 @keyframes pd-shake{0%,100%{transform:translateX(-50%)}15%{transform:translateX(calc(-50% - 12px))}30%{transform:translateX(calc(-50% + 10px))}45%{transform:translateX(calc(-50% - 8px))}60%{transform:translateX(calc(-50% + 5px))}75%{transform:translateX(calc(-50% - 3px))}}
