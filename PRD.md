@@ -5,7 +5,7 @@ title: "Pokémon Duels"
 # PRD: Pokémon Duels (v1)
 
 **Versión:** 1.0 (MVP)
-**Estado:** Listo para diseño técnico
+**Estado:** Implementado (Fases 1–7, ver `BACKLOG.md`) (corrección 2026-08-31, el producto shippeó completo)
 **Autor:** Diego
 
 ---
@@ -46,15 +46,11 @@ Si el producto funciona como se espera, un jugador nuevo pasa de "no conocer el 
   no el azar puro — el orden de ataque dentro de una ronda es aleatorio (RF-4.7), pero no lo es
   quién elige mejor.
 
-<!-- REVISAR: los objetivos técnicos "desplegable en tiers gratuitos" y "motor autoritativo en
-servidor" del draft original ya están cubiertos como criterios verificables en RNF-3 y RNF-4 más
-abajo — se consolidaron ahí para no duplicar el mismo objetivo en dos secciones. -->
-
 ## Alcance (qué sí incluye esta versión)
 
 ### Flujo de usuario (pantallas)
 
-La aplicación consta de **5 pantallas y 2 modales**. El detalle de componentes y wireframes está
+La aplicación consta de **7 pantallas** (5 pantallas principales + 2 pantallas de cierre — cambio de pokémon y ranking — implementadas como rutas propias) (corrección 2026-08-31, swap y ranking son rutas, no modales). El detalle de componentes y wireframes está
 en `UX-DESIGN.md`.
 
 1. **P1 · Ingreso rápido** → el jugador escribe su nickname y entra. Sin registro ni contraseña.
@@ -62,7 +58,7 @@ en `UX-DESIGN.md`.
 3. **P3 · Selección de equipo (draft):**
    - Elige 1 pokémon inicial entre Pikachu, Bulbasaur, Squirtle y Charmander. Los ya tomados por
      otros jugadores aparecen bloqueados en tiempo real.
-   - Elige 5 pokémon adicionales del catálogo de 50 (con buscador y filtro por tipo).
+   - Elige 5 pokémon adicionales del catálogo de 50 (50 del catálogo + 4 iniciales = 54 pokémon totales) (corrección 2026-08-31, el seed afirma pokemons = 54) (con buscador y filtro por tipo).
    - Marca "Ready" (habilitado solo con el equipo completo).
 4. **P4 · Sala de espera / Bracket** → ve el estado de los demás jugadores y el árbol del torneo.
    Entra al duelo cuando el servidor lo indica.
@@ -95,7 +91,7 @@ en `UX-DESIGN.md`.
 **RF-3 · Selección de equipo**
 - RF-3.1 Cada jugador elige exactamente 1 pokémon inicial de los 4 clásicos.
 - RF-3.2 **Exclusividad:** un inicial ya tomado por otro jugador de la sala no está disponible; el primero en confirmar se lo reserva.
-- RF-3.3 Cada jugador elige 5 pokémon adicionales del catálogo de 50.
+- RF-3.3 Cada jugador elige 5 pokémon adicionales del catálogo de 50 (50 del catálogo + 4 iniciales = 54 pokémon totales) (corrección 2026-08-31).
 - RF-3.4 El equipo final es de exactamente 6 pokémon.
 - RF-3.5 Todos los pokémon parten en igualdad de condiciones (mismo HP base, mismo nivel).
 
@@ -206,5 +202,5 @@ Excluido deliberadamente para mantener el alcance acotado:
 | **Suplantación**: sin auth, alguien podría enviar acciones a nombre de otro | Medio | Token de sesión efímero emitido por el servidor al ingresar el nickname; se valida en cada evento |
 
 **Dependencias abiertas:**
-- [ ] Definir la lista final de los 50 pokémon del catálogo con su tipo único asignado.
-- [ ] Definir la matriz de efectividad de tipos a implementar (subset o tabla completa de 18).
+- [x] Definir la lista final de los 50 pokémon del catálogo con su tipo único asignado. — Resuelto: seed en `backend/seed/`, 54 pokémon (50 del catálogo + 4 iniciales) + matriz 18×18 completa (324 filas).
+- [x] Definir la matriz de efectividad de tipos a implementar (subset o tabla completa de 18). — Resuelto: matriz 18×18 completa (324 filas) seedeada.

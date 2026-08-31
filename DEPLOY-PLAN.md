@@ -165,8 +165,7 @@ Ejecutados en sesión de deploy (2026-08-24):
    `https://github.com/Diegoram17/pokeduels`, vía `gh repo create`).
 7. ~~Conectar el repo a Vercel y disparar el primer deploy del frontend~~ — **✅ HECHO**
    (proyecto `pokeduels` en Vercel, URL: `https://pokeduels.vercel.app`).
-8. ~~Activar el workflow de CI~~ — **⏳ PENDIENTE** — requiere configurar los secrets
-   `NEON_PROJECT_ID` y `NEON_API_KEY` en el repo de GitHub.
+8. ~~Activar el workflow de CI~~ — ✅ HECHO — secrets `NEON_PROJECT_ID`/`NEON_API_KEY` configurados 2026-08-25; el job de backend crea/borra una branch efímera de Neon por run y corre las ~164 pruebas DB-gated.
 9. ~~Crear el servicio en Render, conectar el repo, configurar env vars~~ — **✅ HECHO**
    (Web Service `pokeduels-backend`, URL: `https://pokeduels-backend.onrender.com`,
    `rootDir=backend`, env vars `DATABASE_URL` y `CORS_ORIGIN` configuradas).
@@ -176,12 +175,7 @@ Ejecutados en sesión de deploy (2026-08-24):
     **✅ HECHO** — Monitor creado en UptimeRobot (ID: 803822718), intervalo 5 minutos,
     status: activo. Verificado: backend responde 200 OK en `/health`.
 
-**Nota para quien ejecute esto:** el ítem #10 del backlog de producto (integración real de
-duelo/torneo en el frontend — `WaitRoomScreen`/`DuelBoardScreen`/`SwapScreen`/`RankingScreen`)
-sigue **pendiente**, sin relación con este plan de deploy. Quedó pausado en la fase `explore` del
-ciclo SDD (`sdd/frontend-duel-tournament-integration/explore` en Engram, next recomendado:
-`sdd-propose`). No es un prerequisito de deploy, pero el proyecto no está funcionalmente completo
-hasta que se implemente.
+**Nota histórica:** al escribir este plan el ítem #10 estaba pausado; se completó y archivó el 2026-08-24 (BACKLOG #10, `sdd/frontend-duel-tournament-integration`). El proyecto está funcionalmente completo.
 
 ## Registro de ejecución y verificación
 

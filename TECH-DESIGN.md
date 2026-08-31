@@ -5,7 +5,7 @@
 **Design.md disponible:** Sí — `DESIGN.md` + prototipos HTML en `Prototipos/`
 **Estado:** Listo para implementación
 **Stack:** React + Vite + Tailwind (Vercel) · Node.js + Express + Socket.IO (Render) · PostgreSQL (Neon)
-**Decisiones de arquitectura:** ver `adrs/0001` a `0007`, resumidas en la sección 11
+**Decisiones de arquitectura:** ver `adrs/0001` a `adrs/0012` (corrección 2026-08-31, 12 ADRs), resumidas en la sección 11
 
 ---
 
@@ -367,8 +367,10 @@ Sin auth tradicional, el modelo de amenazas cambia: no hay credenciales que prot
 
 ## 8. Plan de implementación por fases
 
+> Plan original del diseño greenfield (4 fases). El desarrollo real se ejecutó como los 19 ítems de `BACKLOG.md` (Fases 1–7 de producto + Fases 1–6 de diagnóstico). Esta sección se conserva como registro del plan inicial.
+
 ### Fase 1 — Fundaciones (sin tiempo real)
-- Esquema de BD + migraciones + seed del catálogo (50 pokémon + matriz de tipos)
+- Esquema de BD + migraciones + seed del catálogo (54 pokémon: 50 del catálogo + 4 iniciales + matriz de tipos 18×18) (corrección 2026-08-31)
 - Endpoint de sesión por nickname (`POST /api/session`)
 - Endpoints REST de catálogo y salas
 - Frontend: **P1 (Nickname)**, **P2 (Lobby)**, **P3 (Draft)** sin exclusividad en tiempo real aún
@@ -414,7 +416,7 @@ Sin auth tradicional, el modelo de amenazas cambia: no hay credenciales que prot
 |---|---|---|
 | 1 | ¿El estado de HP/PP se arrastra entre duelos del bracket? | **Cerrado (ADR-0007):** no se arrastra, cada duelo a full HP/PP |
 | 2 | ¿Reconexión tras desconexión? | **Cerrado:** fuera de v1 durante el duelo activo; sí en lobby/draft con timeout de 60s (RF-2.7) |
-| 3 | Lista final de los 50 pokémon y sus tipos | Pendiente de definir (curación de contenido, no de arquitectura) |
+| 3 | Lista final de los 50 pokémon y sus tipos | Cerrado — catálogo de 54 pokémon curado y seedeado (`backend/seed/seed-data.json`). |
 | 4 | ¿Matriz de tipos completa (18×18) o solo los tipos presentes? | **Cerrado (ADR-0007):** completa |
 
 ## 11. Decisiones de arquitectura (ADRs)
@@ -442,6 +444,8 @@ las alternativas reales consideradas y el trade-off aceptado, no solo la decisi�
 > no se mantenían al ritmo de creación de ADRs.
 
 ## 12. Criterios de aceptación por flujo
+
+> Checklist del desarrollo greenfield. Todos los criterios están cubiertos por los ciclos SDD de `BACKLOG.md` y sus verify-reports en Engram; se conserva como referencia de criterios, no como estado pendiente.
 
 Más granulares que los RF del PRD — pensados como checklist verificable durante el desarrollo.
 Algunos requirieron una interpretación de criterio (marcados abajo); si alguno no refleja lo que
@@ -496,6 +500,6 @@ esperás, decímelo y lo ajusto.
 
 ## Riesgos técnicos abiertos
 
-- ~~Si el backend se reinicia a mitad de un duelo, el estado en memoria de ese duelo se pierde (ADR-0005) — los jugadores lo perciben como si el rival se hubiera desconectado.~~ **Corregido:** ese razonamiento era incorrecto — sin un proceso vivo no hay quién emita `duel:opponent_disconnected`. Resuelto por la reconciliación de arranque (ADR-0008): duelos/salas huérfanos se anulan explícitamente en vez de quedar en un estado indefinido. Sigue faltando logging/alerting que avise cuándo ocurre un reinicio con partidas en curso.
+- ~~Si el backend se reinicia a mitad de un duelo, el estado en memoria de ese duelo se pierde (ADR-0005) — los jugadores lo perciben como si el rival se hubiera desconectado.~~ **Corregido:** ese razonamiento era incorrecto — sin un proceso vivo no hay quién emita `duel:opponent_disconnected`. Resuelto por la reconciliación de arranque (ADR-0008): duelos/salas huérfanos se anulan explícitamente en vez de quedar en un estado indefinido. Parcialmente cubierto — Fase 6 agregó logging estructurado (`pino`, `backend/lib/logger.js`); la reconciliación de arranque (ADR-0008) loguea por ahí. Falta alerting/paging sobre esos eventos.
 - El cron de health check (ADR-0006, ahora un servicio dedicado en vez de GitHub Actions) sigue siendo una pieza externa de terceros — si tiene downtime o nadie configura una alerta sobre pings fallidos, el cold start reaparece igual, aunque ya no por la desactivación silenciosa a 60 días que tenía la alternativa descartada.
-- La curación del catálogo final de 50 pokémon y sus tipos sigue pendiente (TECH-DESIGN §10, ítem 3) y bloquea el seed de `pokemons`/`type_effectiveness`.
+
