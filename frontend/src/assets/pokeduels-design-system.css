@@ -389,7 +389,9 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .rank-main{position:relative;min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 32px;overflow:hidden}
 .podium{display:flex;align-items:flex-end;justify-content:center;gap:16px;width:100%;max-width:1100px;flex-wrap:wrap}
 .bench-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-.bracket-wrap{display:flex;flex-direction:column;gap:8px}
+/* Fase 7 (PR5): the Phase-4 hoisted stacked-list .bracket-wrap is gone —
+   BracketMini was deleted. The name now belongs to the prototype's SVG
+   connector tree (ported in the WaitRoom block below), one class one meaning. */
 
 /* ============ Modal overlay (shared by the A4 Modal component) ============ */
 .pd-modal-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(4,7,18,.78);backdrop-filter:blur(4px);padding:24px}
@@ -502,3 +504,42 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .draft-side-foot{flex:none;margin-top:var(--pd-space-3)}
 /* User addition: catalog search + type filter as a row above .catalog-grid (PR4). */
 .catalog-filters{display:flex;gap:var(--pd-space-3);flex-wrap:wrap;margin-bottom:var(--pd-space-4)}
+
+/* ============ Screen: WaitRoom — ported from Prototipos/4 ============
+   Verbatim from Prototipos/4.Sala_de_espera.html <style> (minus
+   .wait-topbar, which styled the bare header deleted in PR1 — .pd-topbar
+   covers it). .bracket-wrap here is the prototype SVG connector tree (the
+   old stacked-list hoist was removed in PR5). */
+.wait-shell{display:flex;flex-direction:column;height:100vh}
+.wifi-status{display:flex;align-items:center;gap:var(--pd-space-2)}
+.wait-main{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:var(--pd-space-4);padding:var(--pd-space-4) var(--pd-space-6);position:relative;z-index:2}
+@media(min-width:960px){.wait-main{flex-direction:row}}
+.wait-side{width:100%;display:flex;flex-direction:column;gap:var(--pd-space-4);overflow-y:auto}
+@media(min-width:960px){.wait-side{width:34%;flex:none}}
+.wait-side-head{display:flex;justify-content:space-between;align-items:center}
+.player-list{display:flex;flex-direction:column;gap:var(--pd-space-2);flex:1}
+.player-row{display:flex;align-items:center;gap:var(--pd-space-3);padding:var(--pd-space-2);border-radius:var(--pd-radius-md);
+  background:rgba(9,16,40,.55);border:1px solid var(--pd-border-blue-dim)}
+.player-row--ready{border-left:4px solid var(--pd-yellow);background:rgba(255,203,5,.06)}
+.player-row--pending{opacity:.7}
+.player-row img,.player-row .avatar-fallback{width:44px;height:44px;border-radius:var(--pd-radius-sm);object-fit:cover;flex:none;
+  background:rgba(6,12,30,.6);border:1px solid var(--pd-border-blue-dim);display:flex;align-items:center;justify-content:center;color:var(--pd-text-meta)}
+.player-row .info{flex:1}
+.player-row .name{font:700 15px/1 var(--pd-font-mono);color:#fff}
+.player-row .rank{display:flex;align-items:center;gap:var(--pd-space-1);margin-top:var(--pd-space-1);font:400 10px/1.4 var(--pd-font-mono);
+  letter-spacing:.12em;text-transform:uppercase;color:var(--pd-yellow-mid)}
+.player-row .rank .material-symbols-outlined{font-size:14px}
+.player-row--pending .rank{color:var(--pd-text-meta)}
+
+.bracket-section{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.bracket-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--pd-space-4)}
+.bracket-wrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;padding-bottom:70px}
+.bracket-row{display:flex;width:100%;max-width:680px;justify-content:space-between;align-items:stretch;height:220px}
+.semis{display:flex;flex-direction:column;justify-content:space-between;height:100%;width:180px}
+.bracket-slot{display:flex;align-items:center;gap:var(--pd-space-2);padding:var(--pd-space-2)}
+.bracket-slot .pid{width:30px;height:30px;border-radius:var(--pd-radius-sm);display:flex;align-items:center;justify-content:center;
+  font:700 11px/1 var(--pd-font-mono);flex:none}
+.connections{flex:1;position:relative;margin:0 var(--pd-space-4)}
+.final-slot{display:flex;flex-direction:column;justify-content:center;height:100%;width:220px}
+.final-slot .pd-card{text-align:center}
+.bracket-third{display:flex;align-items:center;justify-content:center;gap:var(--pd-space-2);margin-top:var(--pd-space-3)}

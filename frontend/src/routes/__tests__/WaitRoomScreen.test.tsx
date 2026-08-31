@@ -203,3 +203,44 @@ describe('WaitRoomScreen — player ready indicators', () => {
     expect(within(playerList).getByText('Misty')).toBeInTheDocument()
   })
 })
+
+describe('WaitRoomScreen — wait re-skin (PR5)', () => {
+  it('applies the wait structure: wait-main row, wait-side rail, player rows with ready/pending states', () => {
+    const { container } = renderWaitRoom((actions) => {
+      actions.setNickname('Ash')
+      actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
+      actions.receiveRoomState({
+        code: 'AB12',
+        maxPlayers: 2,
+        status: 'waiting',
+        players: [
+          { playerId: 'p1', nickname: 'Ash', ready: true, connected: true },
+          { playerId: 'p2', nickname: 'Misty', ready: false, connected: true },
+        ],
+      })
+    })
+
+    expect(container.querySelector('.wait-main')).not.toBeNull()
+    expect(container.querySelector('.wait-side')).not.toBeNull()
+    expect(container.querySelector('.player-row--ready')).not.toBeNull()
+    expect(container.querySelector('.player-row--pending')).not.toBeNull()
+  })
+
+  it('colors the LISTO toggle with var(--pd-yellow), never the off-palette #22c55e', () => {
+    renderWaitRoom((actions) => {
+      actions.setNickname('Ash')
+      actions.receiveRoomShell({ code: 'AB12', maxPlayers: 2, status: 'waiting' })
+      actions.receiveRoomState({
+        code: 'AB12',
+        maxPlayers: 2,
+        status: 'waiting',
+        players: [{ playerId: 'p1', nickname: 'Ash', ready: true, connected: true }],
+      })
+    })
+
+    const readyBtn = screen.getByRole('button', { name: /listo/i })
+    expect(readyBtn).toBeInTheDocument()
+    expect(readyBtn.style.background).not.toContain('#22c55e')
+    expect(readyBtn.style.borderColor).not.toContain('#22c55e')
+  })
+})
