@@ -15,6 +15,7 @@
  * callback must never take down the shared process (ADR-0001).
  */
 import { DEFAULT_RECONNECT_GRACE_MS } from './reconnectTimers.js';
+import { logger } from '../lib/logger.js';
 
 export const DEFAULT_BRACKET_WALKOVER_GRACE_MS = DEFAULT_RECONNECT_GRACE_MS;
 
@@ -43,7 +44,7 @@ export function createBracketWalkoverTimerRegistry({
           Promise.resolve()
             .then(onExpire)
             .catch((err) => {
-              console.error(`[bracket-walkover] expire callback failed: ${err.message}`, err);
+              logger.error({ err, roomId, playerId }, 'bracket-walkover-timer expire callback failed');
             });
         }, graceMs),
       );

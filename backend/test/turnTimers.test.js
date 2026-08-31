@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createTurnTimerRegistry, DEFAULT_TURN_TIMEOUT_MS } from '../ws/turnTimers.js';
+import { logger } from '../lib/logger.js';
 
 // Unit tests for the per-duel 10s turn timer registry (item #5, design: the
 // "value-producing" timer). Same factory + Map<key,Timeout> pattern as
@@ -92,5 +93,24 @@ describe('createTurnTimerRegistry', () => {
 
     await new Promise((r) => setTimeout(r, 60));
     expect(registry.has(7)).toBe(false);
+  });
+
+  it('logs a structured error record when the expire callback throws', async () => {
+    const registry = createTurnTimerRegistry({ timeoutMs: 20 });
+    const spy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    registry.start(7, () => {
+      throw new Error('boom');
+    });
+
+    await new Promise((r) => setTimeout(r, 60));
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ duelId: 7, err: expect.any(Error) }),
+      'turn-timer expire callback failed',
+    );
+    spy.mockRestore();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 });

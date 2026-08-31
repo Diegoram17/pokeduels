@@ -1,3 +1,5 @@
+import { logger } from '../lib/logger.js';
+
 /**
  * In-memory registry of reconnect grace timers for the WS lobby (design:
  * "Reconnect timer storage — in-memory Map<roomId:playerId, Timeout> via a
@@ -33,7 +35,7 @@ export function createReconnectTimerRegistry({ graceMs = DEFAULT_RECONNECT_GRACE
           Promise.resolve()
             .then(onExpire)
             .catch((err) => {
-              console.error(`[reconnect-timer] expire callback failed: ${err.message}`, err);
+              logger.error({ err, roomId, playerId }, 'reconnect-timer expire callback failed');
             });
         }, graceMs),
       );

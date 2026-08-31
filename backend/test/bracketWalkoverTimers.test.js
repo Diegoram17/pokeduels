@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   createBracketWalkoverTimerRegistry,
   DEFAULT_BRACKET_WALKOVER_GRACE_MS,
 } from '../ws/bracketWalkoverTimers.js';
+import { logger } from '../lib/logger.js';
 
 // Unit tests for the between-round bracket-walkover timer registry (item #7,
 // PR 3). A 4-player bracket player who silently disconnects while awaiting a
@@ -81,5 +82,28 @@ describe('createBracketWalkoverTimerRegistry', () => {
 
     await new Promise((r) => setTimeout(r, 60));
     expect(registry.has('room-1', 'player-1')).toBe(false);
+  });
+
+  it('logs a structured error record when the expire callback throws', async () => {
+    const registry = createBracketWalkoverTimerRegistry({ graceMs: 20 });
+    const spy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    registry.arm('room-1', 'player-1', () => {
+      throw new Error('boom');
+    });
+
+    await new Promise((r) => setTimeout(r, 60));
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        roomId: 'room-1',
+        playerId: 'player-1',
+        err: expect.any(Error),
+      }),
+      'bracket-walkover-timer expire callback failed',
+    );
+    spy.mockRestore();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 });
