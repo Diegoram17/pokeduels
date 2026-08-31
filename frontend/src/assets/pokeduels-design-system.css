@@ -691,11 +691,20 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
    existing .bench-grid name (spec: "bench-grid stays the roster grid").
    .flag--danger .material-symbols-outlined is a React-side addition (the
    prototype sized the warning icon inline). */
-.switch-main{position:relative;z-index:2;padding:var(--pd-space-6);max-width:1200px;margin:0 auto}
-.switch-head{text-align:center;margin-bottom:var(--pd-space-5)}
+/* Fase 7.1: the swap screen fits one viewport — no page scroll, no zoom-out.
+   The shell is a fixed-height column (topbar + main); .switch-main is the
+   flex child that fills the rest, the bench grid scrolls internally when the
+   roster is tall, and CONFIRMAR CAMBIO stays pinned in view via .switch-foot. */
+.switch-shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.switch-main{position:relative;z-index:2;flex:1;min-height:0;display:flex;flex-direction:column;
+  padding:var(--pd-space-4) var(--pd-space-6);max-width:1200px;margin:0 auto;width:100%}
+.switch-head{text-align:center;margin-bottom:var(--pd-space-3);flex:none}
+.switch-main .bench-grid{flex:1;min-height:0;overflow-y:auto;align-content:start;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.switch-foot{display:flex;justify-content:center;padding-top:var(--pd-space-3);flex:none}
 .roster-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--pd-space-4)}
 .unit-card{display:flex;flex-direction:column;position:relative}
-.unit-card .art{height:190px;position:relative;border-bottom:1px solid var(--pd-border-blue-dim);
+.unit-card .art{height:132px;position:relative;border-bottom:1px solid var(--pd-border-blue-dim);
   display:flex;align-items:center;justify-content:center;padding:var(--pd-space-2);background:rgba(6,12,30,.5)}
 .unit-card .art img{width:100%;height:100%;object-fit:contain}
 /* React-side addition: pixelated sprite rendering (was inline on the img). */

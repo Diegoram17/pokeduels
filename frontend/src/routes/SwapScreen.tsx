@@ -202,7 +202,7 @@ function SwapScreen() {
   }
 
   return (
-    <div className="pd-page">
+    <div className="pd-page switch-shell">
       <GlowBlob style={{ left: '50%', top: '-10%', width: 700, height: 700, transform: 'translateX(-50%)' }} />
 
       <ScreenTopbar nickname={player.nickname}>
@@ -235,7 +235,7 @@ function SwapScreen() {
 
         <BenchList pokemon={myPokemon} selectedId={selectedId} onSelect={handleSelect} />
 
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+        <div className="switch-foot">
           <ConfirmSwapButton disabled={!selectedId} onClick={handleConfirm} />
         </div>
       </main>
