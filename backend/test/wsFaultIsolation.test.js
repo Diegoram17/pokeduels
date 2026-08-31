@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WsError } from '../lib/wsError.js';
 import { withWsHandler } from '../ws/wsFaultIsolation.js';
+import { logger } from '../lib/logger.js';
 
 // withWsHandler is the WS analogue of engine/faultIsolation.js: WsError is a
 // domain rejection and is mapped to socket.emit(event, payload); anything
@@ -12,7 +13,7 @@ describe('withWsHandler', () => {
 
   beforeEach(() => {
     socket = { emit: vi.fn() };
-    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -42,7 +43,7 @@ describe('withWsHandler', () => {
     expect(socket.emit).toHaveBeenCalledWith('room:rejected');
   });
 
-  it('logs non-WsError faults and swallows them (no emit, no rethrow)', async () => {
+  it('logs non-WsError faults through the structured logger and swallows them (no emit, no rethrow)', async () => {
     const boom = new Error('pg exploded');
 
     await expect(
@@ -51,7 +52,10 @@ describe('withWsHandler', () => {
       }),
     ).resolves.toBeUndefined();
 
-    expect(errorSpy).toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ err: boom }),
+      'ws handler fault',
+    );
     expect(socket.emit).not.toHaveBeenCalled();
   });
 

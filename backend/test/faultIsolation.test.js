@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { withDuelFaultIsolation } from '../engine/faultIsolation.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Per-duel fault isolation (design: PL1-06). withDuelFaultIsolation wraps ONLY
@@ -36,14 +37,17 @@ describe('withDuelFaultIsolation', () => {
     expect(result.error.message).toBe('sync boom');
   });
 
-  it('logs the failure loudly, including the duelId', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('logs the failure loudly through the structured logger, including the duelId', async () => {
+    const spy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const error = new Error('kaboom');
     await withDuelFaultIsolation(42, async () => {
-      throw new Error('kaboom');
+      throw error;
     });
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy.mock.calls[0][0]).toContain('42');
-    expect(spy.mock.calls[0][1]).toBeInstanceOf(Error);
+    expect(spy.mock.calls[0][0]).toEqual(expect.objectContaining({ duelId: 42 }));
+    expect(spy.mock.calls[0][0].err).toBe(error);
+    expect(spy.mock.calls[0][1]).toBe('duel resolution failed');
+    spy.mockRestore();
   });
 
   it('does not affect another duel: a failed duel A leaves duel B fully functional', async () => {
