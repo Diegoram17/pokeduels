@@ -1,3 +1,5 @@
+import { logger } from '../lib/logger.js';
+
 /**
  * In-memory registry of per-duel 10s turn timers (item #5, design: the
  * "value-producing" timer). Same factory + `Map<key, Timeout>` pattern as
@@ -37,7 +39,7 @@ export function createTurnTimerRegistry({ timeoutMs = DEFAULT_TURN_TIMEOUT_MS } 
           Promise.resolve()
             .then(onExpire)
             .catch((err) => {
-              console.error(`[turn-timer] expire callback failed: ${err.message}`, err);
+              logger.error({ err, duelId }, 'turn-timer expire callback failed');
             });
         }, timeoutMs),
       );

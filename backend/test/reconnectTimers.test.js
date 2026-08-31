@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createReconnectTimerRegistry, DEFAULT_RECONNECT_GRACE_MS } from '../ws/reconnectTimers.js';
+import { logger } from '../lib/logger.js';
 
 // Unit tests for the reconnect grace-window registry (design: "Real setTimeout
 // with a tiny injected graceMs, no fake timers"). The 60s production default
@@ -90,5 +91,28 @@ describe('createReconnectTimerRegistry', () => {
 
     await new Promise((r) => setTimeout(r, 60));
     expect(registry.has('room-1', 'player-1')).toBe(false);
+  });
+
+  it('logs a structured error record when the expire callback throws', async () => {
+    const registry = createReconnectTimerRegistry({ graceMs: 20 });
+    const spy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    registry.start('room-1', 'player-1', () => {
+      throw new Error('boom');
+    });
+
+    await new Promise((r) => setTimeout(r, 60));
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        roomId: 'room-1',
+        playerId: 'player-1',
+        err: expect.any(Error),
+      }),
+      'reconnect-timer expire callback failed',
+    );
+    spy.mockRestore();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 });
