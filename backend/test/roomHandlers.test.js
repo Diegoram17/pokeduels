@@ -170,6 +170,22 @@ describe('registerRoomHandlers', () => {
       expect(socket.join).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
     });
+
+    it('rejects a payload nickname with control characters via room:join_rejected (invalid_nickname)', async () => {
+      // A zero-width space (U+200B) is a Cf format char — the sanitizer must
+      // reject it at the ingress before any join/INSERT (spec R1 scenario 4).
+      const rejected = vi.fn();
+      socket.on('room:join_rejected', rejected);
+
+      socket.emit('room:join', { code: 'ABC123', nickname: 'Ash\u200bKetchum' });
+      await vi.waitFor(() => expect(rejected).toHaveBeenCalled());
+
+      expect(rejected).toHaveBeenCalledWith({ code: 'ABC123', reason: 'invalid_nickname' });
+      expect(joinOrResumeRoom).not.toHaveBeenCalled();
+      expect(socket.join).not.toHaveBeenCalled();
+      // A client-visible rejection, not a swallowed fault.
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('room:ready', () => {
