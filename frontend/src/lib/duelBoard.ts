@@ -5,7 +5,10 @@ import type { MoveIndex } from './moveIndex'
 // timer expires (RF-6.1: "sin tiempo, ataque básico").
 
 export const MAX_HP = 100
-export const TURN_TIMEOUT_SECONDS = 8
+// Per-turn countdown. MUST match the server auto-attack window
+// (backend/ws/turnTimers.js DEFAULT_TURN_TIMEOUT_MS = 10_000; PRD RF-6.1) so
+// the client countdown and the server timeout fire together.
+export const TURN_TIMEOUT_SECONDS = 10
 // Swap screen "EN PELIGRO" threshold: a live unit at or below 20% HP gets the
 // danger flag (matches HpBar's low tier at pct <= 20).
 export const LOW_HP_THRESHOLD = MAX_HP * 0.2

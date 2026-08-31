@@ -40,7 +40,7 @@ describe('basic attack contract', () => {
     expect(isBasicAttack(2)).toBe(false)
   })
 
-  it('exposes a positive turn timeout for the duel timer', () => {
-    expect(TURN_TIMEOUT_SECONDS).toBeGreaterThan(0)
+  it('matches the server turn window of 10s (RF-6.1; backend DEFAULT_TURN_TIMEOUT_MS = 10_000)', () => {
+    expect(TURN_TIMEOUT_SECONDS).toBe(10)
   })
 })

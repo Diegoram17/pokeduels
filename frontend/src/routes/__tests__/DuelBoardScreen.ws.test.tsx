@@ -423,7 +423,8 @@ describe('DuelBoardScreen — move submission', () => {
       vi.advanceTimersByTime(2000)
     })
     const ring = screen.getByTestId('timer-ring')
-    expect(within(ring).getByText('06')).toBeInTheDocument()
+    // 10s turn window (TURN_TIMEOUT_SECONDS) minus 2s elapsed.
+    expect(within(ring).getByText('08')).toBeInTheDocument()
 
     act(() => {
       fakeSocket._fire('duel:action_rejected', { moveIndex: 1, reason: 'insufficient_pp' })
@@ -432,7 +433,7 @@ describe('DuelBoardScreen — move submission', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/rechazado/i)
     expect(screen.getByTestId('duel-probe').textContent).toContain('turn:1')
     // The ring keeps counting from where it was — the rejection must not reset it.
-    expect(within(ring).getByText('06')).toBeInTheDocument()
+    expect(within(ring).getByText('08')).toBeInTheDocument()
     expect(fakeSocket.emit).not.toHaveBeenCalledWith(
       'duel:select_action',
       expect.anything(),
@@ -447,7 +448,9 @@ describe('DuelBoardScreen — presentation-only timer', () => {
     startRound1()
 
     act(() => {
-      vi.advanceTimersByTime(8000)
+      // Past the full 10s turn window — the cosmetic countdown expiring must
+      // still never trigger a client-side auto-submit.
+      vi.advanceTimersByTime(12000)
     })
 
     expect(fakeSocket.emit).not.toHaveBeenCalledWith(
