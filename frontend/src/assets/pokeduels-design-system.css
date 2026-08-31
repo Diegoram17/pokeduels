@@ -585,3 +585,19 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .move-pp{font:700 13px/1 var(--pd-font-mono);color:var(--pd-text-meta)}
 .side-panel{width:100%;display:flex;flex-direction:column;justify-content:flex-end}
 @media(min-width:960px){.side-panel{width:240px;flex:none}}
+
+/* Fase 7 (PR8): attack-replay keyframes on the arena field sprites — ~1s
+   out/back lunge for the attacker (.pd-lunge--human/.pd-lunge--rival, added by
+   useAttackReplay) and ~1s shake for the defender (.pd-shake). Every keyframe
+   set anchors to the sprite's resting transform (.sprite-wrap -50% /
+   .sprite-wrap--rival +50%) so the sprite never snaps back. The Phase-5
+   prefers-reduced-motion blanket collapses these — every animationend fires
+   ~immediately and the sequence self-completes with state updating instantly. */
+.pd-lunge--human{animation:pd-lunge-human 1s ease-in-out}
+.pd-lunge--rival{animation:pd-lunge-rival 1s ease-in-out}
+.sprite-wrap.pd-shake{animation:pd-shake 1s ease-in-out}
+.sprite-wrap--rival.pd-shake{animation:pd-shake--rival 1s ease-in-out}
+@keyframes pd-lunge-human{0%,100%{transform:translateX(-50%)}30%{transform:translateX(0) translateY(-12px)}55%{transform:translateX(0)}}
+@keyframes pd-lunge-rival{0%,100%{transform:translateX(50%)}30%{transform:translateX(0) translateY(-12px)}55%{transform:translateX(0)}}
+@keyframes pd-shake{0%,100%{transform:translateX(-50%)}15%{transform:translateX(calc(-50% - 12px))}30%{transform:translateX(calc(-50% + 10px))}45%{transform:translateX(calc(-50% - 8px))}60%{transform:translateX(calc(-50% + 5px))}75%{transform:translateX(calc(-50% - 3px))}}
+@keyframes pd-shake--rival{0%,100%{transform:translateX(50%)}15%{transform:translateX(calc(50% + 12px))}30%{transform:translateX(calc(50% - 10px))}45%{transform:translateX(calc(50% + 8px))}60%{transform:translateX(calc(50% - 5px))}75%{transform:translateX(calc(50% + 3px))}}

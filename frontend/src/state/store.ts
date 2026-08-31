@@ -1,4 +1,5 @@
 import type {
+  AttackEvent,
   BracketPairing,
   DuelPhase,
   DuelPokemonState,
@@ -222,7 +223,7 @@ export type MockStateAction =
   | { type: 'pendingDuelSet'; duelId: string }
   | { type: 'pendingDuelClear' }
   | { type: 'duelStateReceived'; duel: DuelState; duelPokemonState: DuelPokemonState[] }
-  | { type: 'duelTurnResolved'; duel: DuelState; duelPokemonState: DuelPokemonState[] }
+  | { type: 'duelTurnResolved'; duel: DuelState; duelPokemonState: DuelPokemonState[]; attackSequence: AttackEvent[] | null }
   | { type: 'duelFinished'; duelId: string; winnerId: string; endReason: DuelState['endReason'] }
   | { type: 'duelLeadSelection'; ownerId: number; pokemonId: number }
   | { type: 'duelActionRejected'; moveIndex: number; reason: string }
@@ -300,13 +301,15 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
     case 'pendingDuelClear':
       return { ...state, pendingDuelId: null }
 
-    // duel:state — full snapshot after duel:join (incl. mid-duel resync).
+    // duel:state — full snapshot after duel:join (incl. mid-duel resync). A
+    // resync never replays: the attackSequence is transient and cleared here.
     case 'duelStateReceived':
       return {
         ...state,
         duel: {
           ...action.duel,
           slot: deriveDuelSlot(action.duel.duelId, state.tournament),
+          attackSequence: null,
         },
         duelPokemonState: action.duelPokemonState,
         pendingDuelId: null,
@@ -314,13 +317,15 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
 
     // duel:turn_resolved — server-authoritative round outcome. A fresh
     // snapshot also clears the opponent-disconnect banner and the last
-    // rejection (the opponent is back and the round moved on).
+    // rejection (the opponent is back and the round moved on). The transient
+    // attackSequence (Fase 7, PR8) drives the attack-replay animation.
     case 'duelTurnResolved':
       return {
         ...state,
         duel: {
           ...action.duel,
           slot: deriveDuelSlot(action.duel.duelId, state.tournament),
+          attackSequence: action.attackSequence,
         },
         duelPokemonState: action.duelPokemonState,
       }
@@ -339,6 +344,7 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
           endReason: action.endReason,
           opponentDisconnected: false,
           lastRejection: null,
+          attackSequence: null,
         },
       }
     }

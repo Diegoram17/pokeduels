@@ -164,4 +164,43 @@ describe('useDuelSocket', () => {
       nickname: 'Ash',
     })
   })
+
+  it('threads payload.turnEvents into the duelTurnResolved action as attackSequence (Fase 7, PR8)', () => {
+    const { dispatch } = mount('token-1')
+    const turnEvents = [
+      { type: 'resolved', playerId: 11, moveIndex: 2, damage: 25, effectiveness: 1, fainted: false },
+      { type: 'resolved', playerId: 10, moveIndex: 4, damage: 10, effectiveness: 1, fainted: true },
+    ]
+    act(() => {
+      fakeSocket._fire('duel:turn_resolved', {
+        duelId: 42,
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        pokemonStates: [
+          { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 90, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+        ],
+        turnEvents,
+      })
+    })
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'duelTurnResolved', attackSequence: turnEvents }),
+    )
+  })
+
+  it('carries attackSequence null when turnEvents is absent from the payload (Fase 7, PR8)', () => {
+    const { dispatch } = mount('token-1')
+    act(() => {
+      fakeSocket._fire('duel:turn_resolved', {
+        duelId: 42,
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        pokemonStates: [],
+      })
+    })
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'duelTurnResolved', attackSequence: null }),
+    )
+  })
 })

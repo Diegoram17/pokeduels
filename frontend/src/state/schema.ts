@@ -74,6 +74,21 @@ export interface DuelPokemonState {
 export type DuelPhase = 'lead_selection' | 'awaiting_actions' | 'awaiting_switch' | 'finished'
 export type DuelSlot = TournamentSlot | '1v1'
 
+/**
+ * One attack of a resolved round, in server resolution order (Fase 7, PR8 —
+ * forwarded verbatim from `duel:turn_resolved.turnEvents`, which is
+ * `mapRoundEventsToCamelCase`'s output on the backend).
+ */
+export interface AttackEvent {
+  type: 'resolved' | 'skipped' | 'rejected'
+  playerId: number // attacker, server-issued id
+  moveIndex: number | null // wire 1..4
+  damage: number | null
+  effectiveness: number | null
+  fainted: boolean // true when this strike KO'd the defender
+  reason?: string | null // 'insufficient_pp' | 'target_fainted'
+}
+
 export interface DuelState {
   duelId: string
   slot: DuelSlot
@@ -85,6 +100,14 @@ export interface DuelState {
   opponentDisconnected: boolean
   /** Last `duel:action_rejected` / `duel:switch_rejected` payload (insufficient_pp etc.); cleared on the next snapshot. */
   lastRejection: { moveIndex: number | null; reason: string } | null
+  /**
+   * Transient attack-replay sequence (Fase 7, PR8): set only by
+   * `duel:turn_resolved` with a non-empty `turnEvents`, cleared to null by the
+   * next snapshot (`duelStateReceived` resync) or by `duelFinished`. Optional
+   * so existing DuelState literals/duelFromSnapshot stay valid — the reducer
+   * owns the field explicitly.
+   */
+  attackSequence?: AttackEvent[] | null
 }
 
 export interface MockState {

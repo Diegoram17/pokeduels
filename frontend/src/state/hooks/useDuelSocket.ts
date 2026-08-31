@@ -3,6 +3,7 @@ import type { MutableRefObject } from 'react'
 import type { Socket } from 'socket.io-client'
 import { duelFromSnapshot, type DuelSnapshot, type MockStateAction } from '../store'
 import type {
+  AttackEvent,
   BracketPairing,
   DuelState,
   MockState,
@@ -120,7 +121,16 @@ export function useDuelSocket({
         payload as DuelSnapshot,
         getCachedCatalog() ?? [],
       )
-      dispatch({ type: 'duelTurnResolved', duel, duelPokemonState })
+      // Fase 7 (PR8): the additive turnEvents field (server resolution order)
+      // becomes the transient attackSequence; `null` when absent so a legacy
+      // payload never triggers a replay.
+      const { turnEvents } = payload as DuelSnapshot & { turnEvents?: AttackEvent[] }
+      dispatch({
+        type: 'duelTurnResolved',
+        duel,
+        duelPokemonState,
+        attackSequence: turnEvents ?? null,
+      })
     })
 
     // duel:finished — server-finalized outcome; the client only records it.

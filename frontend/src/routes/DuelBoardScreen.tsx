@@ -7,6 +7,7 @@ import Modal from '../components/Modal'
 import ScreenTopbar from '../components/ScreenTopbar'
 import { HudCard } from '../components/PokemonCard'
 import { humanActivePokemon, rivalActivePokemon, computePostDuelRoute } from '../lib/duelFlow'
+import { useAttackReplay } from '../state/hooks/useAttackReplay'
 import {
   BASIC_ATTACK_INDEX,
   LEAD_SELECTION_TIMEOUT_SECONDS,
@@ -330,6 +331,18 @@ function DuelBoardScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Fase 7 (PR8): the attack replay walks the transient attackSequence and
+  // locks the controls while it runs. Declared before the `!duel` redirect —
+  // the hook accepts a null duel (Rules of Hooks).
+  const humanSpriteRef = useRef<HTMLImageElement>(null)
+  const rivalSpriteRef = useRef<HTMLImageElement>(null)
+  const { replaying } = useAttackReplay(
+    duel,
+    state.player.playerId,
+    humanSpriteRef,
+    rivalSpriteRef,
+  )
+
   // The `!duel` redirect happens AFTER every hook above has been declared —
   // moving it earlier would make hook calls conditional (see Rules of Hooks).
   if (!duel) {
@@ -340,7 +353,8 @@ function DuelBoardScreen() {
   const rivalActive = rivalActivePokemon(state)
   // Round-1 gate: the rival lead is not broadcast until the first
   // duel:turn_resolved, so the move grid must not wait on rivalActive.
-  const canAct = duel.phase === 'awaiting_actions' && Boolean(humanActive)
+  const canAct =
+    duel.phase === 'awaiting_actions' && Boolean(humanActive) && !replaying
 
   const handleAttack = (index: MoveIndex) => {
     actions.submitAction(index)
@@ -388,12 +402,20 @@ function DuelBoardScreen() {
               attack-replay keyframes to these wrappers. */}
           {humanActive && (
             <div className="sprite-wrap">
-              <img src={humanActive.backSpriteUrl} alt={humanActive.name} />
+              <img
+                ref={humanSpriteRef}
+                src={humanActive.backSpriteUrl}
+                alt={humanActive.name}
+              />
             </div>
           )}
           {rivalActive && (
             <div className="sprite-wrap sprite-wrap--rival">
-              <img src={rivalActive.spriteUrl} alt={rivalActive.name} />
+              <img
+                ref={rivalSpriteRef}
+                src={rivalActive.spriteUrl}
+                alt={rivalActive.name}
+              />
             </div>
           )}
         </div>

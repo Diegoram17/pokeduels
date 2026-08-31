@@ -14,7 +14,7 @@ import {
   STORAGE_KEY,
   type StorageLike,
 } from '../store'
-import type { DuelState, MockState, TournamentState } from '../schema'
+import type { AttackEvent, DuelState, MockState, TournamentState } from '../schema'
 import { setCachedCatalog } from '../../lib/catalog'
 import type { Pokemon } from '../../lib/catalog'
 
@@ -337,11 +337,106 @@ describe('reduceMockState — duelTurnResolved', () => {
         { duelId: '42', ownerId: 10, pokemonId: 25, name: 'Pikachu', type: 'electric', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 75, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
         { duelId: '42', ownerId: 11, pokemonId: 5, name: 'Snorlax', type: 'normal', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 75, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
       ],
+      attackSequence: null,
     })
     expect(resolved.duel?.turnNumber).toBe(2)
     expect(resolved.duel?.opponentDisconnected).toBe(false)
     expect(resolved.duel?.lastRejection).toBeNull()
     expect(resolved.duelPokemonState[0].currentHp).toBe(75)
+  })
+
+  it('stores the attackSequence on the resolved duel (Fase 7, PR8)', () => {
+    const attackSequence: AttackEvent[] = [
+      { type: 'resolved', playerId: 11, moveIndex: 2, damage: 25, effectiveness: 1, fainted: false },
+      { type: 'resolved', playerId: 10, moveIndex: 4, damage: 10, effectiveness: 1, fainted: true },
+    ]
+    const resolved = reduceMockState(makeDuelStateFixture(), {
+      type: 'duelTurnResolved',
+      duel: {
+        duelId: '42',
+        slot: '1v1',
+        phase: 'awaiting_actions',
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [
+        { duelId: '42', ownerId: 10, pokemonId: 25, name: 'Pikachu', type: 'electric', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 75, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+        { duelId: '42', ownerId: 11, pokemonId: 5, name: 'Snorlax', type: 'normal', spriteUrl: 'f', backSpriteUrl: 'b', currentHp: 75, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+      ],
+      attackSequence,
+    })
+    expect(resolved.duel?.attackSequence).toEqual(attackSequence)
+  })
+
+  it('nulls the attackSequence on duelStateReceived so a resync never replays (Fase 7, PR8)', () => {
+    const attackSequence: AttackEvent[] = [
+      { type: 'resolved', playerId: 11, moveIndex: 2, damage: 25, effectiveness: 1, fainted: false },
+    ]
+    let s = reduceMockState(makeDuelStateFixture(), {
+      type: 'duelTurnResolved',
+      duel: {
+        duelId: '42',
+        slot: '1v1',
+        phase: 'awaiting_actions',
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [],
+      attackSequence,
+    })
+    expect(s.duel?.attackSequence).toEqual(attackSequence)
+
+    const resynced = reduceMockState(s, {
+      type: 'duelStateReceived',
+      duel: {
+        duelId: '42',
+        slot: '1v1',
+        phase: 'awaiting_actions',
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [],
+    })
+    expect(resynced.duel?.attackSequence).toBeNull()
+  })
+
+  it('nulls the attackSequence on duelFinished (Fase 7, PR8)', () => {
+    const attackSequence: AttackEvent[] = [
+      { type: 'resolved', playerId: 11, moveIndex: 2, damage: 25, effectiveness: 1, fainted: false },
+    ]
+    let s = reduceMockState(makeDuelStateFixture(), {
+      type: 'duelTurnResolved',
+      duel: {
+        duelId: '42',
+        slot: '1v1',
+        phase: 'awaiting_actions',
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        opponentDisconnected: false,
+        lastRejection: null,
+      },
+      duelPokemonState: [],
+      attackSequence,
+    })
+    expect(s.duel?.attackSequence).toEqual(attackSequence)
+
+    const finished = reduceMockState(s, {
+      type: 'duelFinished',
+      duelId: '42',
+      winnerId: '11',
+      endReason: 'ko',
+    })
+    expect(finished.duel?.attackSequence).toBeNull()
   })
 })
 
