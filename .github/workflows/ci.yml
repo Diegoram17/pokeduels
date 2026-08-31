@@ -101,6 +101,9 @@ jobs:
         if: steps.neon_branch.outputs.db_url
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
+          # Destructive-op guard (spec R7c): the ephemeral branch is created
+          # per run and deleted at job end, so it is always disposable.
+          ALLOW_DESTRUCTIVE_DB_TESTS: '1'
         run: |
           # A freshly created Neon branch can reject the first connections with
           # "Control plane request failed" (XX000) while its compute spins up.
@@ -119,12 +122,14 @@ jobs:
         if: steps.neon_branch.outputs.db_url
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
+          ALLOW_DESTRUCTIVE_DB_TESTS: '1'
         run: node seed/index.js
 
       - name: Run DB-gated backend tests (164 tests, requires DATABASE_URL)
         if: steps.neon_branch.outputs.db_url
         env:
           DATABASE_URL: ${{ steps.neon_branch.outputs.db_url }}
+          ALLOW_DESTRUCTIVE_DB_TESTS: '1'
         run: npm test
 
       - name: Delete ephemeral Neon branch
