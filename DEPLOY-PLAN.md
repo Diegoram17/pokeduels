@@ -66,14 +66,12 @@ de GitHub, CI/CD, Dockerfile, `vercel.json`/`render.yaml`, ni conexión real a V
   riesgo ya aceptado en ADR-0001.
 - **Neon existente** (ya seedeada) como base de **producción** — decisión explícita del usuario
   (2026-08-24), no una Neon nueva separada.
-  - **Riesgo a documentar:** al no haber separación dev/prod, cualquier prueba futura contra esa
-    misma base afecta datos "de producción" directamente. ~~Aceptado explícitamente, mismo patrón
-    que el riesgo ya aceptado del token de sesión sin expiración (`SECURITY-REPORT.md`).~~
-    **MITIGADO (2026-08-31, ítem #17 del backlog):** el trabajo local y `npm test` usan un branch
-    `dev` dedicado de Neon (ADR-0012); `assertDestructiveDbAllowed()` en `backend/test/helpers.js`
-    rechaza `migrate down`/re-seed salvo que el destino sea descartable
-    (`ALLOW_DESTRUCTIVE_DB_TESTS=1`, seteado por CI). Producción ya no recibe corridas de test
-    locales.
+  - **Riesgo, MITIGADO (2026-08-31, ítem #17 del backlog):** al no haber separación dev/prod, una
+    prueba contra esa misma base afectaría datos "de producción" directamente. El trabajo local y
+    `npm test` ahora usan un branch `dev` dedicado de Neon (ADR-0012);
+    `assertDestructiveDbAllowed()` en `backend/test/helpers.js` rechaza `migrate down`/re-seed
+    salvo que el destino sea descartable (`ALLOW_DESTRUCTIVE_DB_TESTS=1`, seteado por CI).
+    Producción ya no recibe corridas de test locales.
 - **PokeAPI**, sin cambios — consumido directo desde el frontend, sin infraestructura propia.
 - **Cron externo gratuito** (cron-job.org o UptimeRobot) contra `GET /health` — ahora sí es
   ejecutable: `/health` existe de verdad en `master` (antes no, ver Registro de ejecución).
@@ -288,8 +286,8 @@ commit, sin cambios en `backend/`).
 
 **Hallazgo aparte, no bloqueante — 1 test de backend rojo contra la DB de producción:** como
 chequeo de sanidad extra (backend sin cambios en este fix) se corrió `npm run test` en `backend/`
-contra el `DATABASE_URL` real de `.env` — que es la misma Neon de producción (riesgo ya aceptado,
-ver arriba). Resultado: 444 pass / 1 fail — `test/integration.test.js > reverts every table on
+contra el `DATABASE_URL` real de `.env` — que entonces era la misma Neon de producción (ver
+§Infraestructura — mitigado desde el ítem #17). Resultado: 444 pass / 1 fail — `test/integration.test.js > reverts every table on
 migrate down` (`node-pg-migrate down 0` salió con exit 1). Se verificó de inmediato que la DB de
 producción no quedó dañada: `GET /api/pokemons` y `GET /api/rooms` en
 `https://pokeduels-backend.onrender.com` responden 200 con datos reales intactos. No se investigó
