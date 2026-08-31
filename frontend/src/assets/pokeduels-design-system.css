@@ -546,8 +546,8 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 /* ============ Screen: DuelBoard — ported from Prototipos/5 ============
    Verbatim from Prototipos/5.Tablero_de_duelo.html <style> (minus
    .duel-topbar/.duel-topbar-right, which styled the bare header deleted in
-   PR1 — .pd-topbar covers it). The Phase-4 hoisted .duel-*/.move-grid rules
-   were removed in PR6; this block is now their single source of truth.
+   PR1 — .pd-topbar covers it). The Phase-4 hoisted .duel-* and .move-grid
+   rules were removed in PR6; this block is now their single source of truth.
    .duel-main is a React-side addition (the prototype's arena+command are
    direct children of .duel-shell; in React they sit inside <main>). */
 .duel-shell{display:flex;flex-direction:column;height:100vh}
