@@ -166,17 +166,38 @@ function LeadPicker({
       >
         {String(remaining).padStart(2, '0')}
       </p>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div className="lead-grid">
         {roster.map((p) => (
           <button
             key={p.pokemonId}
             type="button"
-            className="pd-btn pd-btn--primary"
+            className="pd-card pd-card--flush pd-card--interactive lead-card"
             aria-label={p.name}
             onClick={() => onPick(p.pokemonId)}
           >
-            <span className="pd-stat">{p.name.toUpperCase()}</span>
-            <span className="pd-meta">ELEGIR</span>
+            <div className="art">
+              {p.spriteUrl ? (
+                <img src={p.spriteUrl} alt="" />
+              ) : (
+                <span
+                  className="material-symbols-outlined"
+                  aria-hidden="true"
+                  style={{ fontSize: 56, color: 'var(--pd-text-dim)' }}
+                >
+                  pets
+                </span>
+              )}
+              <span className={`pd-badge pd-badge--${p.type} type-tag`}>{p.type.toUpperCase()}</span>
+            </div>
+            <div className="meta">
+              <h4>{p.name.toUpperCase()}</h4>
+              <span className="lead-card__cta">
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  bolt
+                </span>
+                ELEGIR
+              </span>
+            </div>
           </button>
         ))}
       </div>

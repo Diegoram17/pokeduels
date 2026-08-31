@@ -278,6 +278,26 @@ describe('DuelBoardScreen — lead selection', () => {
     expect(screen.queryByText('ELIGE TU PRIMER POKÉMON')).not.toBeInTheDocument()
     expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
   })
+
+  it('renders each lead option as a full card: pokemon sprite + ELEGIR affordance', () => {
+    renderBoard(2)
+    startLeadSelection()
+
+    const picker = screen.getByTestId('lead-picker')
+    const pikachuOption = within(picker).getByRole('button', { name: /pikachu/i })
+
+    const sprite = pikachuOption.querySelector('img')
+    expect(sprite).toHaveAttribute('src', 'front-pikachu')
+    expect(within(pikachuOption).getByText('ELEGIR')).toBeInTheDocument()
+
+    act(() => {
+      pikachuOption.click()
+    })
+    expect(fakeSocket.emit).toHaveBeenCalledWith('duel:select_lead', {
+      duelId: 42,
+      pokemonId: 25,
+    })
+  })
 })
 
 describe('DuelBoardScreen — move submission', () => {
