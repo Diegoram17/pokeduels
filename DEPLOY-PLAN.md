@@ -67,8 +67,13 @@ de GitHub, CI/CD, Dockerfile, `vercel.json`/`render.yaml`, ni conexión real a V
 - **Neon existente** (ya seedeada) como base de **producción** — decisión explícita del usuario
   (2026-08-24), no una Neon nueva separada.
   - **Riesgo a documentar:** al no haber separación dev/prod, cualquier prueba futura contra esa
-    misma base afecta datos "de producción" directamente. Aceptado explícitamente, mismo patrón
-    que el riesgo ya aceptado del token de sesión sin expiración (`SECURITY-REPORT.md`).
+    misma base afecta datos "de producción" directamente. ~~Aceptado explícitamente, mismo patrón
+    que el riesgo ya aceptado del token de sesión sin expiración (`SECURITY-REPORT.md`).~~
+    **MITIGADO (2026-08-31, ítem #17 del backlog):** el trabajo local y `npm test` usan un branch
+    `dev` dedicado de Neon (ADR-0012); `assertDestructiveDbAllowed()` en `backend/test/helpers.js`
+    rechaza `migrate down`/re-seed salvo que el destino sea descartable
+    (`ALLOW_DESTRUCTIVE_DB_TESTS=1`, seteado por CI). Producción ya no recibe corridas de test
+    locales.
 - **PokeAPI**, sin cambios — consumido directo desde el frontend, sin infraestructura propia.
 - **Cron externo gratuito** (cron-job.org o UptimeRobot) contra `GET /health` — ahora sí es
   ejecutable: `/health` existe de verdad en `master` (antes no, ver Registro de ejecución).
@@ -78,8 +83,21 @@ de GitHub, CI/CD, Dockerfile, `vercel.json`/`render.yaml`, ni conexión real a V
 - **Frontend:** Preview deployments automáticos de Vercel por cada push/PR, Production en `main`.
 - **Backend:** un único entorno production (Render free tier no da preview sin costo); cambios se
   prueban localmente antes de mergear.
-- **DB:** Neon ofrece branching gratuito, pero no se usa por ahora — la base actual ES la de
-  producción, no hay un flujo dev/prod separado que branchear.
+- **DB:** Neon ofrece branching gratuito y ahora **se usa** (ADR-0012):
+  - **Dev local** = branch `dev` dedicado de Neon (creado desde `main` en la consola de Neon,
+    con los datos ya seedeados) — `backend/.env` → `DATABASE_URL` apunta a ese branch.
+  - **Producción** = branch `main` de Neon — **nunca** se usa para corridas locales de
+    migraciones/seed/tests; CI usa branches efímeras por run (creadas y borradas por job).
+
+### Flujo de desarrollo local
+
+1. Crear un branch `dev` en la consola de Neon (desde `main`, datos ya seedeados).
+2. Apuntar `backend/.env` → `DATABASE_URL` al branch `dev` (nunca a `main`/producción —
+   ver `backend/.env.example` y ADR-0012).
+3. Setear `ALLOW_DESTRUCTIVE_DB_TESTS=1` para que el bootstrap de tests pueda hacer
+   `migrate up`/seed/re-seed contra ese destino descartable.
+4. `cd backend && npm test` — las suites DB-gated corren contra el branch `dev`;
+   sin el flag, el guard `assertDestructiveDbAllowed()` aborta con instrucciones de remediación.
 
 ### Estrategia de release
 
@@ -92,8 +110,9 @@ de GitHub, CI/CD, Dockerfile, `vercel.json`/`render.yaml`, ni conexión real a V
 
 ### Data & Migrations
 
-- Ya reales, no especulativas: `node-pg-migrate`, 3 migraciones (`0001_initial-schema`,
-  `0002_add-back-sprite`, `0003_add-walkover-end-reason`), corridas y probadas con tests.
+- Ya reales, no especulativas: `node-pg-migrate`, 5 migraciones (`0001_initial-schema`,
+  `0002_add-back-sprite`, `0003_add-walkover-end-reason`, `0004_add-bot-support`,
+  `0005_add-hot-predicate-indexes`), corridas y probadas con tests.
 - Rollback de código ≠ rollback de datos — cada migración necesita su `down`; migrar antes de
   deployar el código que la requiere, nunca al revés.
 
@@ -276,6 +295,11 @@ producción no quedó dañada: `GET /api/pokemons` y `GET /api/rooms` en
 `https://pokeduels-backend.onrender.com` responden 200 con datos reales intactos. No se investigó
 la causa del test en sí (fuera de alcance de este fix, backend sin cambios) — queda como hallazgo
 para una sesión aparte, con la advertencia de que corre contra la base real.
+  - **Cierre (2026-08-31, ítem #17 del backlog):** el riesgo raíz —correr la suite destructiva
+    contra la Neon de producción— quedó **mitigado** por la separación dev/prod vía Neon branching
+    (ADR-0012) y el guard `assertDestructiveDbAllowed()`: las corridas locales de tests exigen un
+    branch `dev` descartable + `ALLOW_DESTRUCTIVE_DB_TESTS=1`, y producción ya no es destino de
+    corridas de test.
 
 **Deploy gate saltado (conocido, documentado arriba):** el workflow de CI (`ci.yml`) sigue sin
 poder correr el job de `backend` — `NEON_PROJECT_ID`/`NEON_API_KEY` todavía no están configurados
