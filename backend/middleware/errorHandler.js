@@ -1,4 +1,5 @@
 import { HttpError } from '../lib/httpError.js';
+import { logger } from '../lib/logger.js';
 
 // pg SQLSTATE → HTTP status. Kept in one place so the mapping is reviewable.
 // 22P02 invalid text representation (e.g. malformed UUID in session_token)
@@ -31,7 +32,7 @@ export function statusForError(err) {
 export function errorHandler(err, req, res, next) {
   const status = statusForError(err);
   if (status === 500) {
-    console.error(err);
+    logger.error({ err }, 'unhandled error');
   }
   const body = { error: status === 500 ? 'Internal Server Error' : err.message };
   if (err instanceof HttpError && err.details !== undefined) {

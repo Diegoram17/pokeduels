@@ -4,6 +4,7 @@ import { createSocketServer } from './ws/index.js';
 import { pool, closePool } from './db/pool.js';
 import { reconcileOrphanedDuels, reconcileStaleWaitingRooms } from './db/reconciliation.js';
 import { loadTypeEffectivenessCache } from './engine/typeEffectiveness.js';
+import { logger } from './lib/logger.js';
 
 const port = process.env.PORT ?? 3000;
 
@@ -27,13 +28,13 @@ let closing = false;
 export async function shutdown(signal = 'SIGTERM') {
   if (closing) return;
   closing = true;
-  console.log(`pokeduels API shutting down (${signal})`);
+  logger.info({ signal }, 'shutting down');
   httpServer?.close();
   io?.close();
   try {
     await closePool();
   } catch (err) {
-    console.error(`pool.end() failed: ${err.message}`, err);
+    logger.error({ err }, 'pool.end() failed');
   }
   process.exit(0);
 }
@@ -64,11 +65,11 @@ async function start() {
   await reconcileStaleWaitingRooms();
 
   httpServer.listen(port, () => {
-    console.log(`pokeduels API listening on port ${port}`);
+    logger.info({ port }, 'pokeduels API listening');
   });
 }
 
 start().catch((err) => {
-  console.error(`failed to start pokeduels API: ${err.message}`, err);
+  logger.error({ err }, 'failed to start pokeduels API');
   process.exit(1);
 });
