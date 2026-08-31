@@ -78,6 +78,32 @@ describe.skipIf(!hasDatabase)('session API (requires DATABASE_URL)', () => {
       expect(after.rows[0].n).toBe(before.rows[0].n);
     });
 
+    it('normalizes a nickname with extra whitespace before storing it (spec R1)', async () => {
+      const app = createApp();
+      const res = await request(app)
+        .post('/api/session')
+        .send({ nickname: '  Ash   Ketchum  ' });
+
+      expect(res.status).toBe(201);
+      const { rows } = await pool.query(
+        'SELECT nickname FROM players WHERE id = $1',
+        [res.body.playerId],
+      );
+      expect(rows[0].nickname).toBe('Ash Ketchum');
+    });
+
+    it('rejects a too-short nickname with 400 and creates no players row (spec R1)', async () => {
+      const app = createApp();
+      const before = await pool.query('SELECT COUNT(*)::int AS n FROM players');
+
+      const res = await request(app).post('/api/session').send({ nickname: 'ab' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBeTruthy();
+      const after = await pool.query('SELECT COUNT(*)::int AS n FROM players');
+      expect(after.rows[0].n).toBe(before.rows[0].n);
+    });
+
     it('returns 429 on the 11th request within the minute and inserts no row', async () => {
       const app = createApp();
       const nickname = 'RateLimitProbe';

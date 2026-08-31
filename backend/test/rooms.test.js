@@ -694,6 +694,31 @@ describe.skipIf(!hasDatabase)('rooms API (requires DATABASE_URL)', () => {
       expect(res.status).toBe(404);
     });
 
+    it('rejects a join whose nickname contains control characters with 400 and inserts nothing (spec R1)', async () => {
+      const creator = await createPlayer('CtrlCreator');
+      const joiner = await createPlayer('CtrlJoiner');
+      const app = createApp();
+      const created = await request(app)
+        .post('/api/rooms')
+        .set('Authorization', `Bearer ${creator.sessionToken}`)
+        .send({ max_players: 4 });
+      expect(created.status).toBe(201);
+
+      const res = await request(app)
+        .post(`/api/rooms/${created.body.code}/join`)
+        .set('Authorization', `Bearer ${joiner.sessionToken}`)
+        .send({ nickname: 'Ash\u200bKetchum' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBeTruthy();
+      const { rows } = await pool.query(
+        'SELECT COUNT(*)::int AS n FROM room_players WHERE room_id = $1',
+        [created.body.id],
+      );
+      // Only the creator auto-joined — the rejected join inserted nothing.
+      expect(rows[0].n).toBe(1);
+    });
+
     it('concurrency: 3 parallel joins on a 2-slot room → exactly one 201, two 409', async () => {
       const creator = await createPlayer('ConcCreator');
       const a = await createPlayer('ConcA');
