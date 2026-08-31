@@ -1,6 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useMockState } from '../state/useMockState'
+import Modal from '../components/Modal'
 import ScreenTopbar from '../components/ScreenTopbar'
 import GlowBlob from '../components/GlowBlob'
 import BracketTree from '../components/BracketTree'
@@ -242,12 +243,15 @@ function BotManager({
   )
 }
 
+/** Escape must not dismiss the rematch decision — REVANCHA or SALIR only. */
+function noop() {}
+
 /**
- * 1v1 post-duel re-ready (#10): shown when a 1v1 duel finished and the room
- * stayed in_progress (pendingDuelId null means no rematch has bootstrapped
- * yet). REVANCHA re-readies through the existing room:ready pipeline; SALIR
- * reuses the shared LeaveRoomButton (design: "'SALIR' (existing
- * LeaveRoomButton)").
+ * 1v1 post-duel re-ready (#10, re-skinned Fase 7.1): an overlaid modal dialog
+ * (not an in-flow card) shown when a 1v1 duel finished and the room stayed
+ * in_progress (pendingDuelId null means no rematch has bootstrapped yet).
+ * REVANCHA re-readies through the existing room:ready pipeline; SALIR reuses
+ * the shared LeaveRoomButton (design: "'SALIR' (existing LeaveRoomButton)").
  */
 function PostDuelRematchPanel({
   won,
@@ -256,21 +260,24 @@ function PostDuelRematchPanel({
   won: boolean
   onRematch: () => void
 }) {
+  const rematchRef = useRef<HTMLButtonElement>(null)
   return (
-    <div className="pd-card" data-testid="rematch-panel" style={{ padding: 24, textAlign: 'center' }}>
-      <h2 className="pd-title" style={{ margin: 0, color: won ? 'var(--pd-yellow)' : 'var(--pd-text-meta)' }}>
-        {won ? '¡GANASTE EL DUELO!' : 'PERDISTE EL DUELO'}
-      </h2>
-      <p className="pd-body" style={{ margin: '8px 0 20px' }}>
-        La sala sigue abierta. ¿Revancha o salir?
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <button type="button" className="pd-btn pd-btn--primary pd-btn--block" onClick={onRematch}>
-          REVANCHA
-        </button>
-        <LeaveRoomButton />
+    <Modal ariaLabel="Duelo terminado" onClose={noop} initialFocusRef={rematchRef}>
+      <div data-testid="rematch-panel">
+        <h2 className="pd-title" style={{ margin: 0, color: won ? 'var(--pd-yellow)' : 'var(--pd-text-meta)' }}>
+          {won ? '¡GANASTE EL DUELO!' : 'PERDISTE EL DUELO'}
+        </h2>
+        <p className="pd-body" style={{ margin: '8px 0 20px' }}>
+          La sala sigue abierta. ¿Revancha o salir?
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <button ref={rematchRef} type="button" className="pd-btn pd-btn--primary pd-btn--block" onClick={onRematch}>
+            REVANCHA
+          </button>
+          <LeaveRoomButton />
+        </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -392,12 +399,7 @@ function WaitRoomScreen() {
         </div>
 
         {showRematch && (
-          <div style={{ display: 'flex', justifyContent: 'center', flex: 'none' }}>
-            <PostDuelRematchPanel
-              won={won}
-              onRematch={() => actions.setReady(true)}
-            />
-          </div>
+          <PostDuelRematchPanel won={won} onRematch={() => actions.setReady(true)} />
         )}
       </main>
     </div>

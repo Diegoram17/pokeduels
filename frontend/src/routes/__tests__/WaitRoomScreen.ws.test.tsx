@@ -122,6 +122,26 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
     expect(within(panel).getByRole('button', { name: /salir/i })).toBeInTheDocument()
   })
 
+  it('presents the post-duel outcome as an overlaid modal dialog, not an in-flow card', () => {
+    renderWaitRoom({
+      player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+      room: makeRoom(2),
+      teamSelection: { starterId: 25, rosterIds: [] },
+      tournament: null,
+      duelPokemonState: [],
+      duel: makeFinished1v1Duel('10'),
+      pendingDuelId: null,
+      finalRanking: null,
+      roomAborted: null,
+    })
+
+    const dialog = screen.getByRole('dialog', { name: /duelo terminado/i })
+    const panel = within(dialog).getByTestId('rematch-panel')
+    expect(within(panel).getByText('¡GANASTE EL DUELO!')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /revancha/i })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /salir/i })).toBeInTheDocument()
+  })
+
   it('marks the duel as lost when the opponent won', () => {
     renderWaitRoom({
       player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
