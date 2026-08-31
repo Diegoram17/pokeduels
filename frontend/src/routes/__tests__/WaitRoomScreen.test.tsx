@@ -226,6 +226,11 @@ describe('WaitRoomScreen — wait re-skin (PR5)', () => {
     expect(container.querySelector('.player-row--pending')).not.toBeNull()
   })
 
+  it('renders the LISTO toggle with the interactive affordance class (border/relief/hover)', () => {
+    renderWaitRoom(seedRoom(2, [{ playerId: 'p1', nickname: 'Ash' }]))
+    expect(screen.getByRole('button', { name: /listo/i })).toHaveClass('ready-toggle')
+  })
+
   it('colors the LISTO toggle with var(--pd-yellow), never the off-palette #22c55e', () => {
     renderWaitRoom((actions) => {
       actions.setNickname('Ash')

@@ -212,6 +212,40 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
   })
 })
 
+describe('WaitRoomScreen — ENTRAR AL COMBATE gate', () => {
+  function baseWaitState(): MockState {
+    return {
+      player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+      room: makeRoom(2),
+      teamSelection: { starterId: 25, rosterIds: [] },
+      tournament: null,
+      duelPokemonState: [],
+      duel: null,
+      pendingDuelId: null,
+      finalRanking: null,
+      roomAborted: null,
+    }
+  }
+
+  it('shows ENTRAR AL COMBATE from the start, disabled until the server announces a duel', () => {
+    renderWaitRoom(baseWaitState())
+
+    const btn = screen.getByRole('button', { name: /entrar al combate/i })
+    expect(btn).toBeInTheDocument()
+    expect(btn).toBeDisabled()
+  })
+
+  it('enables ENTRAR AL COMBATE once duel:start announces a duel', () => {
+    renderWaitRoom(baseWaitState())
+
+    act(() => {
+      fakeSocket._fire('duel:start', { duelId: 77 })
+    })
+
+    expect(screen.getByRole('button', { name: /entrar al combate/i })).toBeEnabled()
+  })
+})
+
 describe('WaitRoomScreen — real bracket', () => {
   it('renders the bracket slots from tournament:bracket broadcasts with roster names', () => {
     renderWaitRoom({

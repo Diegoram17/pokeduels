@@ -130,8 +130,10 @@ function PlayerList({
 }
 
 /**
- * Enter button for a server-announced duel: renders whenever pendingDuelId is
- * non-null and joins it via duel:join (design decision: explicit-click gate).
+ * Enter button for a server-announced duel. Visible from the moment the player
+ * enters the room but `disabled` (opaque) until the server announces a duel —
+ * which the backend does once every seat has readied — then it lights up red
+ * and joins via duel:join (design decision: explicit-click gate).
  */
 function EnterDuelButton() {
   const [state, actions] = useMockState()
@@ -151,12 +153,13 @@ function EnterDuelButton() {
     }
   }, [duel, navigate])
 
-  if (pendingDuelId == null) return null
   return (
     <button
       type="button"
-      className="pd-btn pd-btn--primary"
+      className="pd-btn pd-btn--primary enter-combat-btn"
+      disabled={pendingDuelId == null}
       onClick={() => {
+        if (pendingDuelId == null) return
         requestedDuelIdRef.current = pendingDuelId
         actions.joinDuel(pendingDuelId)
       }}
@@ -352,7 +355,7 @@ function WaitRoomScreen() {
             <BotManager room={room} onBotAdded={handleBotChange} />
             <button
               type="button"
-              className="pd-btn pd-btn--block"
+              className={`pd-btn pd-btn--block ready-toggle${isReady ? ' ready-toggle--on' : ''}`}
               onClick={() => actions.setReady(!isReady)}
               style={{
                 display: 'flex',
@@ -384,16 +387,16 @@ function WaitRoomScreen() {
           <BracketTree bracket={state.tournament.bracket} room={room} />
         )}
 
-        {showRematch ? (
+        <div className="wait-enter-slot">
+          <EnterDuelButton />
+        </div>
+
+        {showRematch && (
           <div style={{ display: 'flex', justifyContent: 'center', flex: 'none' }}>
             <PostDuelRematchPanel
               won={won}
               onRematch={() => actions.setReady(true)}
             />
-          </div>
-        ) : (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', flex: 'none' }}>
-            <EnterDuelButton />
           </div>
         )}
       </main>
