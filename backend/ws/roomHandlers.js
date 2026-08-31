@@ -14,8 +14,7 @@ import { createDuelLifecycle } from '../ws/duelLifecycle.js';
 import { advanceTournamentOrRematch, walkoverPendingDuel } from '../ws/tournamentLifecycle.js';
 import { HttpError } from '../lib/httpError.js';
 import { WsError } from '../lib/wsError.js';
-
-const MAX_NICKNAME_LENGTH = 30;
+import { sanitizeNickname } from '../lib/sanitizeNickname.js';
 
 /** No-op fallback so the handlers stay safe if no registry is injected. */
 const NOOP_WALKOVER_TIMERS = {
@@ -74,12 +73,20 @@ export function registerRoomHandlers(
     withWsHandler(socket, async () => {
       const { code } = payload ?? {};
       const playerId = socket.data.player.id;
-      const nickname =
-        typeof payload?.nickname === 'string' &&
-        payload.nickname.trim().length > 0 &&
-        payload.nickname.length <= MAX_NICKNAME_LENGTH
-          ? payload.nickname
-          : socket.data.player.nickname;
+      // Sanitize a payload-supplied nickname at the ingress: an invalid one is
+      // a client-visible rejection (room:join_rejected), NOT a swallowed fault.
+      // When the payload omits a nickname, fall back to the authenticated one
+      // (already sanitized at session creation — not re-sanitized here).
+      let nickname;
+      if (typeof payload?.nickname === 'string') {
+        const result = sanitizeNickname(payload.nickname);
+        if (!result.ok) {
+          throw new WsError('room:join_rejected', { code, reason: 'invalid_nickname' });
+        }
+        nickname = result.value;
+      } else {
+        nickname = socket.data.player.nickname;
+      }
 
       let room;
       try {
