@@ -442,3 +442,63 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .create-room-btn__title{font:800 16px/1.3 var(--pd-font-display);color:#fff}
 .create-room-btn__desc{display:block;margin-top:var(--pd-space-1);font:400 11px/1.4 var(--pd-font-mono);letter-spacing:.1em;color:var(--pd-text-meta);text-transform:uppercase}
 .create-room-btn__icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+
+/* ============ Screen: TeamSelect — ported from Prototipos/3 ============
+   Verbatim from Prototipos/3.Seleccion_equipo.html <style> (minus
+   .draft-topbar/.center-logo, which styled the bare header deleted in PR1 —
+   .pd-topbar covers it). The catalog search + type filter row (.catalog-filters)
+   is a user addition, restyled per PR4. */
+.draft-shell{display:flex;flex-direction:column;height:100vh}
+.draft-main{flex:1;overflow:hidden;display:flex;gap:var(--pd-space-5);padding:var(--pd-space-5) var(--pd-space-6);position:relative;z-index:2}
+.draft-left{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--pd-space-5);padding-right:var(--pd-space-2)}
+.draft-progress-head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--pd-space-4);margin-bottom:var(--pd-space-3);flex-wrap:wrap}
+.section-heading{display:flex;align-items:center;gap:var(--pd-space-2);margin:0 0 var(--pd-space-3);text-transform:uppercase}
+.starter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--pd-space-4)}
+.catalog-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--pd-space-4)}
+@media(max-width:960px){.starter-grid{grid-template-columns:repeat(2,1fr)}.catalog-grid{grid-template-columns:repeat(3,1fr)}}
+.mon-card{display:flex;flex-direction:column;cursor:pointer}
+.mon-card:focus-visible{border-color:var(--pd-border-blue-soft);outline:2px solid var(--pd-yellow);outline-offset:2px}
+.mon-card .art{height:128px;position:relative;background:rgba(6,12,30,.6);overflow:hidden}
+.mon-card .art img{width:100%;height:100%;object-fit:cover;opacity:.85;transition:opacity var(--pd-fast)}
+.mon-card:hover .art img{opacity:1}
+.mon-card .type-tag{position:absolute;top:8px;right:8px}
+.mon-card .check{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:50%;background:var(--pd-yellow);
+  display:flex;align-items:center;justify-content:center;color:#1a1400}
+.mon-card .check .material-symbols-outlined{font-size:15px}
+.mon-card .meta{padding:var(--pd-space-2) var(--pd-space-3);border-top:1px solid var(--pd-border-blue-dim)}
+.mon-card .meta h4{margin:0;font:700 14px/1.2 var(--pd-font-mono);color:#fff}
+.mon-card .meta span{display:block;margin-top:var(--pd-space-1);font:400 10px/1.4 var(--pd-font-mono);letter-spacing:.1em;color:var(--pd-text-meta);text-transform:uppercase}
+.mon-card--selected{border-color:var(--pd-yellow)}
+.mon-card--selected .meta{border-top-color:rgba(255,203,5,.3)}
+.mon-card--taken{cursor:not-allowed;opacity:.85}
+.mon-card--taken .art img{filter:grayscale(1);opacity:.35}
+.taken-flag{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:repeating-linear-gradient(45deg, rgba(0,0,0,.65),rgba(0,0,0,.65) 10px, rgba(20,20,20,.65) 10px, rgba(20,20,20,.65) 20px)}
+.taken-flag span{transform:rotate(-10deg);border:2px solid rgba(238,21,21,.5);background:rgba(0,0,0,.8);
+  padding:var(--pd-space-1) var(--pd-space-3);font:800 12px/1 var(--pd-font-display);letter-spacing:.14em;color:var(--pd-danger);text-transform:uppercase}
+.catalog-card{cursor:pointer}
+.catalog-card:focus-visible{border-color:var(--pd-border-blue-soft);outline:2px solid var(--pd-yellow);outline-offset:2px}
+.catalog-card .art{height:96px;position:relative;background:rgba(6,12,30,.6)}
+.catalog-card .art img{width:100%;height:100%;object-fit:cover;opacity:.75;transition:opacity var(--pd-fast)}
+.catalog-card:hover .art img{opacity:1}
+.catalog-card .type-tag{position:absolute;top:6px;right:6px;font-size:10px;padding:var(--pd-space-1)}
+.catalog-card .check{position:absolute;top:6px;left:6px;width:16px;height:16px;border-radius:50%;background:var(--pd-yellow);
+  display:flex;align-items:center;justify-content:center;color:#1a1400}
+.catalog-card .check .material-symbols-outlined{font-size:11px}
+.catalog-card .meta{padding:var(--pd-space-2);border-top:1px solid var(--pd-border-blue-dim)}
+.catalog-card .meta h4{margin:0;font:700 13px/1.2 var(--pd-font-mono);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.draft-side{width:320px;flex:none;display:flex;flex-direction:column;height:100%}
+@media(max-width:960px){.draft-side{width:240px}}
+.draft-side-head{border-bottom:1px solid var(--pd-border-blue-dim);padding-bottom:var(--pd-space-2);margin-bottom:var(--pd-space-2);flex:none}
+.squad-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--pd-space-2);padding-right:var(--pd-space-1)}
+.squad-slot{display:flex;align-items:center;gap:var(--pd-space-3);padding:var(--pd-space-2);border-radius:var(--pd-radius-sm);
+  background:rgba(9,16,40,.6);border:1px solid rgba(255,203,5,.3)}
+.squad-slot img{width:44px;height:44px;border-radius:var(--pd-radius-sm);object-fit:cover;flex:none;background:rgba(6,12,30,.6)}
+.squad-slot h4{margin:0;font:700 13px/1.2 var(--pd-font-mono);color:#fff}
+.squad-slot--empty{opacity:.5;border:1px dashed var(--pd-border-blue-soft);background:transparent}
+.squad-slot--empty .num{width:44px;height:44px;flex:none;border-radius:var(--pd-radius-sm);background:rgba(6,12,30,.5);
+  display:flex;align-items:center;justify-content:center;font:700 16px/1 var(--pd-font-mono);color:var(--pd-text-meta)}
+.draft-side-foot{flex:none;margin-top:var(--pd-space-3)}
+/* User addition: catalog search + type filter as a row above .catalog-grid (PR4). */
+.catalog-filters{display:flex;gap:var(--pd-space-3);flex-wrap:wrap;margin-bottom:var(--pd-space-4)}

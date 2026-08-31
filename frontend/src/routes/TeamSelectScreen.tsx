@@ -44,8 +44,10 @@ function typeLabel(type: string): string {
 
 function StarterPicker({
   catalog,
+  takenIds,
 }: {
   catalog: Pokemon[] | null
+  takenIds: number[]
 }) {
   const [state, actions] = useMockState()
   const [blockedHint, setBlockedHint] = useState(false)
@@ -69,38 +71,44 @@ function StarterPicker({
 
   return (
     <section aria-label="ELEGIR INICIAL">
-      <h3 className="pd-title">
+      <h3 className="pd-title section-heading">
         <span className="material-symbols-outlined" aria-hidden="true" style={{ color: 'var(--pd-yellow)' }}>
           star
         </span>
         ELEGIR INICIAL
       </h3>
-      <div>
+      <div className="starter-grid">
         {starters.map((pokemon) => {
           const selected = current === pokemon.id
+          const taken = takenIds.includes(pokemon.id)
           return (
             <button
               type="button"
               key={pokemon.id}
-              className="pd-card pd-card--flush"
+              className={`pd-card pd-card--flush mon-card${selected ? ' mon-card--selected' : ''}${taken ? ' mon-card--taken' : ''}`}
               onClick={() => handlePick(pokemon.id)}
               aria-pressed={selected}
-              disabled={catalog === null}
+              disabled={catalog === null || taken}
             >
-              <div>
+              <div className="art">
                 <img src={pokemon.sprite_url} alt="" />
-                <span className={`pd-badge pd-badge--${pokemon.type}`}>
+                <span className={`pd-badge pd-badge--${pokemon.type} type-tag`}>
                   {typeLabel(pokemon.type)}
                 </span>
                 {selected && (
-                  <span>
+                  <span className="check">
                     <span className="material-symbols-outlined pd-icon--fill" aria-hidden="true">
                       check
                     </span>
                   </span>
                 )}
+                {taken && (
+                  <div className="taken-flag">
+                    <span>SELECCIONADO POR RIVAL</span>
+                  </div>
+                )}
               </div>
-              <div>
+              <div className="meta">
                 <h4>{pokemon.name}</h4>
                 <span>TIPO: {typeLabel(pokemon.type)}</span>
               </div>
@@ -131,7 +139,7 @@ function CatalogFilters({
   types: string[]
 }) {
   return (
-    <div style={{ display: 'flex', gap: 'var(--pd-space-3)', flexWrap: 'wrap', marginBottom: 'var(--pd-space-4)' }}>
+    <div className="catalog-filters">
       <div className="pd-input-wrap" style={{ flex: 1, minWidth: 180 }}>
         <span className="material-symbols-outlined pd-input-icon" aria-hidden="true">
           search
@@ -177,31 +185,31 @@ function PokemonCatalogGrid({
   onToggle: (id: number) => void
 }) {
   return (
-    <div>
+    <div className="catalog-grid">
       {pokemon.map((mon) => {
         const selected = selectedIds.includes(mon.id)
         return (
           <button
             type="button"
             key={mon.id}
-            className="pd-card pd-card--flush"
+            className={`pd-card pd-card--flush catalog-card${selected ? ' mon-card--selected' : ''}`}
             onClick={() => onToggle(mon.id)}
             aria-pressed={selected}
           >
-            <div>
+            <div className="art">
               <img src={mon.sprite_url} alt="" />
-              <span className={`pd-badge pd-badge--${mon.type}`}>
+              <span className={`pd-badge pd-badge--${mon.type} type-tag`}>
                 {typeLabel(mon.type)}
               </span>
               {selected && (
-                <span>
+                <span className="check">
                   <span className="material-symbols-outlined pd-icon--fill" aria-hidden="true">
                     check
                   </span>
                 </span>
               )}
             </div>
-            <div>
+            <div className="meta">
               <h4>{mon.name}</h4>
             </div>
           </button>
@@ -232,7 +240,7 @@ function RosterPicker({
 
   return (
     <section aria-label="CATÁLOGO">
-      <h3 className="pd-title">
+      <h3 className="pd-title section-heading">
         <span className="material-symbols-outlined" aria-hidden="true" style={{ color: 'var(--pd-blue-light)' }}>
           view_cozy
         </span>
@@ -273,8 +281,8 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
   const rosterNames = rosterIds.map((id) => pokemonById(catalog, id)?.name ?? String(id))
 
   return (
-    <aside className="pd-card" aria-label="TU EQUIPO">
-      <div>
+    <aside className="pd-card draft-side" aria-label="TU EQUIPO">
+      <div className="draft-side-head">
         <h3 className="pd-title" style={{ letterSpacing: '-.01em' }}>
           TU EQUIPO
         </h3>
@@ -283,8 +291,8 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
         </p>
       </div>
 
-      <div className="pd-scroll">
-        <div>
+      <div className="squad-list pd-scroll">
+        <div className="squad-slot">
           {starterName ? (
             <>
               <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 44, color: 'var(--pd-yellow)' }}>
@@ -308,7 +316,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
         {Array.from({ length: 5 }).map((_, index) => {
           const picked = rosterNames[index]
           return (
-            <div key={index}>
+            <div key={index} className={`squad-slot${picked ? '' : ' squad-slot--empty'}`}>
               {picked ? (
                 <div>
                   <h4>{picked}</h4>
@@ -318,7 +326,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
                 </div>
               ) : (
                 <>
-                  <span>{index + 1}</span>
+                  <span className="num">{index + 1}</span>
                   <span className="pd-label">SLOT DISPONIBLE</span>
                 </>
               )}
@@ -327,7 +335,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
         })}
       </div>
 
-      <div>
+      <div className="draft-side-foot">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--pd-space-2)' }}>
           <span className="pd-stat pd-stat--xl" style={{ color: 'var(--pd-yellow)', display: 'block' }}>
             {total}/6
@@ -358,7 +366,11 @@ function TeamSelectScreen() {
   const [state] = useMockState()
   const [catalog, setCatalog] = useState<Pokemon[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [wsError, setWsError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  // Starters the backend reported as taken by a rival (team:starter_rejected
+  // with reason 'taken') — rendered as .mon-card--taken per Prototipos/3.
+  const [takenStarterIds, setTakenStarterIds] = useState<number[]>([])
 
   const loadCatalog = useCallback(() => {
     setError(null)
@@ -374,13 +386,19 @@ function TeamSelectScreen() {
   }, [loadCatalog])
 
   // WS rejection events for team selection route through the same inline
-  // error banner + manual retry pattern (decision #3, obs #188/#192).
+  // error banner + manual retry pattern (decision #3, obs #188/#192). A
+  // 'taken' rejection also flags the starter locally so the grid reflects
+  // rival picks (re-skin PR4) while keeping the existing banner behavior.
   useEffect(() => {
-    const offStarter = onSocketEvent('team:starter_rejected', () => {
-      setError('Tu Pokémon inicial fue rechazado. Elegí otro.')
+    const offStarter = onSocketEvent('team:starter_rejected', (payload) => {
+      const { pokemonId, reason } = (payload ?? {}) as { pokemonId?: number; reason?: string }
+      if (reason === 'taken' && pokemonId != null) {
+        setTakenStarterIds((ids) => (ids.includes(pokemonId) ? ids : [...ids, pokemonId]))
+      }
+      setWsError('Tu Pokémon inicial fue rechazado. Elegí otro.')
     })
     const offRoster = onSocketEvent('team:roster_rejected', () => {
-      setError('Tu equipo fue rechazado. Revisá que no haya duplicados.')
+      setWsError('Tu equipo fue rechazado. Revisá que no haya duplicados.')
     })
     return () => {
       offStarter()
@@ -389,13 +407,13 @@ function TeamSelectScreen() {
   }, [])
 
   return (
-    <div className="pd-page">
+    <div className="pd-page draft-shell">
       <GlowBlob style={{ left: '-10%', bottom: '-10%', width: 520, height: 520 }} />
 
       <ScreenTopbar nickname={state.player.nickname} />
 
-      <main id="main-content">
-        <div className="pd-scroll">
+      <main id="main-content" className="draft-main">
+        <div className="draft-left pd-scroll">
           <section className="pd-card">
             <div>
               <div>
@@ -409,6 +427,7 @@ function TeamSelectScreen() {
             </div>
           </section>
 
+          {wsError && <ErrorBanner message={wsError} onRetry={() => setWsError(null)} />}
           {error && <ErrorBanner message={error} onRetry={loadCatalog} />}
 
           {isLoading && !error ? (
@@ -426,7 +445,7 @@ function TeamSelectScreen() {
             </>
           ) : !error ? (
             <>
-              <StarterPicker catalog={catalog} />
+              <StarterPicker catalog={catalog} takenIds={takenStarterIds} />
               <RosterPicker catalog={catalog} />
             </>
           ) : null}

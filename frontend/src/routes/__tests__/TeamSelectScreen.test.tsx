@@ -8,6 +8,15 @@ import { useMockState } from '../../state/useMockState'
 import type { Pokemon } from '../../lib/catalog'
 import { setCachedCatalog } from '../../lib/catalog'
 import TeamSelectScreen from '../TeamSelectScreen'
+import { STORAGE_KEY, serializeMockState } from '../../state/store'
+import type { MockState } from '../../state/schema'
+import { io } from 'socket.io-client'
+
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(),
+}))
+
+import { disconnectSocket } from '../../lib/socket'
 
 const pokemonFixture: Pokemon[] = [
   { id: 25, name: 'Pikachu', type: 'electric', pokeapi_id: 25, sprite_url: 'x', back_sprite_url: 'x', is_starter: true },
@@ -70,8 +79,32 @@ function catalogSection() {
   return screen.getByRole('region', { name: /catálogo/i })
 }
 
+function makeFakeSocket() {
+  const handlers = new Map<string, (payload?: unknown) => void>()
+  const fake = {
+    on: vi.fn((event: string, handler: (payload?: unknown) => void) => {
+      handlers.set(event, handler)
+      return fake
+    }),
+    off: vi.fn((event: string) => {
+      handlers.delete(event)
+      return fake
+    }),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+    _fire: (event: string, payload?: unknown) => {
+      handlers.get(event)?.(payload)
+    },
+  }
+  return fake
+}
+
+let fakeSocket: ReturnType<typeof makeFakeSocket>
+
 beforeEach(() => {
   setCachedCatalog(null)
+  fakeSocket = makeFakeSocket()
+  vi.mocked(io).mockReturnValue(fakeSocket as never)
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue(jsonResponse(200, pokemonFixture)),
@@ -81,6 +114,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   setCachedCatalog(null)
+  disconnectSocket()
 })
 
 describe('TeamSelectScreen', () => {
@@ -282,5 +316,48 @@ describe('TeamSelectScreen — catalog loading state', () => {
     })
     expect(await screen.findByText('Pikachu')).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
+describe('TeamSelectScreen — draft re-skin (PR4)', () => {
+  it('applies the draft structure: draft-main split, starter/catalog grids, side rail, filter row', async () => {
+    const { container } = renderTeamSelect()
+    await screen.findByText('Pikachu')
+
+    expect(container.querySelector('.draft-main')).not.toBeNull()
+    expect(container.querySelector('.starter-grid')).not.toBeNull()
+    expect(container.querySelector('.catalog-grid')).not.toBeNull()
+    expect(container.querySelector('.draft-side')).not.toBeNull()
+    // Catalog search + type filter restyled as a row above the grid.
+    expect(container.querySelector('.catalog-filters')).not.toBeNull()
+    expect(container.querySelector('.catalog-filters .pd-input')).not.toBeNull()
+    expect(container.querySelector('.catalog-filters #type-filter')).not.toBeNull()
+  })
+
+  it('marks a starter taken by the rival with .mon-card--taken, disables it, and shows the flag', async () => {
+    const seeded: MockState = {
+      player: { nickname: 'Ash', playerId: 'p1', sessionToken: 'token-1' },
+      room: { code: 'AB12', maxPlayers: 2, status: 'waiting', players: [] },
+      teamSelection: { starterId: null, rosterIds: [] },
+      tournament: null,
+      duelPokemonState: [],
+      duel: null,
+      pendingDuelId: null,
+      finalRanking: null,
+      roomAborted: null,
+    }
+    localStorage.setItem(STORAGE_KEY, serializeMockState(seeded))
+
+    const { container } = renderTeamSelect()
+    await screen.findByText('Pikachu')
+
+    act(() => {
+      fakeSocket._fire('team:starter_rejected', { pokemonId: 25, reason: 'taken' })
+    })
+
+    const pikachuCard = within(starterSection()).getByRole('button', { name: /pikachu/i })
+    expect(pikachuCard).toBeDisabled()
+    expect(within(starterSection()).getByText('SELECCIONADO POR RIVAL')).toBeInTheDocument()
+    expect(container.querySelector('.mon-card--taken')).not.toBeNull()
   })
 })
