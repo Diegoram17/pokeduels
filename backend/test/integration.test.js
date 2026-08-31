@@ -252,7 +252,7 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
     ).rejects.toMatchObject({ code: '23514' });
   });
 
-  it('reverts every table on migrate down', async () => {
+  it('reverts every table and every 0005 index on migrate down', async () => {
     // Other integration files (e.g. tournamentLifecycle) can run before this
     // one and leave `duels` rows with end_reason='walkover'. The 0003 down
     // migration restores a CHECK that does NOT allow 'walkover', so the revert
@@ -269,13 +269,31 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
     // Passing an explicit count of `0` reverts the full chain to empty.
     run(`${MIGRATE} down 0`);
 
-    return pool
-      .query(
+    // `down 0` reverts the full chain, so the revert list must account for
+    // every 0005 object too: no public table AND none of migration 0005's
+    // seven hot-predicate indexes may remain (spec R2 scenarios 3-4 — the
+    // 0005 down migration drops exactly the indexes it created).
+    const INDEXES_0005 = [
+      'idx_duel_pokemon_state_duel_id',
+      'idx_moves_duel_id',
+      'idx_duels_room_id',
+      'idx_duels_player1_id',
+      'idx_duels_player2_id',
+      'idx_duels_active',
+      'idx_rooms_waiting',
+    ];
+    const [tables, indexes] = await Promise.all([
+      pool.query(
         `SELECT table_name FROM information_schema.tables
          WHERE table_schema = 'public' AND table_name <> 'pgmigrations'`,
-      )
-      .then((result) => {
-        expect(result.rows).toHaveLength(0);
-      });
+      ),
+      pool.query(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = 'public' AND indexname = ANY($1)`,
+        [INDEXES_0005],
+      ),
+    ]);
+    expect(tables.rows).toHaveLength(0);
+    expect(indexes.rows).toHaveLength(0);
   }, SLOW_TEST_TIMEOUT);
 });
