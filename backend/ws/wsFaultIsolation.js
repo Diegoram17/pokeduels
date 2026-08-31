@@ -1,4 +1,5 @@
 import { WsError } from '../lib/wsError.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Per-socket fault isolation for the WS lobby (mirrors engine/faultIsolation.js
@@ -23,7 +24,7 @@ export async function withWsHandler(socket, fn) {
       else socket.emit(err.event);
       return undefined;
     }
-    console.error(`[ws-handler] ${err.message}`, err);
+    logger.error({ err }, 'ws handler fault');
     return undefined;
   }
 }

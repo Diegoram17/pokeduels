@@ -1,3 +1,5 @@
+import { logger } from '../lib/logger.js';
+
 /**
  * Per-duel fault isolation (Phase 3). Closes SECURITY-REPORT PL1-06 under
  * ADR-0001's single-process model: one duel's resolution crashing must never
@@ -23,7 +25,7 @@ export async function withDuelFaultIsolation(duelId, fn) {
     const result = await fn();
     return { ok: true, result };
   } catch (error) {
-    console.error(`[duel-fault] duel ${duelId} failed: ${error.message}`, error);
+    logger.error({ duelId, err: error }, 'duel resolution failed');
     return { ok: false, error };
   }
 }
