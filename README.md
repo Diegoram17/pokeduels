@@ -1,83 +1,84 @@
 # PokeDuels
 
-Real-time **1v1 and 4-player tournament Pokémon duels**. Pick an exclusive starter plus a
-5-Pokémon roster, battle turn by turn using type advantages, and KO all six of your
-rival's units to win. No levels, no items — pure type strategy. Identities are ephemeral
-(just a nickname, no accounts).
+Duelos Pokémon en tiempo real, **1v1 y torneo de 4 jugadores**. Elegí un inicial exclusivo
+más un plantel de 5 Pokémon, combatí turno a turno usando ventajas de tipo y noqueá a las
+seis unidades del rival para ganar. Sin niveles, sin objetos — pura estrategia de tipos. Las
+identidades son efímeras (solo un apodo, sin cuentas).
 
-- **Play:** <https://pokeduels.vercel.app>
+- **Jugar:** <https://pokeduels.vercel.app>
 - **API:** <https://pokeduels-backend.onrender.com>
 
-**Status:** fully implemented and deployed. Product Fases 1–7 and Diagnostic Fases 1–6 are
-merged to `master` — see [`BACKLOG.md`](BACKLOG.md) for the item-by-item history.
+**Estado:** completamente implementado y desplegado. Fases 1–7 de producto y Fases 1–6 de
+diagnóstico están mergeadas a `master` — ver [`BACKLOG.md`](BACKLOG.md) para el historial
+ítem por ítem.
 
 ---
 
-## Architecture at a glance
+## Arquitectura de un vistazo
 
-Monorepo with **two independent npm packages** and no root `package.json`.
+Monorepo con **dos paquetes npm independientes** y sin `package.json` en la raíz.
 
-| Piece | Stack | Runs on |
+| Parte | Stack | Corre en |
 |---|---|---|
-| `frontend/` | Vite 8 · React 19 · React Router 6 · Tailwind 4 · socket.io-client · **TypeScript** | Vercel (static SPA) |
-| `backend/` | Express 5 (REST) · Socket.IO 4 (WS) · `pg` · node-pg-migrate · **plain JS (ESM)** | Render (one Node process) |
-| Database | PostgreSQL — 10 tables, 5 migrations | Neon (serverless; ephemeral branch per CI run) |
+| `frontend/` | Vite 8 · React 19 · React Router 6 · Tailwind 4 · socket.io-client · **TypeScript** | Vercel (SPA estática) |
+| `backend/` | Express 5 (REST) · Socket.IO 4 (WS) · `pg` · node-pg-migrate · **JS plano (ESM)** | Render (un proceso Node) |
+| Base de datos | PostgreSQL — 10 tablas, 5 migraciones | Neon (serverless; branch efímero por corrida de CI) |
 
-- **The combat engine is server-authoritative.** `backend/engine/` is pure (no I/O): it
-  resolves each round — order, damage, KO, end conditions — and the client only renders the
-  snapshots it receives over WebSocket. The client never computes an outcome.
-- **Duel phase state is not persisted.** `lead_selection` / `awaiting_actions` /
-  `awaiting_switch` / `RESOLVING` live in server memory (`backend/ws/duelContext.js`, one
-  store per connection); the client re-derives phase with `deriveDuelPhase()`.
-- **Transport is hybrid:** REST for session / catalog / room creation, Socket.IO for
-  everything live (`room:*`, `team:*`, `duel:*`).
+- **El motor de combate es autoritativo del servidor.** `backend/engine/` es puro (sin I/O):
+  resuelve cada ronda — orden, daño, KO, condiciones de fin — y el cliente solo renderiza los
+  snapshots que recibe por WebSocket. El cliente nunca calcula un resultado.
+- **El estado de fase del duelo no se persiste.** `lead_selection` / `awaiting_actions` /
+  `awaiting_switch` / `RESOLVING` viven en memoria del servidor (`backend/ws/duelContext.js`,
+  un store por conexión); el cliente re-deriva la fase con `deriveDuelPhase()`.
+- **El transporte es híbrido:** REST para sesión / catálogo / creación de sala, Socket.IO para
+  todo lo que es en vivo (`room:*`, `team:*`, `duel:*`).
 
-Full diagrams — class model, layered view, component-and-connector, deployment — live in
-[`arquitectura/`](arquitectura/README.md).
+Los diagramas completos — modelo de clases, vista en capas, componentes y conectores,
+despliegue — viven en [`arquitectura/`](arquitectura/README.md).
 
 ---
 
-## Repository layout
+## Estructura del repositorio
 
 ```
 .
-├── frontend/                 React SPA            → see frontend/README.md
-├── backend/                  Express + Socket.IO API + game engine
-├── arquitectura/             Architecture diagrams (.drawio) + README
+├── frontend/                 SPA de React            → ver frontend/README.md
+├── backend/                  API Express + Socket.IO + motor de juego
+├── arquitectura/             Diagramas de arquitectura (.drawio) + README
 ├── adrs/                     Architecture Decision Records (0001–0012)
-├── Prototipos/               Original static HTML/CSS screen prototypes (design reference)
-├── scripts/                  Repo tooling (sync-seed-data.mjs)
-├── seed-data.json            Curated catalog seed (54 pokémon)
-├── .github/workflows/ci.yml  CI: build + test + lint for both packages
-└── *.md                      Project documentation (indexed below)
+├── Prototipos/               Prototipos HTML/CSS originales de cada pantalla (referencia de diseño)
+├── scripts/                  Tooling del repo (sync-seed-data.mjs)
+├── seed-data.json            Catálogo curado del seed (150 pokémon)
+├── .github/workflows/ci.yml  CI: build + test + lint para ambos paquetes
+└── *.md                      Documentación del proyecto (indexada más abajo)
 ```
 
-### `backend/` internals
+### Interior de `backend/`
 
-| Folder | Responsibility |
+| Carpeta | Responsabilidad |
 |---|---|
-| `app.js` / `server.js` | Express app factory · HTTP + Socket.IO bootstrap · graceful shutdown · startup reconciliation |
-| `ws/` | WebSocket layer — `index.js` (composition root), `duelContext.js`, room/team/duel handlers, `turnCycle.js`, `tournamentLifecycle.js`, `botManager.js`, timer registries |
+| `app.js` / `server.js` | Factory de la app Express · bootstrap de HTTP + Socket.IO · apagado ordenado · reconciliación al arrancar |
+| `ws/` | Capa de WebSocket — `index.js` (composition root), `duelContext.js`, handlers de sala/equipo/duelo, `turnCycle.js`, `tournamentLifecycle.js`, `botManager.js`, registros de timers |
 | `routes/` | REST — `session.js`, `rooms.js`, `catalog.js` |
-| `engine/` | Pure game logic — `roundResolver.js`, `stateMachine.js`, `switchValidation.js`, `damageCalc.js`, `typeEffectiveness.js` |
-| `repositories/` | Data access — `duelRepository.js` barrel over `duelQueries.js` / `duelTransactions.js` / `duelStateMapper.js` |
-| `db/` | `pool.js` (shared `pg` pool), `rooms.js`, `teamSelections.js`, `players.js`, `pokemons.js`, `reconciliation.js` |
-| `migrations/` | node-pg-migrate SQL (`0001`–`0005`) |
-| `middleware/`, `lib/` | auth · rate limiting · error handler · structured logger (`pino`) · sanitizers |
+| `engine/` | Lógica de juego pura — `roundResolver.js`, `stateMachine.js`, `switchValidation.js`, `damageCalc.js`, `typeEffectiveness.js` |
+| `repositories/` | Acceso a datos — `duelRepository.js` como barrel sobre `duelQueries.js` / `duelTransactions.js` / `duelStateMapper.js` |
+| `db/` | `pool.js` (pool compartido de `pg`), `rooms.js`, `teamSelections.js`, `players.js`, `pokemons.js`, `reconciliation.js` |
+| `migrations/` | SQL de node-pg-migrate (`0001`–`0005`) |
+| `middleware/`, `lib/` | auth · rate limiting · manejador de errores · logger estructurado (`pino`) · sanitizadores |
 
 ---
 
-## Quick start (local)
+## Arranque rápido (local)
 
 ### Backend
 
 ```bash
 cd backend
 npm install
-cp .env.example .env          # then set DATABASE_URL to a Postgres/Neon instance
+cp .env.example .env          # después configurá DATABASE_URL a una instancia Postgres/Neon
 npm run migrate:up
-npm run seed                  # catalog: 54 pokémon + 18×18 type matrix
-npm run dev                   # listens on PORT (default 3000)
+npm run seed                  # catálogo: 150 pokémon + matriz de tipos 18×18
+npm run dev                   # escucha en PORT (default 3000)
 ```
 
 ### Frontend
@@ -85,7 +86,7 @@ npm run dev                   # listens on PORT (default 3000)
 ```bash
 cd frontend
 npm install
-# set VITE_API_URL (e.g. http://localhost:3000/api) and VITE_WS_URL (e.g. http://localhost:3000)
+# configurá VITE_API_URL (ej. http://localhost:3000/api) y VITE_WS_URL (ej. http://localhost:3000)
 npm run dev
 ```
 
@@ -93,52 +94,55 @@ npm run dev
 
 ## Tests, lint, CI
 
-| Command | Package | What |
+| Comando | Paquete | Qué hace |
 |---|---|---|
-| `npm test` | frontend | Vitest — component + unit tests (run with `--maxWorkers=2` on low-RAM machines) |
+| `npm test` | frontend | Vitest — tests de componentes + unitarios (correr con `--maxWorkers=2` en máquinas con poca RAM) |
 | `npm run build` | frontend | `tsc -b` + `vite build` |
 | `npm run lint` | frontend | oxlint |
-| `npm test` | backend | Vitest — ~275 tests run with no `DATABASE_URL`; ~164 more are DB-gated and need one |
+| `npm test` | backend | Vitest — ~330 tests corren sin `DATABASE_URL`; ~170 más están gateados por DB y necesitan una |
 | `npm run lint` | backend | oxlint |
 | `npm run migrate:up` / `migrate:down` | backend | node-pg-migrate |
 
-**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs both packages on every push and PR to `master`. The DB-gated backend tests run against an **ephemeral Neon branch** created and deleted per run; when the Neon secrets are absent that block is skipped visibly in the job summary, never reported as passing.
+**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) corre ambos paquetes en cada
+push y PR a `master`. Los tests del backend gateados por DB corren contra un **branch efímero
+de Neon** creado y borrado en cada corrida; cuando faltan los secrets de Neon, ese bloque se
+saltea de forma visible en el resumen del job, nunca se reporta como exitoso.
 
 ---
 
-## Deployment
+## Despliegue
 
-- Push to `master` → **Vercel** redeploys `frontend/` automatically; **Render** redeploys `backend/`.
-- A cron hits `GET /health` to keep the Render free-tier instance warm and dodge cold starts (ADR-0006).
-- Dev and prod databases are kept separate via Neon branching (ADR-0012); the test bootstrap refuses to run destructive operations unless `ALLOW_DESTRUCTIVE_DB_TESTS=1`.
-
----
-
-## How to play
-
-1. Enter a nickname → land in the lobby.
-2. Create or join a room (**1v1** = 2 seats, **tournament** = 4 seats). You can add a bot to fill a seat.
-3. Pick **1 exclusive starter** (no two players in a room may share one) + **5 roster** Pokémon.
-4. Ready up. When every seat is ready the duel starts; choose your lead Pokémon (30s timer).
-5. Each turn (10s timer) pick one of **4 moves** — 3 cost PP (25 / 20 / 15 dmg), move 4 is unlimited (10 dmg) — or switch Pokémon. Type match-ups apply a ×2 / ×1 / ×0.5 multiplier.
-6. KO all six of the opponent's Pokémon to win. A 4-player room runs semifinals → final + third-place and produces a ranking.
-
-Canonical rules: [`spec-juego-tipo-pokemon.md`](spec-juego-tipo-pokemon.md).
+- Push a `master` → **Vercel** redespliega `frontend/` automáticamente; **Render** redespliega `backend/`.
+- Un cron pega a `GET /health` para mantener despierta la instancia gratuita de Render y evitar cold starts (ADR-0006).
+- Las bases de dev y prod se mantienen separadas vía branching de Neon (ADR-0012); el bootstrap de tests rechaza correr operaciones destructivas salvo que `ALLOW_DESTRUCTIVE_DB_TESTS=1`.
 
 ---
 
-## Documentation
+## Cómo jugar
 
-| File | Contents |
+1. Ingresá un apodo → caés en el lobby.
+2. Creá o unite a una sala (**1v1** = 2 lugares, **torneo** = 4 lugares). Podés agregar un bot para llenar un lugar.
+3. Elegí **1 inicial exclusivo** (ningún otro jugador de la sala puede compartirlo) + **5 Pokémon** de plantel.
+4. Marcate listo. Cuando todos los lugares están listos arranca el duelo; elegí tu Pokémon líder (30s de timer).
+5. En cada turno (10s de timer) elegí uno de **4 movimientos** — 3 gastan PP (25 / 20 / 15 de daño), el movimiento 4 es ilimitado (10 de daño) — o cambiá de Pokémon. Las ventajas de tipo aplican un multiplicador ×2 / ×1 / ×0.5.
+6. Noqueá a los seis Pokémon del rival para ganar. Una sala de 4 jugadores corre semifinales → final + tercer puesto y produce un ranking.
+
+Reglas canónicas: [`spec-juego-tipo-pokemon.md`](spec-juego-tipo-pokemon.md).
+
+---
+
+## Documentación
+
+| Archivo | Contenido |
 |---|---|
-| [`PRD.md`](PRD.md) | Product requirements (RF / RNF) |
-| [`TECH-DESIGN.md`](TECH-DESIGN.md) | Technical design, data model, API contracts, ADR index |
-| [`DESIGN.md`](DESIGN.md) | High-level design overview |
-| [`UX-DESIGN.md`](UX-DESIGN.md) | UX / UI design |
-| [`spec-juego-tipo-pokemon.md`](spec-juego-tipo-pokemon.md) | Game rules — type matrix, damage, turn flow |
-| [`BACKLOG.md`](BACKLOG.md) | Implementation backlog (all items complete) |
-| [`DEPLOY-PLAN.md`](DEPLOY-PLAN.md) | Deployment strategy |
-| [`SECURITY-REPORT.md`](SECURITY-REPORT.md) | Security review |
-| [`FIX-PLAN-production-bugs.md`](FIX-PLAN-production-bugs.md) | Historical root-cause analysis of early production bugs |
+| [`PRD.md`](PRD.md) | Requisitos de producto (RF / RNF) |
+| [`TECH-DESIGN.md`](TECH-DESIGN.md) | Diseño técnico, modelo de datos, contratos de API, índice de ADRs |
+| [`DESIGN.md`](DESIGN.md) | Overview de diseño de alto nivel |
+| [`UX-DESIGN.md`](UX-DESIGN.md) | Diseño de UX / UI |
+| [`spec-juego-tipo-pokemon.md`](spec-juego-tipo-pokemon.md) | Reglas del juego — matriz de tipos, daño, flujo de turnos |
+| [`BACKLOG.md`](BACKLOG.md) | Backlog de implementación (todos los ítems completos) |
+| [`DEPLOY-PLAN.md`](DEPLOY-PLAN.md) | Estrategia de despliegue |
+| [`SECURITY-REPORT.md`](SECURITY-REPORT.md) | Revisión de seguridad |
+| [`FIX-PLAN-production-bugs.md`](FIX-PLAN-production-bugs.md) | Análisis histórico de causa raíz de bugs tempranos en producción |
 | [`adrs/`](adrs/) | Architecture Decision Records 0001–0012 |
-| [`arquitectura/`](arquitectura/README.md) | Architecture diagrams (class model, layers, C&C, deployment) |
+| [`arquitectura/`](arquitectura/README.md) | Diagramas de arquitectura (modelo de clases, capas, C&C, despliegue) |

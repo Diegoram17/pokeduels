@@ -1,38 +1,38 @@
 # PokeDuels — Frontend
 
-Real-time Pokemon duels client. Vite + React 19 + TypeScript + Tailwind 4.
+Cliente de duelos Pokémon en tiempo real. Vite + React 19 + TypeScript + Tailwind 4.
 
-## Setup
+## Instalación
 
 ```bash
 npm install
 ```
 
-## Environment variables
+## Variables de entorno
 
-Create a `.env` file (or set in your shell):
+Creá un archivo `.env` (o configuralas en tu shell):
 
-| Variable | Description | Example |
+| Variable | Descripción | Ejemplo |
 |---|---|---|
-| `VITE_API_URL` | Backend REST API base URL | `http://localhost:3000/api` |
-| `VITE_WS_URL` | Backend WebSocket URL | `http://localhost:3000` |
+| `VITE_API_URL` | URL base de la API REST del backend | `http://localhost:3000/api` |
+| `VITE_WS_URL` | URL del WebSocket del backend | `http://localhost:3000` |
 
 ## Scripts
 
-| Command | What |
+| Comando | Qué hace |
 |---|---|
-| `npm run dev` | Start dev server (HMR) |
-| `npm test` | Run tests (Vitest) |
-| `npm run test:watch` | Run tests in watch mode |
+| `npm run dev` | Levanta el servidor de dev (HMR) |
+| `npm test` | Corre los tests (Vitest) |
+| `npm run test:watch` | Corre los tests en modo watch |
 | `npm run lint` | Lint (oxlint) |
-| `npm run build` | Typecheck + production build |
+| `npm run build` | Typecheck + build de producción |
 
-## Architecture
+## Arquitectura
 
-- **Routes:** `src/routes/` — 7 screens (Login, Lobby, TeamSelect, WaitRoom, Duel, Swap, Ranking)
-- **State:** `src/state/` — `MockStateProvider` (`useReducer` + Context, `reduceMockState`) + Socket.IO hooks (`useDuelSocket`, `useMockPersistence`)
-- **Components:** `src/components/` — shared UI (Modal, ScreenTopbar, HpBar, etc.)
-- **Design system:** `src/assets/pokeduels-design-system.css` (`.pd-*` tokens, Fase 7)
-- **Engine:** combat is server-authoritative (`backend/engine/`); the client renders snapshots
+- **Rutas:** `src/routes/` — 7 pantallas (Login, Lobby, TeamSelect, WaitRoom, Duel, Swap, Ranking)
+- **Estado:** `src/state/` — `MockStateProvider` (`useReducer` + Context, `reduceMockState`) + hooks de Socket.IO (`useDuelSocket`, `useMockPersistence`)
+- **Componentes:** `src/components/` — UI compartida (Modal, ScreenTopbar, HpBar, etc.)
+- **Sistema de diseño:** `src/assets/pokeduels-design-system.css` (tokens `.pd-*`, Fase 7)
+- **Motor:** el combate es autoritativo del servidor (`backend/engine/`); el cliente solo renderiza snapshots
 
-See the [root README](../README.md) for the full project overview.
+Ver el [README de la raíz](../README.md) para el overview completo del proyecto.
