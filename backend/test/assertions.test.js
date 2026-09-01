@@ -3,7 +3,7 @@ import { assertSeedCounts } from '../seed/assertions.js';
 
 const OK = {
   types: 18,
-  pokemons: 54,
+  pokemons: 150,
   effectiveness: 324,
   attackingTypes: 18,
   defendingTypes: 18,
@@ -19,7 +19,7 @@ describe('assertSeedCounts', () => {
   });
 
   it('throws with an explicit row-count error when pokemons is wrong', () => {
-    expect(() => assertSeedCounts({ ...OK, pokemons: 53 })).toThrow(/54/);
+    expect(() => assertSeedCounts({ ...OK, pokemons: 149 })).toThrow(/150/);
   });
 
   it('throws with an explicit row-count error when effectiveness is below 324', () => {

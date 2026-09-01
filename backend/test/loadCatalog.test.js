@@ -32,19 +32,19 @@ describe('mergeCatalog', () => {
 });
 
 describe('loadCatalogFromFile', () => {
-  it('loads the canonical root seed-data.json: 54 pokemon, exactly 4 starters, no duplicate names', () => {
+  it('loads the canonical root seed-data.json: 150 pokemon, exactly 4 starters, no duplicate names', () => {
     const rows = loadCatalogFromFile();
-    expect(rows).toHaveLength(54);
+    expect(rows).toHaveLength(150);
     expect(rows.filter((p) => p.is_starter)).toHaveLength(4);
-    expect(new Set(rows.map((p) => p.name)).size).toBe(54);
+    expect(new Set(rows.map((p) => p.name)).size).toBe(150);
   });
 
-  it('carries a non-empty back_sprite_url for all 54 pokemon', () => {
+  it('carries a non-empty back_sprite_url for all 150 pokemon', () => {
     const rows = loadCatalogFromFile();
     const withBackSprite = rows.filter(
       (p) => typeof p.back_sprite_url === 'string' && p.back_sprite_url.length > 0,
     );
-    expect(withBackSprite).toHaveLength(54);
+    expect(withBackSprite).toHaveLength(150);
   });
 
   it('mirrors the front-sprite convention: every back_sprite_url points at the back/{pokeapi_id} path', () => {
@@ -63,13 +63,13 @@ describe('readSeedData', () => {
   it('parses the canonical root seed-data.json with catalog and sparse effectiveness', () => {
     const data = readSeedData();
     expect(data.starters).toHaveLength(4);
-    expect(data.catalog).toHaveLength(50);
+    expect(data.catalog).toHaveLength(146);
     expect(data.type_effectiveness).toHaveLength(120);
   });
 });
 
 describe('pokeapi_id uniqueness (regression: Tyranitar-Dark once collided with Weavile at 461)', () => {
-  it('has no duplicate pokeapi_id across all 54 starters + catalog entries', () => {
+  it('has no duplicate pokeapi_id across all 150 starters + catalog entries', () => {
     const rows = loadCatalogFromFile();
     const ids = rows.map((p) => p.pokeapi_id);
     expect(new Set(ids).size).toBe(ids.length);

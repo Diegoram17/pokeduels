@@ -85,7 +85,7 @@ export async function ensureSchemaAndSeed(pool) {
   const { pokemons, effectiveness, null_backs } = rows[0];
   // Counts alone are not enough: migrate up recreates the back_sprite_url
   // column NULL (after a partial migrate down), so also require it populated.
-  if (pokemons !== 54 || effectiveness !== 324 || null_backs > 0) {
+  if (pokemons !== 150 || effectiveness !== 324 || null_backs > 0) {
     run('node seed/index.js');
   }
 }

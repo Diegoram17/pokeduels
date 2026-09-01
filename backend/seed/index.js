@@ -7,9 +7,13 @@
  *   2. Read root seed-data.json, merge starters + catalog, validate every
  *      type against the canonical 18 — drift aborts BEFORE any write.
  *   3. Upsert pokemons by name (ON CONFLICT (name) DO UPDATE).
- *   4. Expand the 120 sparse effectiveness rows to the full 324 ordered pairs
+ *   4. Prune pokemons whose name is no longer in the seed data (e.g. a
+ *      catalog swap that drops entries), deleting their historical
+ *      dependents first (moves, duel_pokemon_state, team_selections) since
+ *      none of those FKs cascade — upsert alone never removes stale rows.
+ *   5. Expand the 120 sparse effectiveness rows to the full 324 ordered pairs
  *      (curated multiplier wins, otherwise 1.0) and upsert each.
- *   5. Assert exact post-seed counts (18 / 54 / 324 and 18x18 coverage) —
+ *   6. Assert exact post-seed counts (18 / 150 / 324 and 18x18 coverage) —
  *      any mismatch rolls back and exits non-zero.
  *
  * Requires DATABASE_URL (Neon). Idempotent: safe to rerun without a schema
@@ -60,6 +64,29 @@ async function main() {
            is_starter = EXCLUDED.is_starter`,
         [p.name, p.type, p.pokeapi_id, p.sprite_url ?? null, p.back_sprite_url ?? null, p.is_starter ?? false],
       );
+    }
+
+    // Upsert never removes rows: a pokemon dropped from seed-data.json (e.g.
+    // this catalog swap to Gen-1-only) would otherwise linger forever. Prune
+    // it and its historical dependents in FK-safe order — none of the
+    // pokemon_id FKs cascade, so leaving this out would either fail the
+    // count assertion below or (if loosened) silently keep stale entries
+    // selectable in the live catalog.
+    const keepNames = pokemons.map((p) => p.name);
+    const { rows: staleRows } = await client.query(
+      'SELECT id FROM pokemons WHERE NOT (name = ANY($1::text[]))',
+      [keepNames],
+    );
+    const staleIds = staleRows.map((r) => r.id);
+    if (staleIds.length > 0) {
+      await client.query(
+        'DELETE FROM moves WHERE pokemon_id = ANY($1) OR target_pokemon_id = ANY($1)',
+        [staleIds],
+      );
+      await client.query('DELETE FROM duel_pokemon_state WHERE pokemon_id = ANY($1)', [staleIds]);
+      await client.query('DELETE FROM team_selections WHERE pokemon_id = ANY($1)', [staleIds]);
+      await client.query('DELETE FROM pokemons WHERE id = ANY($1)', [staleIds]);
+      console.log(`seed: pruned ${staleIds.length} pokemon(s) no longer in seed-data.json`);
     }
 
     const rows = expandEffectiveness(data.type_effectiveness ?? [], CANONICAL_TYPES);

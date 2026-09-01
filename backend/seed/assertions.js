@@ -1,7 +1,7 @@
 /** Expected post-seed counts (from the db-schema-seed spec). */
 export const EXPECTED_COUNTS = {
   types: 18,
-  pokemons: 54,
+  pokemons: 150,
   effectiveness: 324,
   attackingTypes: 18,
   defendingTypes: 18,

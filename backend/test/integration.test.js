@@ -63,7 +63,7 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
   // tight. 600s of headroom covers migrate up + seed + migrate down.
   const SLOW_TEST_TIMEOUT = 600000;
 
-  it('migrates up, seeds 18/54/324 with full 18x18 coverage, then migrates down to empty', () => {
+  it('migrates up, seeds 18/150/324 with full 18x18 coverage, then migrates down to empty', () => {
     run(`${MIGRATE} up`);
     run('node seed/index.js');
 
@@ -77,14 +77,14 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
       n('SELECT COUNT(DISTINCT defending_type)::int AS n FROM type_effectiveness'),
     ]).then(([types, pokemons, effectiveness, attacking, defending]) => {
       expect(types).toBe(18);
-      expect(pokemons).toBe(54);
+      expect(pokemons).toBe(150);
       expect(effectiveness).toBe(324);
       expect(attacking).toBe(18);
       expect(defending).toBe(18);
     });
   }, SLOW_TEST_TIMEOUT);
 
-  it('seeds idempotently: a second run keeps 54 pokemons and 324 rows', () => {
+  it('seeds idempotently: a second run keeps 150 pokemons and 324 rows', () => {
     run('node seed/index.js');
     run('node seed/index.js');
 
@@ -94,7 +94,7 @@ describe.skipIf(!hasDatabase)('database schema + seed integration (requires DATA
       n('SELECT COUNT(*)::int AS n FROM pokemons'),
       n('SELECT COUNT(*)::int AS n FROM type_effectiveness'),
     ]).then(([pokemons, effectiveness]) => {
-      expect(pokemons).toBe(54);
+      expect(pokemons).toBe(150);
       expect(effectiveness).toBe(324);
     });
   }, SLOW_TEST_TIMEOUT);

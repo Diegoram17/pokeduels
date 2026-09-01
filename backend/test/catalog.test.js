@@ -17,9 +17,9 @@ describe.skipIf(!hasDatabase)('catalog API (requires DATABASE_URL)', () => {
   });
 
   describe('db layer: listPokemons / listTypeEffectiveness', () => {
-    it('listPokemons returns the full 54-entry catalog with 4 starters', async () => {
+    it('listPokemons returns the full 150-entry catalog with 4 starters', async () => {
       const pokemons = await listPokemons();
-      expect(pokemons).toHaveLength(54);
+      expect(pokemons).toHaveLength(150);
       expect(pokemons.filter((p) => p.is_starter)).toHaveLength(4);
     });
 
@@ -35,13 +35,13 @@ describe.skipIf(!hasDatabase)('catalog API (requires DATABASE_URL)', () => {
   });
 
   describe('GET /api/pokemons', () => {
-    it('returns 200 with exactly 54 entries, 4 of which are starters', async () => {
+    it('returns 200 with exactly 150 entries, 4 of which are starters', async () => {
       const app = createApp();
       const res = await request(app).get('/api/pokemons');
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body).toHaveLength(54);
+      expect(res.body).toHaveLength(150);
       expect(res.body.filter((p) => p.is_starter === true)).toHaveLength(4);
     });
 
