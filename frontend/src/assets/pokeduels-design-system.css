@@ -614,6 +614,12 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .move-pp{font:700 13px/1 var(--pd-font-mono);color:var(--pd-text-meta)}
 .side-panel{width:100%;display:flex;flex-direction:column;justify-content:flex-end}
 @media(min-width:960px){.side-panel{width:240px;flex:none}}
+/* QA-round-4: right-hand action column — the CAMBIAR POKÉMON button sits at
+   its TOP so it lines up with the top move row (ATAQUE VELOZ) and the enemy
+   status card, instead of floating under the move grid. On narrow widths it
+   stacks full-width below the moves. */
+.action-aside{width:100%;display:flex;flex-direction:column;justify-content:flex-start}
+@media(min-width:960px){.action-aside{width:240px;flex:none}}
 
 /* Lead picker (ELIGE TU PRIMER POKÉMON): full cards with the roster sprite;
    the whole card is the ELEGIR action. */
@@ -622,8 +628,11 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
    widths). During lead selection the arena is collapsed (.duel-shell--lead)
    so the picker fits the viewport with NO scroll — the countdown sits inline
    to the left of the heading instead of on its own row. */
-.duel-shell--lead .duel-arena{height:12vh}
-.duel-shell--lead .duel-command{padding:var(--pd-space-3) var(--pd-space-6);overflow:hidden}
+.duel-shell--lead .duel-arena{height:16vh}
+.duel-shell--lead .duel-command{padding:var(--pd-space-4) var(--pd-space-6);overflow:hidden;
+  align-items:center;justify-content:center}
+.duel-shell--lead .lead-picker{max-height:100%;margin-top:2vh}
+.duel-shell--lead .lead-grid{flex:0 1 auto}
 .lead-picker{width:100%;min-width:0;max-height:100%;display:flex;flex-direction:column;
   gap:var(--pd-space-3);overflow:hidden}
 .lead-picker__head{display:flex;align-items:center;gap:var(--pd-space-3);flex:none}

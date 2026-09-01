@@ -631,12 +631,15 @@ function DuelBoardScreen() {
               onGoNow={() => navigate('/ranking')}
             />
           ) : (
-            <div style={{ display: 'flex', gap: 16, flex: 1, flexDirection: 'column' }}>
+            <>
               <MoveButtonGrid disabled={!canAct} active={humanActive} onAttack={handleAttack} />
-              <div className="side-panel">
+              {/* QA-round-4: the swap action lives at the TOP of the right-hand
+                  action column — level with the top move row and the enemy
+                  status card — not floating under the moves. */}
+              <div className="action-aside">
                 <button
                   type="button"
-                  className="pd-btn pd-btn--secondary"
+                  className="pd-btn pd-btn--secondary pd-btn--block"
                   disabled={!canAct}
                   onClick={() => navigate('/swap?mode=voluntary')}
                 >
@@ -646,7 +649,7 @@ function DuelBoardScreen() {
                   CAMBIAR POKÉMON
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
       </main>
