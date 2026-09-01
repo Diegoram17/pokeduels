@@ -477,6 +477,33 @@ describe('reduceMockState — duelFinished', () => {
   })
 })
 
+describe('reduceMockState — duelCleared', () => {
+  it('drops the finished duel, its pokemon and the pending pointer, keeping room/player/team', () => {
+    const finished = reduceMockState(makeDuelStateFixture(), {
+      type: 'duelFinished',
+      duelId: '42',
+      winnerId: '10',
+      endReason: 'ko',
+    })
+    expect(finished.duel?.phase).toBe('finished')
+
+    const s = reduceMockState(finished, { type: 'duelCleared' })
+
+    expect(s.duel).toBeNull()
+    expect(s.duelPokemonState).toEqual([])
+    expect(s.pendingDuelId).toBeNull()
+    // A rematch re-picks the team, but the room seat and identity survive.
+    expect(s.room?.code).toBe('AB12')
+    expect(s.player.nickname).toBe('Ash')
+    expect(s.teamSelection).toEqual(finished.teamSelection)
+  })
+
+  it('is a plain no-op when there is no duel', () => {
+    const base = createInitialState()
+    expect(reduceMockState(base, { type: 'duelCleared' })).toEqual(base)
+  })
+})
+
 describe('reduceMockState — duelLeadSelection', () => {
   function makeLeadDuel(): MockState {
     return reduceMockState(makeDuelStateFixture(), {

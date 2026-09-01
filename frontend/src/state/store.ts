@@ -225,6 +225,7 @@ export type MockStateAction =
   | { type: 'duelStateReceived'; duel: DuelState; duelPokemonState: DuelPokemonState[] }
   | { type: 'duelTurnResolved'; duel: DuelState; duelPokemonState: DuelPokemonState[]; attackSequence: AttackEvent[] | null }
   | { type: 'duelFinished'; duelId: string; winnerId: string; endReason: DuelState['endReason'] }
+  | { type: 'duelCleared' }
   | { type: 'duelLeadSelection'; ownerId: number; pokemonId: number }
   | { type: 'duelActionRejected'; moveIndex: number; reason: string }
   | { type: 'duelSwitchRejected'; switchTo: number; reason: string }
@@ -348,6 +349,13 @@ export function reduceMockState(state: MockState, action: MockStateAction): Mock
         },
       }
     }
+
+    // Clear a finished duel from client state so a rematch starts from a clean
+    // slate. Without this the finished DuelState lingers across the REVANCHA ->
+    // team-select -> wait-room navigation and re-triggers the "¡GANASTE EL
+    // DUELO!" panel in a loop (the panel keys off duel.phase === 'finished').
+    case 'duelCleared':
+      return { ...state, duel: null, duelPokemonState: [], pendingDuelId: null }
 
     // Optimistic echo of the player's own duel:select_lead emit: activate the
     // picked lead locally so the picker UI reflects it immediately. Phase stays
