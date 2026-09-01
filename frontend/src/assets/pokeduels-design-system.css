@@ -457,9 +457,15 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
    solid white, a heavier size, and a dark halo so it reads at any scroll.
    QA-round-2: the tight inherited line-height clipped the ascenders/glow at the
    top of the card — give it room. */
-.draft-heading{color:#fff;font-size:34px;line-height:1.25;letter-spacing:.02em;
+.draft-heading{color:#fff;font-size:26px;line-height:1.25;letter-spacing:.02em;
   margin:0;padding-top:.12em;overflow:visible;
   text-shadow:0 2px 12px rgba(3,6,16,.85), 0 0 3px rgba(3,6,16,.95)}
+/* QA-round-3: .pd-card sets overflow:hidden (for the ::before gradient bar),
+   which zeroes out a flex child's automatic min-height — inside .draft-left's
+   column flexbox this let the heading card get crushed to ~52px by its
+   siblings regardless of font-size, clipping the heading and the intro
+   paragraph beneath it. Pin it to its content size instead. */
+.draft-heading-card{flex-shrink:0}
 .section-heading{display:flex;align-items:center;gap:var(--pd-space-2);margin:0 0 var(--pd-space-3);text-transform:uppercase}
 .starter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--pd-space-4)}
 .catalog-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--pd-space-4)}

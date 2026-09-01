@@ -431,7 +431,7 @@ function TeamSelectScreen() {
 
       <main id="main-content" className="draft-main">
         <div className="draft-left pd-scroll">
-          <section className="pd-card">
+          <section className="pd-card draft-heading-card">
             <div>
               <div>
                 <h2 className="pd-title pd-title--lg draft-heading" style={{ textTransform: 'uppercase' }}>
