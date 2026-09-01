@@ -132,9 +132,18 @@ export async function removeBot(roomId, botId, requesterPlayerId) {
 }
 
 /**
- * Automatically selects a random team for a bot: 1 starter + 5 roster pokemon.
+ * Automatically selects a random team for a bot: 1 starter + 5 roster pokemon,
+ * then marks the bot ready. Idempotent: a no-op when the bot already has a
+ * team in the room, so advanceTournamentOrRematch can safely re-seed bot seats
+ * after a match wipe without risking a double-insert (23505).
  */
-async function autoSelectBotTeam(roomId, botId) {
+export async function autoSelectBotTeam(roomId, botId) {
+  const { rows: existing } = await pool.query(
+    'SELECT 1 FROM team_selections WHERE room_id = $1 AND player_id = $2 LIMIT 1',
+    [roomId, botId]
+  );
+  if (existing.length > 0) return; // Bot already has a team — nothing to seed.
+
   // Get available pokemon (not already taken as starters in this room)
   const { rows: takenStarters } = await pool.query(
     'SELECT pokemon_id FROM team_selections WHERE room_id = $1 AND is_starter = TRUE',

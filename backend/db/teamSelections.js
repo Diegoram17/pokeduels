@@ -6,19 +6,24 @@ const STARTER_SLOT = 1;
 const ROSTER_SLOTS = [2, 3, 4, 5, 6];
 
 /**
- * Inserts a starter selection for a seated player: slot 1, is_starter TRUE.
- * Starter exclusivity per room is enforced by the partial unique index
- * uq_starter_por_sala: a 23505 on it means another player already reserved
- * that pokemon → team:starter_rejected { pokemonId, reason: 'taken' }. A 23505
- * on the player's own slot/pokemon unique constraints → 'already_selected'.
- * A 23503 (unknown pokemon_id) → team:roster_rejected { reason:
- * 'not_in_catalog' } per the design's error mapping. Anything else rethrows.
+ * Upserts a starter selection for a seated player: slot 1, is_starter TRUE.
+ * The upsert is idempotent — re-picking (same mon, or swapping to another free
+ * mon) replaces the player's own slot-1 row via ON CONFLICT DO UPDATE instead
+ * of failing, so a rematch team-select from scratch works. Starter exclusivity
+ * per room is still enforced by the partial unique index uq_starter_por_sala:
+ * a 23505 on it means another player already reserved that pokemon →
+ * team:starter_rejected { pokemonId, reason: 'taken' }. Any other 23505 →
+ * 'already_selected'. A 23503 (unknown pokemon_id) → team:roster_rejected
+ * { reason: 'not_in_catalog' } per the design's error mapping. Anything else
+ * rethrows.
  */
 export async function selectStarter(roomId, playerId, pokemonId) {
   try {
     const { rows } = await pool.query(
       `INSERT INTO team_selections (room_id, player_id, pokemon_id, is_starter, slot)
        VALUES ($1, $2, $3, TRUE, $4)
+       ON CONFLICT (room_id, player_id, slot)
+       DO UPDATE SET pokemon_id = EXCLUDED.pokemon_id, is_starter = TRUE
        RETURNING id, room_id, player_id, pokemon_id, is_starter, slot`,
       [roomId, playerId, pokemonId, STARTER_SLOT],
     );
@@ -36,12 +41,16 @@ export async function selectStarter(roomId, playerId, pokemonId) {
 }
 
 /**
- * Inserts a full 5-pokemon roster for a seated player at slots 2..6
- * (is_starter FALSE) in one transaction. Validation runs before any DB work:
+ * Replaces a seated player's 5-pokemon roster at slots 2..6 (is_starter FALSE)
+ * in one transaction: the player's own previous roster rows are deleted first,
+ * so re-selecting a team (e.g. a rematch team-select from scratch) is
+ * idempotent instead of failing on the slot/pokemon unique constraints. The
+ * starter row (slot 1) is left untouched. Validation runs before any DB work:
  * payload must be exactly 5 pokemon ids with no duplicates →
  * team:roster_rejected { reason: 'invalid_count' | 'duplicate' }. DB-level
- * 23505 (slot/pokemon already taken by this player) → 'duplicate'; 23503
- * (unknown pokemon_id) → 'not_in_catalog'. Anything else rethrows.
+ * 23505 (the picked pokemon collides with the player's own starter) →
+ * 'duplicate'; 23503 (unknown pokemon_id) → 'not_in_catalog'. Anything else
+ * rethrows.
  */
 export async function selectRoster(roomId, playerId, pokemonIds) {
   if (!Array.isArray(pokemonIds) || pokemonIds.length !== ROSTER_SIZE) {
@@ -56,6 +65,12 @@ export async function selectRoster(roomId, playerId, pokemonIds) {
   try {
     await client.query('BEGIN');
     inTransaction = true;
+
+    await client.query(
+      `DELETE FROM team_selections
+       WHERE room_id = $1 AND player_id = $2 AND is_starter = FALSE`,
+      [roomId, playerId],
+    );
 
     const inserted = [];
     for (let i = 0; i < ROSTER_SIZE; i += 1) {

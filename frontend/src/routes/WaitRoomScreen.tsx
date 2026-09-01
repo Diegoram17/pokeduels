@@ -268,7 +268,7 @@ function PostDuelRematchPanel({
           {won ? '¡GANASTE EL DUELO!' : 'PERDISTE EL DUELO'}
         </h2>
         <p className="pd-body" style={{ margin: '8px 0 20px' }}>
-          La sala sigue abierta. ¿Revancha o salir?
+          La sala sigue abierta. La revancha arranca eligiendo un equipo nuevo.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <button ref={rematchRef} type="button" className="pd-btn pd-btn--primary pd-btn--block" onClick={onRematch}>
@@ -287,11 +287,10 @@ function WaitRoomScreen() {
   const room = state.room
   const [, forceUpdate] = useState(0)
 
-  // QA-round-2: the "PERDISTE/GANASTE EL DUELO" overlay used to have no exit —
-  // REVANCHA re-readied silently and the modal stayed up, so it read as "does
-  // nothing". Now REVANCHA also dismisses the overlay, dropping the player back
-  // into the wait-room (already server-reset to not-ready, then re-readied by
-  // the same click) to await the opponent — no trip back to the lobby.
+  // Each match starts from a fresh team pick (the backend wipes team_selections
+  // on a 1v1 finish). REVANCHA therefore clears the stale client selection and
+  // routes to /team-select instead of re-readying in place; rematchDismissed
+  // hides the overlay so a browser-back to the wait-room isn't re-trapped.
   const [rematchDismissed, setRematchDismissed] = useState(false)
   const finishedDuelId = state.duel?.phase === 'finished' ? state.duel.duelId : null
   useEffect(() => {
@@ -416,8 +415,9 @@ function WaitRoomScreen() {
           <PostDuelRematchPanel
             won={won}
             onRematch={() => {
-              actions.setReady(true)
+              actions.updateTeamSelection({ starterId: null, rosterIds: [] })
               setRematchDismissed(true)
+              navigate('/team-select')
             }}
           />
         )}

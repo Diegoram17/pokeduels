@@ -150,6 +150,31 @@ describe('TeamSelectScreen WS', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/rechazad|no disponible|tomad/i)
   })
 
+  it('rolls back the optimistic starter pick on rejection so a different starter stays selectable', async () => {
+    const user = userEvent.setup()
+    renderTeamSelect()
+    await screen.findByText('Pikachu')
+    await waitFor(() => {
+      expect(fakeSocket.on).toHaveBeenCalledWith('team:starter_rejected', expect.any(Function))
+    })
+
+    // Pick Pikachu, the server rejects it (a rival reserved it first).
+    await user.click(within(starterSection()).getByRole('button', { name: /pikachu/i }))
+    fakeSocket._fire('team:starter_rejected', { pokemonId: 25, reason: 'taken' })
+
+    // The picker must NOT be deadlocked: Charmander is still enabled and picking
+    // it emits its id (previously starterId stayed on the rejected mon, so
+    // toggleStarter blocked every other pick and the player kept 5 mons).
+    const charmander = within(starterSection()).getByRole('button', { name: /charmander/i })
+    await waitFor(() => expect(charmander).toBeEnabled())
+    await user.click(charmander)
+
+    await waitFor(() => {
+      expect(fakeSocket.emit).toHaveBeenCalledWith('team:select_starter', { pokemonId: 4 })
+    })
+    expect(charmander).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('renders an error banner when the server rejects the roster', async () => {
     renderTeamSelect()
     await screen.findByText('Pikachu')

@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { MockStateProvider } from '../../state/MockStateProvider'
+import { useMockState } from '../../state/useMockState'
 import { STORAGE_KEY, serializeMockState } from '../../state/store'
 import type { DuelState, MockState, RoomState } from '../../state/schema'
 import WaitRoomScreen from '../WaitRoomScreen'
@@ -41,6 +42,17 @@ function makeFakeSocket(): Socket & { _fire: (event: string, payload?: unknown) 
 }
 
 let fakeSocket: ReturnType<typeof makeFakeSocket>
+
+/** Probe route: surfaces the live teamSelection so a REVANCHA reset is observable. */
+function TeamSelectProbe() {
+  const [state] = useMockState()
+  const { starterId, rosterIds } = state.teamSelection
+  return (
+    <div data-testid="team-select-probe">
+      starter={starterId ?? 'none'} roster={rosterIds.length}
+    </div>
+  )
+}
 
 function makeRoom(maxPlayers: 2 | 4): RoomState {
   const players = [
@@ -85,6 +97,7 @@ function renderWaitRoom(state: MockState) {
               </>
             }
           />
+          <Route path="/team-select" element={<div>TEAM-SELECT-LANDED</div>} />
           <Route path="/lobby" element={<div>LOBBY-LANDED</div>} />
         </Routes>
       </MemoryRouter>
@@ -158,31 +171,61 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
     expect(screen.getByText('PERDISTE EL DUELO')).toBeInTheDocument()
   })
 
-  it('REVANCHA emits room:ready; a new duel:start hides the panel and ENTRAR AL COMBATE joins via duel:join', async () => {
+  it('REVANCHA sends the player to team-select for a fresh pick and does NOT auto-ready', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      serializeMockState({
+        player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+        room: makeRoom(2),
+        teamSelection: { starterId: 25, rosterIds: [4, 5, 6, 7, 8] },
+        tournament: null,
+        duelPokemonState: [],
+        duel: makeFinished1v1Duel('10'),
+        pendingDuelId: null,
+        finalRanking: null,
+        roomAborted: null,
+      }),
+    )
+    render(
+      <MockStateProvider>
+        <MemoryRouter initialEntries={['/wait-room']}>
+          <Routes>
+            <Route path="/wait-room" element={<WaitRoomScreen />} />
+            <Route path="/team-select" element={<TeamSelectProbe />} />
+            <Route path="/lobby" element={<div>LOBBY-LANDED</div>} />
+          </Routes>
+        </MemoryRouter>
+      </MockStateProvider>,
+    )
+
+    act(() => {
+      screen.getByRole('button', { name: /revancha/i }).click()
+    })
+
+    // Routed to team-select, the stale roster cleared, and no room:ready emitted
+    // (each match now starts from a clean team pick).
+    expect(screen.getByTestId('team-select-probe')).toHaveTextContent('starter=none roster=0')
+    expect(fakeSocket.emit).not.toHaveBeenCalledWith('room:ready', { ready: true })
+  })
+
+  it('ENTRAR AL COMBATE joins via duel:join and only navigates once duel:state lands', () => {
     renderWaitRoom({
       player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
       room: makeRoom(2),
       teamSelection: { starterId: 25, rosterIds: [] },
       tournament: null,
       duelPokemonState: [],
-      duel: makeFinished1v1Duel('10'),
+      duel: null,
       pendingDuelId: null,
       finalRanking: null,
       roomAborted: null,
     })
 
     act(() => {
-      screen.getByRole('button', { name: /revancha/i }).click()
-    })
-    expect(fakeSocket.emit).toHaveBeenCalledWith('room:ready', { ready: true })
-
-    // Both seats re-ready -> the server bootstraps a new duel via duel:start.
-    act(() => {
       fakeSocket._fire('duel:start', { duelId: 99 })
     })
-    expect(screen.queryByText('¡GANASTE EL DUELO!')).not.toBeInTheDocument()
     const enterButton = screen.getByRole('button', { name: /entrar al combate/i })
-    expect(enterButton).toBeInTheDocument()
+    expect(enterButton).toBeEnabled()
 
     // Clicking joins the duel WITHOUT navigating yet (race-condition fix: the
     // screen must not bounce to /duel before duel:state has actually landed,
@@ -193,8 +236,6 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
     expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 99 })
     expect(screen.queryByText('DUEL-LANDED')).not.toBeInTheDocument()
 
-    // Once the server resolves the join with duel:state, the player is routed
-    // into the duel with state ready to render.
     act(() => {
       fakeSocket._fire('duel:state', {
         duelId: 99,
@@ -208,32 +249,6 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
       })
     })
     expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
-  })
-
-  it('REVANCHA dismisses the outcome overlay so the wait-room is usable again without a new duel:start', () => {
-    renderWaitRoom({
-      player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
-      room: makeRoom(2),
-      teamSelection: { starterId: 25, rosterIds: [] },
-      tournament: null,
-      duelPokemonState: [],
-      duel: makeFinished1v1Duel('11'),
-      pendingDuelId: null,
-      finalRanking: null,
-      roomAborted: null,
-    })
-
-    expect(screen.getByText('PERDISTE EL DUELO')).toBeInTheDocument()
-
-    act(() => {
-      screen.getByRole('button', { name: /revancha/i }).click()
-    })
-
-    expect(
-      screen.queryByRole('dialog', { name: /duelo terminado/i }),
-    ).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^listo/i })).toBeInTheDocument()
-    expect(fakeSocket.emit).toHaveBeenCalledWith('room:ready', { ready: true })
   })
 
   it('leaves the room to the lobby when the player chooses SALIR', async () => {

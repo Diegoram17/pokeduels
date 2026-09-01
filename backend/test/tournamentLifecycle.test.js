@@ -19,6 +19,9 @@ vi.mock('../repositories/duelRepository.js', () => ({
 vi.mock('../ws/duelLifecycle.js', () => ({
   finalizeDuelSideEffects: vi.fn(),
 }));
+vi.mock('../ws/botManager.js', () => ({
+  autoSelectBotTeam: vi.fn(async () => {}),
+}));
 
 import { pool } from '../db/pool.js';
 import {
@@ -27,6 +30,7 @@ import {
   finishDuelByWalkover,
 } from '../repositories/duelRepository.js';
 import { finalizeDuelSideEffects } from '../ws/duelLifecycle.js';
+import { autoSelectBotTeam } from '../ws/botManager.js';
 import {
   advanceTournamentOrRematch,
   computeFourPlayerRanks,
@@ -63,9 +67,11 @@ const io = { to: vi.fn(() => ({ emit: vi.fn() })) };
 describe('advanceTournamentOrRematch — 1v1 rematch branch (item #7, PR 1)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // No bot seats by default (the post-commit bot re-seed query).
+    pool.query.mockResolvedValue({ rows: [] });
   });
 
-  it('resets both seats ready to false for a 1v1 room and does NOT close or emit', async () => {
+  it('resets both seats ready to false AND wipes team_selections for a 1v1 room, without closing or emitting', async () => {
     const room = { id: 7, max_players: 2, status: 'in_progress' };
     const { client, queries } = makeClient(room);
     pool.connect.mockResolvedValue(client);
@@ -84,6 +90,12 @@ describe('advanceTournamentOrRematch — 1v1 rematch branch (item #7, PR 1)', ()
         sql.includes('UPDATE room_players') && sql.includes('ready = FALSE'),
       ),
     ).toBe(true);
+    // Fresh team selection each match: both seats' selections are cleared.
+    expect(
+      queries.some((sql) =>
+        sql.includes('DELETE FROM team_selections') && sql.includes('room_id = $1'),
+      ),
+    ).toBe(true);
 
     // Spec: no rank, no room close, no room:final_ranking / tournament event.
     expect(queries.some((sql) => sql.includes('final_rank'))).toBe(false);
@@ -92,7 +104,31 @@ describe('advanceTournamentOrRematch — 1v1 rematch branch (item #7, PR 1)', ()
     expect(client.release).toHaveBeenCalled();
   });
 
-  it('does not emit any event or write ranks when the 1v1 room was reset (no side effects beyond ready reset)', async () => {
+  it('re-seeds a random team and re-readies every bot seat after the wipe', async () => {
+    const room = { id: 7, max_players: 2, status: 'in_progress' };
+    const { client } = makeClient(room);
+    pool.connect.mockResolvedValue(client);
+    // The post-commit "which seats are bots" query returns one bot seat.
+    pool.query.mockResolvedValue({ rows: [{ player_id: 88 }] });
+
+    await advanceTournamentOrRematch(io, 7, 9);
+
+    expect(autoSelectBotTeam).toHaveBeenCalledTimes(1);
+    expect(autoSelectBotTeam).toHaveBeenCalledWith(7, 88);
+  });
+
+  it('does not call autoSelectBotTeam when the 1v1 room has no bot seats (PvP)', async () => {
+    const room = { id: 7, max_players: 2, status: 'in_progress' };
+    const { client } = makeClient(room);
+    pool.connect.mockResolvedValue(client);
+    pool.query.mockResolvedValue({ rows: [] });
+
+    await advanceTournamentOrRematch(io, 7, 9);
+
+    expect(autoSelectBotTeam).not.toHaveBeenCalled();
+  });
+
+  it('does not emit any event or write ranks when the 1v1 room was reset (the only UPDATE is the ready reset)', async () => {
     const room = { id: 7, max_players: 2, status: 'in_progress' };
     const { client } = makeClient(room);
     pool.connect.mockResolvedValue(client);
@@ -102,10 +138,12 @@ describe('advanceTournamentOrRematch — 1v1 rematch branch (item #7, PR 1)', ()
     const updateSql = client.query.mock.calls
       .map((c) => c[0])
       .filter((sql) => sql.startsWith('UPDATE'));
-    // Exactly one UPDATE: the ready reset. Nothing else mutates state.
+    // Exactly one UPDATE: the ready reset. The team_selections wipe is a DELETE,
+    // and no rank / room-close / event write happens.
     expect(updateSql).toHaveLength(1);
     expect(updateSql[0]).toContain('room_players');
     expect(updateSql[0]).toContain('ready = FALSE');
+    expect(io.to).not.toHaveBeenCalled();
   });
 
   it('is a no-op (no ready reset, no emit) for an unknown room', async () => {

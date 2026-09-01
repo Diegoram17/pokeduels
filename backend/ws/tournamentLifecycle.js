@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { createDuelFromRoom, findPendingBracketDuelForPlayer, finishDuelByWalkover } from '../repositories/duelRepository.js';
+import { autoSelectBotTeam } from './botManager.js';
 import { PHASES, EVENTS, transition } from '../engine/stateMachine.js';
 import { ROUND_SUB_STATES } from './duelRoundState.js';
 
@@ -154,10 +155,28 @@ export async function advanceTournamentOrRematch(io, roomId, duelId, deps = {}) 
 
     if (room.max_players === 2) {
       // 1v1 rematch: reset both seats to not-ready so a rematch is an explicit
-      // opt-in (re-ready), never an automatic instant one. No close, no rank,
+      // opt-in (re-ready), never an automatic instant one. Also wipe both
+      // seats' team_selections so the next match starts from a fresh team pick
+      // (there is no scoring — each match is a clean slate). No close, no rank,
       // no event — the room stays `in_progress`.
       await client.query('UPDATE room_players SET ready = FALSE WHERE room_id = $1', [roomId]);
+      await client.query('DELETE FROM team_selections WHERE room_id = $1', [roomId]);
       await client.query('COMMIT');
+
+      // A human seat re-picks via the team-select screen; a bot seat has no
+      // client, so re-seed its (random) team here and re-ready it. Idempotent
+      // per seat — safe if this fires more than once for the same finish.
+      const { rows: botSeats } = await pool.query(
+        `SELECT rp.player_id
+           FROM room_players rp
+           JOIN players p ON p.id = rp.player_id
+          WHERE rp.room_id = $1 AND p.is_bot = TRUE`,
+        [roomId],
+      );
+      for (const seat of botSeats) {
+        // eslint-disable-next-line no-await-in-loop
+        await autoSelectBotTeam(roomId, seat.player_id);
+      }
       return;
     }
 

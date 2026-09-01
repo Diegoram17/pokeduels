@@ -363,7 +363,7 @@ function TeamPanel({ catalog }: { catalog: Pokemon[] | null }) {
 }
 
 function TeamSelectScreen() {
-  const [state] = useMockState()
+  const [state, actions] = useMockState()
   const navigate = useNavigate()
   const [catalog, setCatalog] = useState<Pokemon[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -396,6 +396,11 @@ function TeamSelectScreen() {
       if (reason === 'taken' && pokemonId != null) {
         setTakenStarterIds((ids) => (ids.includes(pokemonId) ? ids : [...ids, pokemonId]))
       }
+      // The pick never landed server-side — roll back the optimistic starterId.
+      // Otherwise toggleStarter blocks every other pick while starterId still
+      // points at the rejected mon (which is itself disabled as "taken"),
+      // deadlocking the picker so the player enters the duel with only 5 mons.
+      actions.updateTeamSelection({ starterId: null })
       setWsError('Tu Pokémon inicial fue rechazado. Elegí otro.')
     })
     const offRoster = onSocketEvent('team:roster_rejected', () => {
@@ -405,7 +410,7 @@ function TeamSelectScreen() {
       offStarter()
       offRoster()
     }
-  }, [])
+  }, [actions])
 
   return (
     <div className="pd-page draft-shell">

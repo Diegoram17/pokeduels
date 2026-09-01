@@ -22,17 +22,26 @@ beforeEach(() => {
 });
 
 describe('selectStarter', () => {
-  it('inserts the starter at slot 1 with is_starter TRUE and returns the row', async () => {
+  it('upserts the starter at slot 1 with is_starter TRUE (ON CONFLICT DO UPDATE) and returns the row', async () => {
     const row = { id: 1, room_id: ROOM_ID, player_id: PLAYER_ID, pokemon_id: 25, is_starter: true, slot: 1 };
     poolMock.query.mockResolvedValue({ rows: [row] });
 
     const result = await selectStarter(ROOM_ID, PLAYER_ID, 25);
 
     expect(result).toEqual(row);
-    expect(poolMock.query).toHaveBeenCalledWith(
-      expect.stringContaining('slot'),
-      [ROOM_ID, PLAYER_ID, 25, 1],
-    );
+    const [sql, args] = poolMock.query.mock.calls[0];
+    expect(sql).toContain('ON CONFLICT');
+    expect(sql).toContain('DO UPDATE');
+    expect(sql).toContain('slot');
+    expect(args).toEqual([ROOM_ID, PLAYER_ID, 25, 1]);
+  });
+
+  it('re-selecting the same starter resolves idempotently (the upsert never rejects "already_selected")', async () => {
+    const row = { id: 1, room_id: ROOM_ID, player_id: PLAYER_ID, pokemon_id: 25, is_starter: true, slot: 1 };
+    poolMock.query.mockResolvedValue({ rows: [row] });
+
+    await expect(selectStarter(ROOM_ID, PLAYER_ID, 25)).resolves.toEqual(row);
+    await expect(selectStarter(ROOM_ID, PLAYER_ID, 25)).resolves.toEqual(row);
   });
 
   it('maps 23505 on uq_starter_por_sala to starter_rejected "taken"', async () => {
@@ -45,8 +54,8 @@ describe('selectStarter', () => {
     });
   });
 
-  it('maps 23505 on the own slot/pokemon constraint to starter_rejected "already_selected"', async () => {
-    poolMock.query.mockRejectedValue({ code: '23505', constraint: 'team_selections_room_id_player_id_slot_key' });
+  it('maps an unexpected 23505 (any other unique constraint) to starter_rejected "already_selected"', async () => {
+    poolMock.query.mockRejectedValue({ code: '23505', constraint: 'team_selections_some_other_key' });
 
     await expect(selectStarter(ROOM_ID, PLAYER_ID, 25)).rejects.toMatchObject({
       event: 'team:starter_rejected',
@@ -88,10 +97,11 @@ describe('selectRoster', () => {
     expect(poolMock.connect).not.toHaveBeenCalled();
   });
 
-  it('inserts 5 roster rows at slots 2..6 with is_starter FALSE inside a transaction', async () => {
+  it('clears the player\'s previous roster rows, then inserts 5 fresh rows at slots 2..6 inside a transaction', async () => {
     const client = makeClientMock();
     client.query
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // DELETE previous roster rows
       .mockResolvedValueOnce({ rows: [{ id: 1, slot: 2 }] })
       .mockResolvedValueOnce({ rows: [{ id: 2, slot: 3 }] })
       .mockResolvedValueOnce({ rows: [{ id: 3, slot: 4 }] })
@@ -108,6 +118,17 @@ describe('selectRoster', () => {
     expect(client.query).toHaveBeenCalledWith('BEGIN');
     expect(client.query).toHaveBeenCalledWith('COMMIT');
     expect(client.release).toHaveBeenCalledTimes(1);
+
+    const sqls = client.query.mock.calls.map(([sql]) => sql);
+    const deleteIdx = sqls.findIndex(
+      (sql) => sql.includes('DELETE FROM team_selections') && sql.includes('is_starter = FALSE'),
+    );
+    const firstInsertIdx = sqls.findIndex((sql) => sql.includes('INSERT'));
+    expect(deleteIdx).toBeGreaterThan(-1);
+    expect(deleteIdx).toBeLessThan(firstInsertIdx);
+    const deleteCall = client.query.mock.calls[deleteIdx];
+    expect(deleteCall[1]).toEqual([ROOM_ID, PLAYER_ID]);
+
     // Each insert carries (room_id, player_id, pokemon_id, slot) args.
     const insertCalls = client.query.mock.calls.filter(([sql]) => sql.includes('INSERT'));
     expect(insertCalls).toHaveLength(5);
@@ -119,6 +140,7 @@ describe('selectRoster', () => {
     const client = makeClientMock();
     client.query
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // DELETE previous roster rows
       .mockRejectedValueOnce({ code: '23505', constraint: 'team_selections_room_id_player_id_pokemon_id_key' })
       .mockResolvedValue({ rows: [] }); // default: any later call (ROLLBACK)
     poolMock.connect.mockResolvedValue(client);
@@ -136,6 +158,7 @@ describe('selectRoster', () => {
     const client = makeClientMock();
     client.query
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // DELETE previous roster rows
       .mockRejectedValueOnce({ code: '23503' })
       .mockResolvedValue({ rows: [] }); // default: any later call (ROLLBACK)
     poolMock.connect.mockResolvedValue(client);
