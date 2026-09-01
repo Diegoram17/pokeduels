@@ -497,11 +497,14 @@ describe('DuelBoardScreen — move submission', () => {
 
     // The grid must not be gated on the rival lead — it renders once the human
     // active is set (the server's leads-settled broadcast already fields it).
-    const grid = screen.getByRole('button', { name: /golpe fuerte/i })
+    // Move labels are themed per the active pokemon's type (MOVE_NAMES_BY_TYPE)
+    // — the human lead here is Pikachu (electric), so slot 0 shows "RAYO"
+    // instead of the generic "GOLPE FUERTE".
+    const grid = screen.getByRole('button', { name: /rayo/i })
     expect(grid).toBeEnabled()
 
     act(() => {
-      screen.getByRole('button', { name: /golpe fuerte/i }).click()
+      screen.getByRole('button', { name: /rayo/i }).click()
     })
     expect(fakeSocket.emit).toHaveBeenCalledWith('duel:select_action', {
       duelId: 42,
@@ -522,9 +525,11 @@ describe('DuelBoardScreen — move submission', () => {
       })
     })
 
-    expect(screen.getByRole('button', { name: /golpe fuerte/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /ataque veloz/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /golpe rápido/i })).toBeEnabled()
+    // Electric-themed labels (Pikachu is the active pokemon) — see the
+    // "enables the move grid" test above for why these aren't the generic names.
+    expect(screen.getByRole('button', { name: /rayo/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /chispazo/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /impactrueno/i })).toBeEnabled()
     expect(screen.getByRole('button', { name: /ataque básico/i })).toBeEnabled()
   })
 
@@ -585,11 +590,12 @@ describe('DuelBoardScreen — opponent disconnect banner', () => {
     })
 
     expect(screen.getByRole('status')).toHaveTextContent(/rival se desconect/i)
-    // Non-blocking: the move grid stays usable.
-    expect(screen.getByRole('button', { name: /golpe fuerte/i })).toBeEnabled()
+    // Non-blocking: the move grid stays usable. "RAYO" is Pikachu's (electric)
+    // themed label for slot 0 — see the "move submission" describe block.
+    expect(screen.getByRole('button', { name: /rayo/i })).toBeEnabled()
 
     act(() => {
-      screen.getByRole('button', { name: /golpe fuerte/i }).click()
+      screen.getByRole('button', { name: /rayo/i }).click()
     })
     expect(fakeSocket.emit).toHaveBeenCalledWith('duel:select_action', {
       duelId: 42,

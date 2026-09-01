@@ -15,6 +15,7 @@ import {
   TURN_TIMEOUT_SECONDS,
   isBasicAttack,
   moveDamageLabel,
+  moveNameForType,
 } from '../lib/duelBoard'
 
 /**
@@ -69,14 +70,16 @@ function MoveButton({
   index,
   disabled,
   pp,
+  type,
   onAttack,
 }: {
   index: MoveIndex
   disabled: boolean
   pp: number
+  type: string | undefined
   onAttack: (index: MoveIndex) => void
 }) {
-  const slot = MOVE_SLOTS[index]
+  const name = moveNameForType(type, index)
   const basic = isBasicAttack(index)
   return (
     <button
@@ -87,7 +90,7 @@ function MoveButton({
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <span style={{ font: '800 16px/1.2 var(--pd-font-display)', color: '#fff', textTransform: 'uppercase' }}>
-          {slot.name}
+          {name}
         </span>
         <span style={{ font: '700 13px/1 var(--pd-font-mono)', color: basic ? 'var(--pd-text-meta)' : 'var(--pd-blue-light)' }}>
           {moveDamageLabel(index)}
@@ -128,6 +131,7 @@ function MoveButtonGrid({
           index={i as MoveIndex}
           disabled={disabled || ppOf(i as MoveIndex) <= 0}
           pp={ppOf(i as MoveIndex)}
+          type={active?.type}
           onAttack={onAttack}
         />
       ))}

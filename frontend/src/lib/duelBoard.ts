@@ -32,6 +32,36 @@ export const MOVE_SLOTS: MoveSlot[] = [
   { name: 'ATAQUE BÁSICO', damage: 10 },
 ]
 
+// Display-only move names per Pokémon type (frontend constant, same pattern
+// as TeamSelectScreen's TYPE_LABELS — no seed/DB/backend involved). Damage
+// per slot and move resolution stay exactly MOVE_SLOTS/moveIndex; this only
+// changes the label shown on the move grid.
+export const MOVE_NAMES_BY_TYPE: Record<string, [string, string, string, string]> = {
+  normal: ['PLACAJE FEROZ', 'GOLPE CUERPO', 'ATAQUE RÁPIDO', 'ATAQUE BÁSICO'],
+  fire: ['LLAMARADA', 'LANZALLAMAS', 'ASCUAS', 'ATAQUE BÁSICO'],
+  water: ['HIDROBOMBA', 'SURF', 'PISTOLA AGUA', 'ATAQUE BÁSICO'],
+  electric: ['RAYO', 'CHISPAZO', 'IMPACTRUENO', 'ATAQUE BÁSICO'],
+  grass: ['LÁTIGO CEPA', 'HOJA AFILADA', 'DRENADOSOL', 'ATAQUE BÁSICO'],
+  ice: ['VENTISCA', 'RAYO HIELO', 'VIENTO HELADO', 'ATAQUE BÁSICO'],
+  fighting: ['GOLPE KÁRATE', 'PATADA GIRO', 'COMBO DE PUÑOS', 'ATAQUE BÁSICO'],
+  poison: ['BOMBA LODO', 'PÚAS VENENOSAS', 'GAS TÓXICO', 'ATAQUE BÁSICO'],
+  ground: ['TERREMOTO', 'GOLPE CAVAR', 'LANZAROCAS', 'ATAQUE BÁSICO'],
+  flying: ['ATAQUE AÉREO', 'TORNADO', 'RÁFAGA DE VIENTO', 'ATAQUE BÁSICO'],
+  psychic: ['PSÍQUICO', 'CONFUSIÓN', 'PODER OCULTO', 'ATAQUE BÁSICO'],
+  bug: ['ZUMBIDO', 'PICOTAZO VENENOSO', 'CORTE FURIA', 'ATAQUE BÁSICO'],
+  rock: ['AVALANCHA', 'LANZARROCAS', 'PEDRADA', 'ATAQUE BÁSICO'],
+  ghost: ['BOLA SOMBRA', 'MAL DE OJO', 'LAMENTO', 'ATAQUE BÁSICO'],
+  dragon: ['ALIENTO DRAGÓN', 'GARRA DRAGÓN', 'PULSO DRAGÓN', 'ATAQUE BÁSICO'],
+  dark: ['PULSO UMBRÍO', 'MORDISCO', 'GOLPE BAJO', 'ATAQUE BÁSICO'],
+  steel: ['PUÑO BALA', 'GARRA METAL', 'CABEZAZO HIERRO', 'ATAQUE BÁSICO'],
+  fairy: ['VIENTO HADA', 'BENGALA ÁUREA', 'BESO DRENADOR', 'ATAQUE BÁSICO'],
+}
+
+/** Resolves the themed move name for a type; falls back to the generic MOVE_SLOTS name for an unknown/missing type. */
+export function moveNameForType(type: string | undefined, moveIndex: MoveIndex): string {
+  return MOVE_NAMES_BY_TYPE[type ?? '']?.[moveIndex] ?? MOVE_SLOTS[moveIndex].name
+}
+
 export function moveDamageLabel(moveIndex: MoveIndex): string {
   return `${MOVE_SLOTS[moveIndex].damage}% DMG`
 }
