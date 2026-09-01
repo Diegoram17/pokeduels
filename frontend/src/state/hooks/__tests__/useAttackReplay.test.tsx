@@ -5,9 +5,9 @@
 // defender) and exposing a `replaying` lock. The resync guard makes a
 // duelStateReceived with the same turnNumber a no-op.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { useRef } from 'react'
-import { render, fireEvent } from '@testing-library/react'
+import { act, render, fireEvent } from '@testing-library/react'
 import { useAttackReplay } from '../useAttackReplay'
 import type { AttackEvent, DuelState } from '../../schema'
 
@@ -108,5 +108,30 @@ describe('useAttackReplay', () => {
     expect(rivalSprite.classList.contains('pd-lunge--rival')).toBe(false)
     expect(humanSprite.classList.contains('pd-shake')).toBe(false)
     expect(moveBtn).toBeEnabled()
+  })
+
+  it('releases the control lock after a hard ceiling even if animationend never fires (QA-round-2 freeze guard)', () => {
+    vi.useFakeTimers()
+    try {
+      const { rerender, getByRole } = render(
+        <ReplayHarness duel={null} playerId="10" />,
+      )
+      const moveBtn = getByRole('button', { name: /movers/i })
+
+      // A new turn with a sequence starts the replay and locks controls.
+      act(() => {
+        rerender(<ReplayHarness duel={makeDuel(2, twoEvents)} playerId="10" />)
+      })
+      expect(moveBtn).toBeDisabled()
+
+      // jsdom never fires `animationend`, so without the guard the lock sticks
+      // forever. Advancing past the ceiling must release it.
+      act(() => {
+        vi.advanceTimersByTime(8100)
+      })
+      expect(moveBtn).toBeEnabled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

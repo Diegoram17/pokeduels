@@ -35,6 +35,18 @@ export function useAttackReplay(
   const seqRef = useRef<AttackEvent[] | null>(null)
   const humanIdRef = useRef(Number(playerId))
 
+  // Safety release: the replay advances on the attacker sprite's `animationend`.
+  // If that event never fires (a broken/empty sprite src, a missing keyframe, a
+  // detached node), the control lock would stick forever and the duel screen
+  // freezes mid-turn. Force the lock off after a hard ceiling well past any real
+  // turn animation (~3-4s) so play always resumes.
+  const REPLAY_MAX_MS = 8000
+  useEffect(() => {
+    if (!replaying) return
+    const id = setTimeout(() => setReplaying(false), REPLAY_MAX_MS)
+    return () => clearTimeout(id)
+  }, [replaying])
+
   // Resync guard (mount-scoped): a fresh mount must not replay the current
   // turn's events — they already played before the remount (mid-duel refresh).
   useEffect(() => {

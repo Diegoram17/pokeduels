@@ -617,9 +617,15 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 
 /* Lead picker (ELIGE TU PRIMER POKÉMON): full cards with the roster sprite;
    the whole card is the ELEGIR action. */
-.lead-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:var(--pd-space-3);width:100%}
+/* QA-round-2: the lead picker sits in the bottom .duel-command panel; the
+   6-card grid was wrapping to a second row and getting clipped below the
+   fold. Lay the whole team out in ONE horizontal row of 6 (compact cards),
+   and let the picker scroll inside its panel as a last resort. */
+.lead-picker{width:100%;min-width:0;max-height:100%;overflow-y:auto}
+.lead-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:var(--pd-space-2);width:100%}
+@media(max-width:720px){.lead-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .lead-card{align-items:stretch;text-align:left;overflow:hidden;cursor:pointer;padding:0}
-.lead-card .art{height:118px;position:relative;display:flex;align-items:center;justify-content:center;
+.lead-card .art{height:92px;position:relative;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(circle at 50% 40%,rgba(120,180,255,.12),transparent 70%);
   border-bottom:1px solid var(--pd-border-blue-dim)}
 .lead-card .art img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}

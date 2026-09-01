@@ -152,7 +152,7 @@ function LeadPicker({
   }, [])
 
   return (
-    <div data-testid="lead-picker">
+    <div className="lead-picker" data-testid="lead-picker">
       <h2 className="pd-title" style={{ margin: 0 }}>
         ELIGE TU PRIMER POKÉMON
       </h2>
