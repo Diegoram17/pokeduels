@@ -14,8 +14,8 @@ Create a `.env` file (or set in your shell):
 
 | Variable | Description | Example |
 |---|---|---|
-| `VITE_API_URL` | Backend REST API base URL | `http://localhost:3001/api` |
-| `VITE_WS_URL` | Backend WebSocket URL | `http://localhost:3001` |
+| `VITE_API_URL` | Backend REST API base URL | `http://localhost:3000/api` |
+| `VITE_WS_URL` | Backend WebSocket URL | `http://localhost:3000` |
 
 ## Scripts
 
@@ -30,7 +30,7 @@ Create a `.env` file (or set in your shell):
 ## Architecture
 
 - **Routes:** `src/routes/` — 7 screens (Login, Lobby, TeamSelect, WaitRoom, Duel, Swap, Ranking)
-- **State:** `src/state/` — Zustand store + Socket.IO hooks
+- **State:** `src/state/` — `MockStateProvider` (`useReducer` + Context, `reduceMockState`) + Socket.IO hooks (`useDuelSocket`, `useMockPersistence`)
 - **Components:** `src/components/` — shared UI (Modal, ScreenTopbar, HpBar, etc.)
 - **Design system:** `src/assets/pokeduels-design-system.css` (`.pd-*` tokens, Fase 7)
 - **Engine:** combat is server-authoritative (`backend/engine/`); the client renders snapshots

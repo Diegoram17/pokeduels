@@ -1,0 +1,93 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PokeDuels - Modelo de despliegue (asignacion)" id="pokeduels-deploy">
+    <mxGraphModel dx="2400" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1360" pageHeight="900" background="light-dark(#ffffff, #121212)" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="&lt;b&gt;PokeDuels — Modelo de despliegue&lt;/b&gt;  (SPA en Vercel · backend monoproceso en Render · PostgreSQL en Neon)" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="900" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Vercel ============ -->
+        <mxCell id="n_vercel" value="&amp;laquo;device&amp;raquo;  Vercel — Edge / CDN estatico" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundColor=#dae8fc;darkOpacity=0.05;darkOpacity2=0.1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;align=center;spacingTop=6;size=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="360" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="a_dist" value="&amp;laquo;artifact&amp;raquo;&lt;br&gt;&lt;b&gt;frontend/dist/&lt;/b&gt;&lt;br&gt;index.html + JS + CSS + assets&lt;br&gt;(vite build, deploy auto en push a master)" style="shape=component;whiteSpace=wrap;html=1;align=left;spacingLeft=16;fontSize=11;fillColor=#f4dcc5;strokeColor=#c69c6d;" vertex="1" parent="1">
+          <mxGeometry x="70" y="120" width="300" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Render ============ -->
+        <mxCell id="n_render" value="&amp;laquo;device&amp;raquo;  Render — Web Service  (Node 20, free tier · 1 proceso: node server.js)" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundColor=#dae8fc;darkOpacity=0.05;darkOpacity2=0.1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;align=center;spacingTop=6;size=14;" vertex="1" parent="1">
+          <mxGeometry x="470" y="70" width="520" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="c_express" value="&amp;laquo;component&amp;raquo;&lt;br&gt;&lt;b&gt;:Express API&lt;/b&gt;&lt;br&gt;REST: /api/session, /api/rooms, /api/pokemons, /health" style="shape=component;whiteSpace=wrap;html=1;align=left;spacingLeft=16;fontSize=11;fillColor=#ffe599;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="500" y="120" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c_sio" value="&amp;laquo;component&amp;raquo;&lt;br&gt;&lt;b&gt;:Socket.IO Server&lt;/b&gt;&lt;br&gt;WSS · handshake touchSession · room/team/duel handlers" style="shape=component;whiteSpace=wrap;html=1;align=left;spacingLeft=16;fontSize=11;fillColor=#ffe599;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="500" y="230" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c_engine" value="&amp;laquo;component&amp;raquo;&lt;br&gt;&lt;b&gt;:Motor de duelo&lt;/b&gt;&lt;br&gt;engine/ + turnCycle + tournamentLifecycle&lt;br&gt;estado de fases en memoria (phaseStore / roundState)" style="shape=component;whiteSpace=wrap;html=1;align=left;spacingLeft=16;fontSize=11;fillColor=#ffe599;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="800" y="175" width="170" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="c_pool" value="&amp;laquo;component&amp;raquo;&lt;br&gt;&lt;b&gt;:Pg Pool (db/pool.js)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=left;spacingLeft=16;fontSize=11;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="640" y="335" width="180" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Neon ============ -->
+        <mxCell id="n_neon" value="&amp;laquo;device&amp;raquo;  Neon — PostgreSQL serverless" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundColor=#dae8fc;darkOpacity=0.05;darkOpacity2=0.1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;align=center;spacingTop=6;size=14;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="120" width="250" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="d_db" value="&amp;laquo;datastore&amp;raquo;&lt;br&gt;&lt;b&gt;BD pokeduels&lt;/b&gt;&lt;br&gt;10 tablas · migraciones 0001-0005&lt;br&gt;(CI: rama efimera por corrida)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundColor=#ffffff;fillColor=#b0e3e6;strokeColor=#0e8088;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="170" width="180" height="150" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Cliente ============ -->
+        <mxCell id="n_client" value="&amp;laquo;device&amp;raquo;  Dispositivo Cliente (navegador)" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundColor=#dae8fc;darkOpacity=0.05;darkOpacity2=0.1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;align=center;spacingTop=6;size=14;" vertex="1" parent="1">
+          <mxGeometry x="380" y="560" width="360" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="c_spa" value="&amp;laquo;component&amp;raquo;&lt;br&gt;&lt;b&gt;:SPA PokeDuels&lt;/b&gt;&lt;br&gt;React 19 + Router 6 + socket.io-client&lt;br&gt;estado en memoria + localStorage (pokeduels:mockState)" style="shape=component;whiteSpace=wrap;html=1;align=left;spacingLeft=16;fontSize=11;fillColor=#f4dcc5;strokeColor=#c69c6d;" vertex="1" parent="1">
+          <mxGeometry x="410" y="610" width="300" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Cron ============ -->
+        <mxCell id="n_cron" value="&amp;laquo;device&amp;raquo;  Cron externo (keep-warm)" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundColor=#f5f5f5;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;fontStyle=1;verticalAlign=top;align=center;spacingTop=6;size=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="420" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c_ping" value="&amp;laquo;script&amp;raquo; ping periodico" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=11;fillColor=#ffffff;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="60" y="460" width="180" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Conexiones ============ -->
+        <mxCell id="cx1" value="&amp;laquo;HTTPS&amp;raquo;  carga inicial del SPA" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="c_spa" target="a_dist">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cx2" value="&amp;laquo;HTTPS&amp;raquo;  REST /api/*  (bearer sessionToken)" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="c_spa" target="c_express">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cx3" value="&amp;laquo;WSS&amp;raquo;  Socket.IO  (duel:*, room:*, team:*)" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;fontStyle=1;strokeColor=#2d7d74;" edge="1" parent="1" source="c_spa" target="c_sio">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cx4" value="&amp;laquo;TCP/TLS 5432&amp;raquo;  pool pg  (DATABASE_URL)" style="html=1;endArrow=open;endFill=0;fontSize=11;fontStyle=1;" edge="1" parent="1" source="c_pool" target="d_db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cx5" value="&amp;laquo;HTTPS&amp;raquo;  GET /health  (ADR-0006, evita el spin-down del free tier)" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=10;fontStyle=2;" edge="1" parent="1" source="c_ping" target="c_express">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cx6" value="in-process (mismo node server.js)" style="html=1;endArrow=none;dashed=1;fontSize=10;fontStyle=2;" edge="1" parent="1" source="c_sio" target="c_engine">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cx7" value="" style="html=1;endArrow=none;dashed=1;fontSize=10;" edge="1" parent="1" source="c_engine" target="c_pool">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cx8" value="" style="html=1;endArrow=none;dashed=1;fontSize=10;" edge="1" parent="1" source="c_express" target="c_pool">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cicd" value="CI/CD: push a master  →  Vercel redepliega el frontend (auto)  ·  Render redepliega el backend (auto/manual)  ·  GitHub Actions corre la suite contra una rama efimera de Neon" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=2;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="770" width="1100" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

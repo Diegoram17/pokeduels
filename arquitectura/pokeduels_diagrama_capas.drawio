@@ -1,0 +1,69 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PokeDuels - Estilo de capas (modulo)" id="pokeduels-layers">
+    <mxGraphModel dx="1200" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="&lt;b&gt;PokeDuels — Estilo de capas (dependencia hacia abajo)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="160" y="10" width="560" height="26" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l1" value="&lt;b&gt;1. Capa de presentacion (SPA React 19 + React Router 6)&lt;/b&gt;&lt;br&gt;&amp;#8226; routes/: LoginScreen, LobbyScreen, TeamSelectScreen, WaitRoomScreen, DuelBoardScreen, SwapScreen, RankingScreen&lt;br&gt;&amp;#8226; components/: Modal, HpBar, BracketTree, RulesModal, ScreenTopbar, PokemonCard, ErrorBanner&lt;br&gt;&amp;#8226; assets/: pokeduels-design-system.css (Tailwind 4)" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingTop=8;spacingLeft2=16;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="50" width="640" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l2" value="&lt;b&gt;2. Capa de estado de cliente&lt;/b&gt;&lt;br&gt;&amp;#8226; state/MockStateProvider.tsx (raiz de composicion + acciones)&lt;br&gt;&amp;#8226; state/store.ts (reducer reduceMockState, deriveDuelPhase / deriveDuelSlot, duelFromSnapshot, serialize)&lt;br&gt;&amp;#8226; state/schema.ts (tipos MockState / DuelState / DuelPokemonState)&lt;br&gt;&amp;#8226; hooks: useDuelSocket, useMockPersistence (localStorage), useAttackReplay" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingTop=8;spacingLeft2=16;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="220" width="640" height="126" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l3" value="&lt;b&gt;3. Capa de transporte / borde&lt;/b&gt;&lt;br&gt;&amp;#8226; cliente: lib/socket.ts (Socket.IO client, onSocketEvent), lib/api.ts (fetch REST + bearer)&lt;br&gt;&amp;#8226; servidor: app.js (Express 5, routers /api/*), ws/index.js (Socket.IO Server + handshake touchSession)&lt;br&gt;&amp;#8226; middleware: auth, rateLimit / wsRateLimit, errorHandler ; lib: httpError, wsError, logger" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=left;spacingTop=8;spacingLeft2=16;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="396" width="640" height="112" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l4" value="&lt;b&gt;4. Capa de aplicacion (handlers / orquestacion)&lt;/b&gt;&lt;br&gt;&amp;#8226; ws/duelContext.js (raiz de composicion: phaseStore / roundState / turnCycle por conexion)&lt;br&gt;&amp;#8226; ws/roomHandlers.js, ws/teamHandlers.js, ws/duelHandlers.js&lt;br&gt;&amp;#8226; ws/turnCycle.js, ws/tournamentLifecycle.js, ws/duelLifecycle.js, ws/duelBootstrap.js, ws/botManager.js&lt;br&gt;&amp;#8226; ws/turnTimers.js, ws/reconnectTimers.js, ws/bracketWalkoverTimers.js, ws/roomState.js&lt;br&gt;&amp;#8226; routes/session.js, routes/rooms.js, routes/catalog.js" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;align=left;spacingTop=8;spacingLeft2=16;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="558" width="640" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l5" value="&lt;b&gt;5. Capa de dominio (motor de juego puro, sin I/O)&lt;/b&gt;&lt;br&gt;&amp;#8226; engine/roundResolver.js (resolverRonda: orden, dano, KO, eventos)&lt;br&gt;&amp;#8226; engine/stateMachine.js (PHASES / EVENTS / transition), engine/duelPhaseStore.js&lt;br&gt;&amp;#8226; engine/switchValidation.js, engine/damageCalc.js&lt;br&gt;&amp;#8226; engine/typeEffectiveness.js (matriz 18x18, 324 filas en memoria), engine/constants.js, engine/faultIsolation.js" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;align=left;spacingTop=8;spacingLeft2=16;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="758" width="640" height="126" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l6" value="&lt;b&gt;6. Capa de acceso a datos (repositorios / consultas)&lt;/b&gt;&lt;br&gt;&amp;#8226; repositories/duelRepository.js (barrel) -&gt; duelQueries.js, duelTransactions.js, duelStateMapper.js&lt;br&gt;&amp;#8226; db/rooms.js, db/teamSelections.js, db/players.js, db/pokemons.js, db/reconciliation.js" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingTop=8;spacingLeft2=16;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="934" width="640" height="96" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l7" value="&lt;b&gt;7. Capa de persistencia&lt;/b&gt;&lt;br&gt;&amp;#8226; db/pool.js (pool pg compartido)&lt;br&gt;&amp;#8226; PostgreSQL / Neon serverless — 10 tablas (migraciones node-pg-migrate 0001-0005)&lt;br&gt;&amp;#8226; CI: rama efimera de Neon por corrida" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;fillColor=#b0e3e6;strokeColor=#0e8088;verticalAlign=top;align=left;spacingTop=8;spacingLeft2=16;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1080" width="640" height="96" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a12" value="usa" style="html=1;endArrow=open;endFill=0;rounded=0;strokeColor=#444444;fontSize=10;" edge="1" parent="1" source="l1" target="l2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a23" value="emite eventos / fetch" style="html=1;endArrow=open;endFill=0;rounded=0;strokeColor=#444444;fontSize=10;" edge="1" parent="1" source="l2" target="l3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a34" value="despacha a handlers" style="html=1;endArrow=open;endFill=0;rounded=0;strokeColor=#444444;fontSize=10;" edge="1" parent="1" source="l3" target="l4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a45" value="invoca reglas" style="html=1;endArrow=open;endFill=0;rounded=0;strokeColor=#444444;fontSize=10;" edge="1" parent="1" source="l4" target="l5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a46" value="lee / escribe" style="html=1;endArrow=open;endFill=0;rounded=0;strokeColor=#444444;fontSize=10;exitX=1;exitY=0.5;entryX=1;entryY=0;" edge="1" parent="1" source="l4" target="l6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="800" y="633" />
+              <mxPoint x="800" y="934" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a56" value="devuelve estado canonico (snake_case)" style="html=1;endArrow=open;endFill=0;rounded=0;strokeColor=#444444;fontSize=10;" edge="1" parent="1" source="l5" target="l6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a67" value="pool.query / transacciones" style="html=1;endArrow=open;endFill=0;rounded=0;strokeColor=#444444;fontSize=10;" edge="1" parent="1" source="l6" target="l7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,416 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PokeDuels - Clases (modelo de dominio)" id="pokeduels-cd">
+    <mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="&lt;b&gt;PokeDuels — Diagrama de clases (modelo de dominio persistido, 10 tablas / migraciones 0001-0005)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1200" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ================= Type ================= -->
+        <mxCell id="cType" value="Type &lt;br&gt;&lt;i&gt;(types)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=center;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="230" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="cType_a1" value="- name: String {PK}  // 18 tipos canónicos" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cType">
+          <mxGeometry y="36" width="230" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= TypeEffectiveness ================= -->
+        <mxCell id="cTE" value="TypeEffectiveness &lt;br&gt;&lt;i&gt;(type_effectiveness)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=center;" vertex="1" parent="1">
+          <mxGeometry x="40" y="190" width="230" height="102" as="geometry" />
+        </mxCell>
+        <mxCell id="cTE_a1" value="- attackingType: String {PK,FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTE">
+          <mxGeometry y="36" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cTE_a2" value="- defendingType: String {PK,FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTE">
+          <mxGeometry y="58" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cTE_a3" value="- multiplier: Decimal {0.5 | 1.0 | 2.0}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTE">
+          <mxGeometry y="80" width="230" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= Pokemon ================= -->
+        <mxCell id="cPok" value="Pokemon &lt;br&gt;&lt;i&gt;(pokemons)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="230" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="cPok_a1" value="- id: Integer {PK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPok">
+          <mxGeometry y="36" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPok_a2" value="- name: String {unique}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPok">
+          <mxGeometry y="58" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPok_a3" value="- type: String {FK -&gt; Type}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPok">
+          <mxGeometry y="80" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPok_a4" value="- pokeapiId: Integer" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPok">
+          <mxGeometry y="102" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPok_a5" value="- spriteUrl: String" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPok">
+          <mxGeometry y="124" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPok_a6" value="- backSpriteUrl: String  // migr. 0002" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPok">
+          <mxGeometry y="146" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPok_a7" value="- isStarter: Boolean" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPok">
+          <mxGeometry y="168" width="230" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= Player ================= -->
+        <mxCell id="cPlr" value="Player &lt;br&gt;&lt;i&gt;(players)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;" vertex="1" parent="1">
+          <mxGeometry x="40" y="620" width="230" height="168" as="geometry" />
+        </mxCell>
+        <mxCell id="cPlr_a1" value="- id: Integer {PK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPlr">
+          <mxGeometry y="36" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPlr_a2" value="- nickname: String(30)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPlr">
+          <mxGeometry y="58" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPlr_a3" value="- sessionToken: UUID {unique}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPlr">
+          <mxGeometry y="80" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPlr_a4" value="- isBot: Boolean  // migr. 0004" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPlr">
+          <mxGeometry y="102" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPlr_a5" value="- createdAt: DateTime" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPlr">
+          <mxGeometry y="124" width="230" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cPlr_a6" value="- lastSeenAt: DateTime" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cPlr">
+          <mxGeometry y="146" width="230" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= Room ================= -->
+        <mxCell id="cRoom" value="Room &lt;br&gt;&lt;i&gt;(rooms)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;" vertex="1" parent="1">
+          <mxGeometry x="400" y="360" width="250" height="168" as="geometry" />
+        </mxCell>
+        <mxCell id="cRoom_a1" value="- id: Integer {PK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRoom">
+          <mxGeometry y="36" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRoom_a2" value="- code: String(8) {unique}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRoom">
+          <mxGeometry y="58" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRoom_a3" value="- maxPlayers: Integer {2 | 4}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRoom">
+          <mxGeometry y="80" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRoom_a4" value="- status: String {waiting|in_progress|finished|aborted}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRoom">
+          <mxGeometry y="102" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRoom_a5" value="- createdBy: Integer {FK -&gt; Player}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRoom">
+          <mxGeometry y="124" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRoom_a6" value="- createdAt: DateTime" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRoom">
+          <mxGeometry y="146" width="250" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= RoomPlayer ================= -->
+        <mxCell id="cRP" value="RoomPlayer &lt;br&gt;&lt;i&gt;(room_players)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;" vertex="1" parent="1">
+          <mxGeometry x="400" y="590" width="250" height="212" as="geometry" />
+        </mxCell>
+        <mxCell id="cRP_a1" value="- id: Integer {PK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRP">
+          <mxGeometry y="36" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRP_a2" value="- roomId: Integer {FK, unique(roomId,playerId)}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRP">
+          <mxGeometry y="58" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRP_a3" value="- playerId: Integer {FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRP">
+          <mxGeometry y="80" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRP_a4" value="- nickname: String(30) {unique(roomId,nickname)}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRP">
+          <mxGeometry y="102" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRP_a5" value="- ready: Boolean" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRP">
+          <mxGeometry y="124" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRP_a6" value="- connected: Boolean" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRP">
+          <mxGeometry y="146" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRP_a7" value="- finalRank: Integer {1..4, nullable}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRP">
+          <mxGeometry y="168" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cRP_a8" value="- joinedAt: DateTime" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cRP">
+          <mxGeometry y="190" width="250" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= TeamSelection ================= -->
+        <mxCell id="cTS" value="TeamSelection &lt;br&gt;&lt;i&gt;(team_selections)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;" vertex="1" parent="1">
+          <mxGeometry x="400" y="860" width="250" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="cTS_a1" value="- id: Integer {PK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTS">
+          <mxGeometry y="36" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cTS_a2" value="- roomId: Integer {FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTS">
+          <mxGeometry y="58" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cTS_a3" value="- playerId: Integer {FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTS">
+          <mxGeometry y="80" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cTS_a4" value="- pokemonId: Integer {FK -&gt; Pokemon}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTS">
+          <mxGeometry y="102" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cTS_a5" value="- isStarter: Boolean  // uq_starter_por_sala" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTS">
+          <mxGeometry y="124" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cTS_a6" value="- slot: Integer {1..6, unique(room,player,slot)}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cTS">
+          <mxGeometry y="146" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cTS_a7" value="{unique(roomId, playerId, pokemonId)}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=10;fontStyle=2;" vertex="1" parent="cTS">
+          <mxGeometry y="168" width="250" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= Duel ================= -->
+        <mxCell id="cDuel" value="Duel &lt;br&gt;&lt;i&gt;(duels)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;" vertex="1" parent="1">
+          <mxGeometry x="760" y="330" width="270" height="234" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a1" value="- id: Integer {PK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDuel">
+          <mxGeometry y="36" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a2" value="- roomId: Integer {FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDuel">
+          <mxGeometry y="58" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a3" value="- player1Id: Integer {FK -&gt; Player}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDuel">
+          <mxGeometry y="80" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a4" value="- player2Id: Integer {FK -&gt; Player}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDuel">
+          <mxGeometry y="102" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a5" value="- round: String {unica|semifinal|final|tercer_puesto}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDuel">
+          <mxGeometry y="124" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a6" value="- winnerId: Integer {FK -&gt; Player, nullable}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDuel">
+          <mxGeometry y="146" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a7" value="- status: String {pending|in_progress|finished}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDuel">
+          <mxGeometry y="168" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a8" value="- endReason: String {ko|disconnect|surrender|walkover|server_restart}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=10;" vertex="1" parent="cDuel">
+          <mxGeometry y="190" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDuel_a9" value="- createdAt: DateTime   / turnNumber (derivado de moves)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=10;" vertex="1" parent="cDuel">
+          <mxGeometry y="212" width="270" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= DuelPokemonState ================= -->
+        <mxCell id="cDPS" value="DuelPokemonState &lt;br&gt;&lt;i&gt;(duel_pokemon_state)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;" vertex="1" parent="1">
+          <mxGeometry x="760" y="640" width="270" height="256" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a1" value="- id: Integer {PK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="36" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a2" value="- duelId: Integer {FK, unique(duel,player,pokemon)}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="58" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a3" value="- playerId: Integer {FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="80" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a4" value="- pokemonId: Integer {FK -&gt; Pokemon}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="102" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a5" value="- currentHp: Integer {0..100}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="124" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a6" value="- ppMove1: Integer {0..4}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="146" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a7" value="- ppMove2: Integer {0..4}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="168" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a8" value="- ppMove3: Integer {0..4}   // move_4 sin PP" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="190" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a9" value="- isActive: Boolean   // en campo" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="212" width="270" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cDPS_a10" value="- fainted: Boolean" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cDPS">
+          <mxGeometry y="234" width="270" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= Move ================= -->
+        <mxCell id="cMove" value="Move &lt;br&gt;&lt;i&gt;(moves — log append-only)&lt;/i&gt;" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;horizontalStack=0;resizeParent=0;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="470" width="280" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a1" value="- id: Integer {PK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="36" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a2" value="- duelId: Integer {FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="58" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a3" value="- turnNumber: Integer" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="80" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a4" value="- playerId: Integer {FK}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="102" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a5" value="- actionType: String {attack | switch}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="124" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a6" value="- pokemonId: Integer {FK -&gt; Pokemon}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="146" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a7" value="- moveIndex: Integer {1..4, req. si attack}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="168" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a8" value="- targetPokemonId: Integer {FK -&gt; Pokemon}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="190" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a9" value="- damageDealt: Integer" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="212" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a10" value="- effectiveness: Decimal {0.5 | 1.0 | 2.0}" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="234" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a11" value="- wasTimeout: Boolean" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="256" width="280" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="cMove_a12" value="- createdAt: DateTime" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;fontSize=11;" vertex="1" parent="cMove">
+          <mxGeometry y="278" width="280" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ================= Asociaciones ================= -->
+        <mxCell id="e1" value="tipifica" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cType" target="cPok">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e1">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e1t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e1">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e2" value="clasifica (ataca/defiende)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cType" target="cTE">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e2">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e2t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e2">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e3" value="se elige en" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cPok" target="cTS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e3">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e3t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e3">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e4" value="instancia" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cPok" target="cDPS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e4">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e4t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e4">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e5" value="ocupa asiento" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cPlr" target="cRP">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e5">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e5t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e5">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e6" value="arma" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cPlr" target="cTS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e6">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e6t" value="0..6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e6">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e7" value="reúne" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cRoom" target="cRP">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e7">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e7t" value="2..4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e7">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e8" value="contiene" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cRoom" target="cTS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e8">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e8t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e8">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e9" value="hospeda" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cRoom" target="cDuel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e9">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e9t" value="0..*  (1v1: 1  ·  torneo: 4)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e9">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e10" value="enfrenta" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cPlr" target="cDuel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10s" value="2  (player1/player2)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e10">
+          <mxGeometry relative="1" x="-0.8" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e10t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e10">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e11" value="fija estado de" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cDuel" target="cDPS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e11">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e11t" value="4..12  (6 por jugador)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e11">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e12" value="registra" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cDuel" target="cMove">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e12">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e12t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e12">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e13" value="controla" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cPlr" target="cDPS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e13">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e13t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e13">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e14" value="ejecuta" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=10;jettySize=auto;orthogonalLoop=1;" edge="1" parent="1" source="cPlr" target="cMove">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14s" value="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e14">
+          <mxGeometry relative="1" x="-0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e14t" value="0..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=10;" connectable="0" vertex="1" parent="e14">
+          <mxGeometry relative="1" x="0.85" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="note" value="Nota: identidades efímeras por nickname (sin cuentas). El estado transitorio de fases del duelo (lead_selection / awaiting_actions / awaiting_switch / RESOLVING) NO se persiste: vive en memoria del servidor (ws/duelContext.js: phaseStore + roundState) y en el cliente se deriva con deriveDuelPhase()." style="text;html=1;align=left;verticalAlign=top;fontSize=10;fontStyle=2;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1080" width="1000" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

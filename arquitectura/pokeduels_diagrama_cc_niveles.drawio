@@ -1,0 +1,146 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PokeDuels - C&amp;C N-Niveles" id="pokeduels-cc">
+    <mxGraphModel dx="1212" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1020" pageHeight="1220" background="light-dark(#FFFFFF,#121212)" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="&lt;b&gt;PokeDuels — Vista Componente-y-Conector por niveles&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="8" width="620" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Nivel cliente ============ -->
+        <mxCell id="lvl1" value="&lt;b&gt;Nivel cliente (SPA en el navegador)&lt;/b&gt;" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;verticalAlign=top;align=center;spacingTop=10;fontSize=13;fillColor=#c9c2e8;strokeColor=#7a6bb0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="940" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="c_spa" value="«component»&lt;br&gt;&lt;b&gt;:SPA (routes/ + components/)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#f4dcc5;strokeColor=#c69c6d;" vertex="1" parent="1">
+          <mxGeometry x="110" y="100" width="240" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c_store" value="«component»&lt;br&gt;&lt;b&gt;:Store (MockStateProvider + reduceMockState)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#f4dcc5;strokeColor=#c69c6d;" vertex="1" parent="1">
+          <mxGeometry x="430" y="100" width="300" height="64" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Nivel borde ============ -->
+        <mxCell id="lvl2" value="&lt;b&gt;Nivel borde / transporte&lt;/b&gt;" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;verticalAlign=top;align=center;spacingTop=10;fontSize=13;fillColor=#4fb3a9;strokeColor=#2d7d74;" vertex="1" parent="1">
+          <mxGeometry x="40" y="250" width="940" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="c_cliws" value="«component»&lt;br&gt;&lt;b&gt;:ClienteSocketIO (lib/socket.ts)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#d9ead3;strokeColor=#6aa84f;" vertex="1" parent="1">
+          <mxGeometry x="90" y="310" width="200" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c_clirest" value="«component»&lt;br&gt;&lt;b&gt;:ClienteREST (lib/api.ts)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#d9ead3;strokeColor=#6aa84f;" vertex="1" parent="1">
+          <mxGeometry x="320" y="310" width="180" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c_srvws" value="«component»&lt;br&gt;&lt;b&gt;:ServidorSocketIO (ws/index.js)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#d9ead3;strokeColor=#6aa84f;" vertex="1" parent="1">
+          <mxGeometry x="540" y="310" width="210" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c_api" value="«component»&lt;br&gt;&lt;b&gt;:ExpressAPI (app.js, routes/*)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#d9ead3;strokeColor=#6aa84f;" vertex="1" parent="1">
+          <mxGeometry x="780" y="310" width="180" height="64" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Nivel aplicacion ============ -->
+        <mxCell id="lvl3" value="&lt;b&gt;Nivel aplicacion — handlers / orquestacion (ws/)&lt;/b&gt;" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;verticalAlign=top;align=center;spacingTop=10;fontSize=13;fillColor=#8fe0e8;strokeColor=#3d9aa5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="480" width="940" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="c_room" value="«component»&lt;br&gt;&lt;b&gt;:RoomHandlers&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#dcc86e;strokeColor=#a68a2a;" vertex="1" parent="1">
+          <mxGeometry x="90" y="540" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="c_duelh" value="«component»&lt;br&gt;&lt;b&gt;:DuelHandlers&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#dcc86e;strokeColor=#a68a2a;" vertex="1" parent="1">
+          <mxGeometry x="300" y="540" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="c_turn" value="«component»&lt;br&gt;&lt;b&gt;:TurnCycle&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#dcc86e;strokeColor=#a68a2a;" vertex="1" parent="1">
+          <mxGeometry x="520" y="540" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="c_bot" value="«component»&lt;br&gt;&lt;b&gt;:BotManager&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#dcc86e;strokeColor=#a68a2a;" vertex="1" parent="1">
+          <mxGeometry x="710" y="540" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="c_lvl3note" value="tambien: :TeamHandlers · :TournamentLifecycle · :DuelLifecycle · :DuelBootstrap · registros de timers (turno 10s, reconexion, walkover)" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="90" y="620" width="800" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Nivel dominio ============ -->
+        <mxCell id="lvl4" value="&lt;b&gt;Nivel dominio — motor de juego puro (engine/)&lt;/b&gt;" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;verticalAlign=top;align=center;spacingTop=10;fontSize=13;fillColor=#b3d9ff;strokeColor=#4a86c7;" vertex="1" parent="1">
+          <mxGeometry x="40" y="730" width="940" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="c_resolver" value="«component»&lt;br&gt;&lt;b&gt;:RoundResolver (resolverRonda)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="110" y="790" width="230" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c_sm" value="«component»&lt;br&gt;&lt;b&gt;:StateMachine (fases / transiciones)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="380" y="790" width="220" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c_te" value="«component»&lt;br&gt;&lt;b&gt;:TypeEffectiveness (matriz 18x18)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="640" y="790" width="250" height="64" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Nivel datos ============ -->
+        <mxCell id="lvl5" value="&lt;b&gt;Nivel datos y persistencia&lt;/b&gt;" style="shape=folder;fontStyle=1;spacingLeft=20;tabWidth=200;tabHeight=18;tabPosition=left;html=1;whiteSpace=wrap;verticalAlign=top;align=center;spacingTop=10;fontSize=13;fillColor=#f4b8c4;strokeColor=#c25b73;" vertex="1" parent="1">
+          <mxGeometry x="40" y="950" width="940" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="c_repo" value="«component»&lt;br&gt;&lt;b&gt;:DuelRepository + db/rooms + db/teamSelections&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1010" width="320" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c_pool" value="«component»&lt;br&gt;&lt;b&gt;:PgPool (db/pool.js)&lt;/b&gt;" style="shape=component;whiteSpace=wrap;html=1;align=center;fontSize=12;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="470" y="1010" width="170" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c_pg" value="«datastore»&lt;br&gt;&lt;b&gt;PostgreSQL / Neon (10 tablas)&lt;/b&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundColor=#ffffff;align=center;fontSize=12;fillColor=#b0e3e6;strokeColor=#0e8088;" vertex="1" parent="1">
+          <mxGeometry x="690" y="1000" width="230" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Interfaces (lollipops) ============ -->
+        <mxCell id="ell1" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9fc5e8;strokeColor=#3d6ea5;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="515" y="225" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ell1_lbl" value="publicacion-suscripcion&#10;(duel:state, duel:turn_resolved, room:state)" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="555" y="222" width="300" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ell2" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9fc5e8;strokeColor=#3d6ea5;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="375" y="395" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ell2_lbl" value="llamada-retorno (HTTPS /api/session, /api/rooms, /api/pokemons)" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="440" width="420" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ell3" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9fc5e8;strokeColor=#3d6ea5;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="485" y="555" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ell4" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9fc5e8;strokeColor=#3d6ea5;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="210" y="700" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ell4_lbl" value="llamada-retorno" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="245" y="702" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ell5" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9fc5e8;strokeColor=#3d6ea5;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1025" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ell5_lbl" value="pool.query / withTransaction" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1078" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Conectores ============ -->
+        <mxCell id="k1" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="c_spa" target="c_store"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k2" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="c_store" target="ell1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k3" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="ell1" target="c_cliws"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k4" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="c_store" target="c_clirest"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k5" value="WSS (Socket.IO)" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_cliws" target="c_srvws"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k6" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="c_clirest" target="ell2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k7" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="ell2" target="c_api"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k8" value="registerRoomHandlers" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_srvws" target="c_room"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k9" value="registerDuelHandlers" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_srvws" target="c_duelh"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k10" value="createRoomsRouter" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_api" target="c_room"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k11" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="c_duelh" target="ell3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k12" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="ell3" target="c_turn"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k13" value="bot lead / accion" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_duelh" target="c_bot"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k14" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="c_turn" target="ell4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k15" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="ell4" target="c_resolver"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k16" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="c_resolver" target="c_sm"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k17" value="multiplicador" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_resolver" target="c_te"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k18" value="getDuelState / applyRoundResult" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_turn" target="c_repo"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k19" value="createDuelFromRoom / setPlayerReady" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_room" target="c_repo"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k20" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="c_repo" target="ell5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k21" value="" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;" edge="1" parent="1" source="ell5" target="c_pool"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k22" value="TCP/TLS 5432" style="html=1;endArrow=none;startArrow=none;strokeColor=#333333;fontSize=10;" edge="1" parent="1" source="c_pool" target="c_pg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="k23" value="broadcast: io.to('duel:&lt;id&gt;').emit(...)" style="dashed=1;html=1;endArrow=open;endFill=0;strokeColor=#c25b73;fontSize=10;fontStyle=2;" edge="1" parent="1" source="c_srvws" target="c_cliws"><mxGeometry relative="1" as="geometry">
+          <Array as="points"><mxPoint x="640" y="270" /><mxPoint x="190" y="270" /></Array>
+        </mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
