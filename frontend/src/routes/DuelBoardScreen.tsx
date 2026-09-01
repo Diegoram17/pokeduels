@@ -427,6 +427,28 @@ function DuelBoardScreen() {
     }
   }, [duel, state, navigate])
 
+  // QA-round-5: after CONTINUAR, the human stays in combat while the opponent
+  // picks a replacement (phase awaiting_switch, no rival active). If the
+  // opponent's new-active broadcast is dropped/late, the rival slot stays
+  // blank and the board is stuck. Re-pull the snapshot once after a short
+  // wait so play resumes.
+  const opponentPickResyncRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!duel) return
+    const opponentChoosing =
+      duel.phase === 'awaiting_switch' &&
+      Boolean(humanActivePokemon(state)) &&
+      !rivalActivePokemon(state)
+    if (!opponentChoosing) return
+    const key = `${duel.duelId}:${duel.turnNumber}`
+    if (opponentPickResyncRef.current === key) return
+    const id = setTimeout(() => {
+      opponentPickResyncRef.current = key
+      actions.joinDuel(duel.duelId)
+    }, 4000)
+    return () => clearTimeout(id)
+  }, [duel, state, actions])
+
   // Duel finish routing (server-driven): 1v1 -> wait-room rematch panel;
   // bracket + final ranking -> ranking screen; bracket + no final ranking ->
   // stay and render the wait/go-now choice (the effect re-runs and navigates
@@ -505,6 +527,11 @@ function DuelBoardScreen() {
 
   const humanActive = humanActivePokemon(state)
   const rivalActive = rivalActivePokemon(state)
+  // The human won the exchange and is holding position while the opponent
+  // picks a replacement — render a placeholder in the rival slot instead of
+  // a blank arena.
+  const opponentChoosing =
+    duel.phase === 'awaiting_switch' && Boolean(humanActive) && !rivalActive
   // Round-1 gate: the rival lead is not broadcast until the first
   // duel:turn_resolved, so the move grid must not wait on rivalActive.
   const canAct =
@@ -565,7 +592,18 @@ function DuelBoardScreen() {
             className="duel-hud"
           >
             {humanActive && <HudCard pokemon={humanActive} side="human" />}
-            {rivalActive && <HudCard pokemon={rivalActive} side="rival" />}
+            {rivalActive ? (
+              <HudCard pokemon={rivalActive} side="rival" />
+            ) : opponentChoosing ? (
+              <div className="pd-card hud-card--waiting" data-testid="rival-choosing">
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  hourglass_top
+                </span>
+                <p className="pd-label" style={{ margin: 0 }}>
+                  EL RIVAL ESTÁ ELIGIENDO SU POKÉMON…
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {/* Free-standing arena field sprites (Prototipos/5): own pokemon
@@ -580,7 +618,7 @@ function DuelBoardScreen() {
               />
             </div>
           )}
-          {rivalActive && (
+          {rivalActive ? (
             <div className="sprite-wrap sprite-wrap--rival">
               <img
                 ref={rivalSpriteRef}
@@ -588,7 +626,11 @@ function DuelBoardScreen() {
                 alt={rivalActive.name}
               />
             </div>
-          )}
+          ) : opponentChoosing ? (
+            <div className="sprite-wrap sprite-wrap--rival sprite-wrap--empty" aria-hidden="true">
+              <span className="material-symbols-outlined">catching_pokemon</span>
+            </div>
+          ) : null}
         </div>
 
         <div

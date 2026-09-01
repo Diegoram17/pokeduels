@@ -336,6 +336,37 @@ describe('DuelBoardScreen — post-round KO (opponent switching)', () => {
     expect(screen.queryByText('SWAP-LANDED')).not.toBeInTheDocument()
   })
 
+  it('keeps a rival placeholder (not a blank arena) while the opponent picks a replacement, then restores it', () => {
+    renderBoard(2)
+    startRound1()
+    fireOpponentKoSnapshot()
+
+    act(() => {
+      screen.getByRole('button', { name: /continuar/i }).click()
+    })
+
+    // The opponent has no active — the rival slot shows a "choosing" placeholder.
+    expect(screen.getByTestId('rival-choosing')).toBeInTheDocument()
+    expect(screen.getByText(/rival está eligiendo/i)).toBeInTheDocument()
+
+    // The opponent's new active arrives -> placeholder gone, board resumes.
+    act(() => {
+      fakeSocket._fire('duel:state', {
+        duelId: 42,
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        pokemonStates: [
+          { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 60, ppMove1: 3, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+          { duelId: 42, ownerId: 11, pokemonId: 23, type: 'flying', currentHp: 0, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: true },
+          { duelId: 42, ownerId: 11, pokemonId: 5, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+        ],
+      })
+    })
+    expect(screen.queryByTestId('rival-choosing')).not.toBeInTheDocument()
+    expect(screen.getByTestId('duel-probe').textContent).toContain('phase:awaiting_actions')
+  })
+
   it('CAMBIAR POKÉMON from the modal goes to voluntary swap', () => {
     renderBoard(2)
     startRound1()

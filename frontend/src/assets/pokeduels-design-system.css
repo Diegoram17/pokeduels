@@ -621,6 +621,15 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
 .action-aside{width:100%;display:flex;flex-direction:column;justify-content:flex-start}
 @media(min-width:960px){.action-aside{width:240px;flex:none}}
 
+/* QA-round-5: placeholder in the rival slot while the opponent picks a new
+   active after their pokemon was KO'd (the human held position via CONTINUAR).
+   Keeps the arena from going half-blank. */
+.hud-card--waiting{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--pd-space-2);
+  min-height:96px;text-align:center;color:var(--pd-text-meta);border-style:dashed}
+.hud-card--waiting .material-symbols-outlined{font-size:28px;color:var(--pd-blue-light)}
+.sprite-wrap--empty{display:flex;align-items:center;justify-content:center;opacity:.35}
+.sprite-wrap--empty .material-symbols-outlined{font-size:64px;color:var(--pd-blue-light)}
+
 /* Lead picker (ELIGE TU PRIMER POKÉMON): full cards with the roster sprite;
    the whole card is the ELEGIR action. */
 /* QA-round-2/3: the lead picker lives in the bottom .duel-command panel. Lay
