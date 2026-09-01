@@ -1,5 +1,6 @@
 import {
   getDuelState,
+  applySwitchDecision,
   mapDuelStateToCamelCase,
   mapRoundEventsToCamelCase,
 } from '../repositories/duelRepository.js';
@@ -7,6 +8,15 @@ import { resolverRonda } from '../engine/roundResolver.js';
 import { withDuelFaultIsolation } from '../engine/faultIsolation.js';
 import { ROUND_SUB_STATES } from './duelRoundState.js';
 import { advanceTournamentOrRematch } from './tournamentLifecycle.js';
+import { isBotPlayer } from './botManager.js';
+
+/** Which player ids lost their active this round but still have a live bench. */
+function sidesNeedingSwitch(pokemonStates, player1_id, player2_id) {
+  return [player1_id, player2_id].filter((pid) => {
+    const owned = pokemonStates.filter((p) => p.player_id === pid);
+    return !owned.some((p) => p.is_active) && owned.some((p) => !p.fainted);
+  });
+}
 
 /**
  * Per-duel action buffer + shared turn-resolution trigger (item #5, design:
@@ -152,14 +162,36 @@ export function createTurnCycle({ bracketWalkoverTimers, roundState, phaseStore 
         return true;
       }
 
-      const needingSwitch = [player1_id, player2_id].filter((pid) => {
-        const owned = fresh.pokemonStates.filter((p) => p.player_id === pid);
-        return !owned.some((p) => p.is_active) && owned.some((p) => !p.fainted);
-      });
-      if (needingSwitch.length > 0) {
-        roundState.set(duelId, ROUND_SUB_STATES.AWAITING_SWITCH);
-        io.to(`duel:${duelId}`).emit('duel:awaiting_switch', { duelId });
-        return true;
+      let current = fresh;
+      let pending = sidesNeedingSwitch(current.pokemonStates, player1_id, player2_id);
+      if (pending.length > 0) {
+        // A bot side picks its replacement instantly, server-side (bots have no
+        // socket to answer duel:awaiting_switch). Only a HUMAN side keeps the
+        // duel waiting in awaiting_switch.
+        let botSwitched = false;
+        for (const pid of pending) {
+          // eslint-disable-next-line no-await-in-loop
+          if (!(await isBotPlayer(pid))) continue;
+          const owned = current.pokemonStates.filter((p) => p.player_id === pid);
+          const candidates = owned.filter(
+            (p) => !p.fainted && !p.is_active && p.current_hp > 0,
+          );
+          if (candidates.length === 0) continue;
+          const pick = candidates[Math.floor(Math.random() * candidates.length)];
+          // eslint-disable-next-line no-await-in-loop
+          await applySwitchDecision(duelId, pid, pick.pokemon_id);
+          botSwitched = true;
+        }
+        if (botSwitched) {
+          current = await getDuelState(duelId);
+          io.to(`duel:${duelId}`).emit('duel:state', mapDuelStateToCamelCase(current));
+          pending = sidesNeedingSwitch(current.pokemonStates, player1_id, player2_id);
+        }
+        if (pending.length > 0) {
+          roundState.set(duelId, ROUND_SUB_STATES.AWAITING_SWITCH);
+          io.to(`duel:${duelId}`).emit('duel:awaiting_switch', { duelId });
+          return true;
+        }
       }
 
       roundState.set(duelId, ROUND_SUB_STATES.AWAITING_ACTIONS);

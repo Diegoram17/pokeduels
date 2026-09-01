@@ -9,6 +9,7 @@ import { createTurnCycle } from '../ws/turnCycle.js';
 // WS integration tests (duelHandlers.ws.test.js).
 vi.mock('../repositories/duelRepository.js', () => ({
   getDuelState: vi.fn(),
+  applySwitchDecision: vi.fn(async () => {}),
   mapDuelStateToCamelCase: vi.fn(),
   mapRoundEventsToCamelCase: vi.fn(),
 }));
@@ -21,10 +22,14 @@ vi.mock('../ws/duelLifecycle.js', () => ({
 vi.mock('../ws/tournamentLifecycle.js', () => ({
   advanceTournamentOrRematch: vi.fn(async () => {}),
 }));
+vi.mock('../ws/botManager.js', () => ({
+  isBotPlayer: vi.fn(async () => false),
+}));
 
-import { getDuelState, mapDuelStateToCamelCase, mapRoundEventsToCamelCase } from '../repositories/duelRepository.js';
+import { getDuelState, applySwitchDecision, mapDuelStateToCamelCase, mapRoundEventsToCamelCase } from '../repositories/duelRepository.js';
 import { resolverRonda } from '../engine/roundResolver.js';
 import { advanceTournamentOrRematch } from '../ws/tournamentLifecycle.js';
+import { isBotPlayer } from '../ws/botManager.js';
 import { createRoundStateStore } from '../ws/duelRoundState.js';
 import { createPhaseStore } from '../engine/duelPhaseStore.js';
 
@@ -301,5 +306,97 @@ describe('createTurnCycle duel:turn_resolved turnEvents payload (Fase 7, PR7)', 
     // The finished branch still ran after the emit.
     expect(finalizeMock).toHaveBeenCalled();
     expect(advanceTournamentOrRematch).toHaveBeenCalled();
+  });
+});
+
+describe('createTurnCycle bot auto-switch after a KO round (QA)', () => {
+  let cycle;
+  let emit;
+  let roundState;
+  const io = { to: vi.fn() };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isBotPlayer.mockResolvedValue(false);
+    mapDuelStateToCamelCase.mockImplementation((s) => s);
+    mapRoundEventsToCamelCase.mockReturnValue([]);
+    resolverRonda.mockResolvedValue({ events: [] });
+    roundState = createRoundStateStore();
+    cycle = createTurnCycle({
+      roundState,
+      phaseStore: createPhaseStore(),
+      bracketWalkoverTimers: { arm() {}, cancel() {}, has() {}, clear() {} },
+    });
+    cycle.bindLifecycle({ finalizeDuelSideEffects: vi.fn(async () => {}) });
+    emit = vi.fn();
+    vi.mocked(io.to).mockReturnValue({ emit });
+  });
+
+  const inProgress = { id: 7, player1_id: 1, player2_id: 2, status: 'in_progress' };
+
+  it("switches a KO'd bot side instantly and resumes to awaiting_actions", async () => {
+    getDuelState
+      .mockResolvedValueOnce({
+        duel: inProgress,
+        pokemonStates: [
+          { player_id: 1, pokemon_id: 10, is_active: true, fainted: false, current_hp: 50, pp_move_1: 4, pp_move_2: 4, pp_move_3: 4 },
+          { player_id: 2, pokemon_id: 20, is_active: true, fainted: false, current_hp: 5, pp_move_1: 4, pp_move_2: 4, pp_move_3: 4 },
+        ],
+      })
+      .mockResolvedValueOnce({
+        duel: inProgress,
+        pokemonStates: [
+          { player_id: 1, pokemon_id: 10, is_active: true, fainted: false, current_hp: 50 },
+          { player_id: 2, pokemon_id: 20, is_active: false, fainted: true, current_hp: 0 },
+          { player_id: 2, pokemon_id: 21, is_active: false, fainted: false, current_hp: 100 },
+        ],
+      })
+      .mockResolvedValueOnce({
+        duel: inProgress,
+        pokemonStates: [
+          { player_id: 1, pokemon_id: 10, is_active: true, fainted: false, current_hp: 50 },
+          { player_id: 2, pokemon_id: 20, is_active: false, fainted: true, current_hp: 0 },
+          { player_id: 2, pokemon_id: 21, is_active: true, fainted: false, current_hp: 100 },
+        ],
+      });
+    isBotPlayer.mockImplementation(async (pid) => pid === 2);
+
+    cycle.bufferAction(7, 1, { moveIndex: 4 });
+    cycle.bufferAction(7, 2, { moveIndex: 4 });
+    const ok = await cycle.attemptResolveTurn(io, 7);
+
+    expect(ok).toBe(true);
+    expect(applySwitchDecision).toHaveBeenCalledWith(7, 2, 21);
+    expect(emit).toHaveBeenCalledWith('duel:state', expect.objectContaining({ duel: inProgress }));
+    expect(emit).not.toHaveBeenCalledWith('duel:awaiting_switch', expect.anything());
+    expect(roundState.get(7)).toBe('AWAITING_ACTIONS');
+  });
+
+  it("keeps awaiting_switch when the KO'd side is a human", async () => {
+    getDuelState
+      .mockResolvedValueOnce({
+        duel: inProgress,
+        pokemonStates: [
+          { player_id: 1, pokemon_id: 10, is_active: true, fainted: false, current_hp: 5, pp_move_1: 4, pp_move_2: 4, pp_move_3: 4 },
+          { player_id: 2, pokemon_id: 20, is_active: true, fainted: false, current_hp: 40, pp_move_1: 4, pp_move_2: 4, pp_move_3: 4 },
+        ],
+      })
+      .mockResolvedValueOnce({
+        duel: inProgress,
+        pokemonStates: [
+          { player_id: 1, pokemon_id: 10, is_active: false, fainted: true, current_hp: 0 },
+          { player_id: 1, pokemon_id: 11, is_active: false, fainted: false, current_hp: 100 },
+          { player_id: 2, pokemon_id: 20, is_active: true, fainted: false, current_hp: 40 },
+        ],
+      });
+    isBotPlayer.mockResolvedValue(false);
+
+    cycle.bufferAction(7, 1, { moveIndex: 4 });
+    cycle.bufferAction(7, 2, { moveIndex: 4 });
+    await cycle.attemptResolveTurn(io, 7);
+
+    expect(applySwitchDecision).not.toHaveBeenCalled();
+    expect(emit).toHaveBeenCalledWith('duel:awaiting_switch', { duelId: 7 });
+    expect(roundState.get(7)).toBe('AWAITING_SWITCH');
   });
 });

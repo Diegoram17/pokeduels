@@ -240,6 +240,39 @@ describe('SwapScreen — forced mode', () => {
     expect(screen.getByRole('button', { name: /snorlax/i })).toBeEnabled()
   })
 
+  it('selects a bench pokemon by clicking anywhere on its card (not just the button) and enables CONFIRMAR CAMBIO', () => {
+    renderSwapFromState(buildForcedSwapState(), '/swap?mode=forced')
+
+    expect(screen.getByRole('button', { name: /confirmar cambio/i })).toBeDisabled()
+
+    // Click the card container, away from the inner button.
+    act(() => {
+      screen.getByTestId('bench-card-5').click()
+    })
+
+    expect(screen.getByTestId('bench-card-5').className).toContain('unit-card--selected')
+    expect(screen.getByRole('button', { name: /confirmar cambio/i })).toBeEnabled()
+  })
+
+  it('treats a string currentHp of "0" as K.O. (not selectable) and a live string hp as selectable', () => {
+    const duel: MockState['duel'] = {
+      duelId: '42', slot: '1v1', phase: 'awaiting_switch', turnNumber: 2,
+      winnerId: null, endReason: null, opponentDisconnected: false, lastRejection: null,
+    }
+    renderSwapFromState(
+      baseState(duel, [
+        // wire values arriving as strings
+        makePokemon(10, 25, 'Pikachu', { currentHp: '0' as unknown as number, fainted: false, isActive: false }),
+        makePokemon(10, 5, 'Snorlax', { currentHp: '100' as unknown as number }),
+        makePokemon(11, 23, 'Pidgeot', { isActive: true }),
+      ]),
+      '/swap?mode=forced',
+    )
+
+    expect(screen.getByRole('button', { name: /pikachu/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /snorlax/i })).toBeEnabled()
+  })
+
   it('re-requests the duel state and offers an escape when the forced roster is empty (QA-round-3)', () => {
     renderSwapFromState({ ...buildForcedSwapState(), duelPokemonState: [] }, '/swap?mode=forced')
 

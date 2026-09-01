@@ -763,3 +763,7 @@ button.pd-card{appearance:none;-webkit-appearance:none;-moz-appearance:none;marg
   padding:var(--pd-space-1) var(--pd-space-4);font:800 20px/1 var(--pd-font-display);letter-spacing:.2em;color:var(--pd-danger);text-transform:uppercase}
 .unit-card--ko{opacity:.6;filter:grayscale(1)}
 .unit-card--active{border-color:var(--pd-yellow);box-shadow:0 0 0 1px var(--pd-yellow),0 26px 70px rgba(0,0,0,.72)}
+/* QA: the whole card is the click target on the swap screen; give the chosen
+   one an unmistakable highlight. */
+.unit-card.pd-card--interactive{cursor:pointer}
+.unit-card--selected{border-color:var(--pd-yellow);box-shadow:0 0 0 2px var(--pd-yellow),0 0 24px rgba(255,203,5,.35)}

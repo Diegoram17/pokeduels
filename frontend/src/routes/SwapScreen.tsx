@@ -25,15 +25,24 @@ function BenchPokemonCard({
   selected: boolean
   onSelect: (pokemonId: number) => void
 }) {
-  const isActive = pokemon.isActive
-  const isKo = pokemon.fainted || pokemon.currentHp === 0
-  const isLowHp = !isKo && pokemon.currentHp <= LOW_HP_THRESHOLD
+  // Coerce: the server snapshot may deliver numeric fields as strings on some
+  // paths — `hp === 0` / `hp <= X` would then misfire.
+  const hp = Number(pokemon.currentHp) || 0
+  const isActive = pokemon.isActive === true
+  const isKo = pokemon.fainted === true || hp <= 0
+  const isLowHp = !isKo && hp <= LOW_HP_THRESHOLD
   const selectable = !isActive && !isKo
+  const name = pokemon.name ?? String(pokemon.pokemonId)
+  const type = pokemon.type ?? '—'
+  const pick = () => {
+    if (selectable) onSelect(pokemon.pokemonId)
+  }
 
   return (
     <div
-      className={`pd-card pd-card--flush unit-card${selectable ? ' pd-card--interactive' : ''}${isActive ? ' unit-card--active' : ''}${isKo ? ' unit-card--ko' : ''}`}
+      className={`pd-card pd-card--flush unit-card${selectable ? ' pd-card--interactive' : ''}${isActive ? ' unit-card--active' : ''}${isKo ? ' unit-card--ko' : ''}${selectable && selected ? ' unit-card--selected' : ''}`}
       data-testid={`bench-card-${pokemon.pokemonId}`}
+      onClick={selectable ? pick : undefined}
     >
       {isActive && <span className="flag flag--active">EN CAMPO</span>}
       {isLowHp && (
@@ -51,7 +60,7 @@ function BenchPokemonCard({
       )}
       <div className="art">
         {pokemon.spriteUrl ? (
-          <img src={pokemon.spriteUrl} alt={pokemon.name} />
+          <img src={pokemon.spriteUrl} alt={name} />
         ) : (
           <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 56, color: 'var(--pd-text-dim)' }}>
             pets
@@ -60,25 +69,28 @@ function BenchPokemonCard({
       </div>
       <div className="body">
         <div className="top-row">
-          <h2>{pokemon.name.toUpperCase()}</h2>
-          <span className={`pd-badge pd-badge--${pokemon.type}`}>{pokemon.type.toUpperCase()}</span>
+          <h2>{name.toUpperCase()}</h2>
+          <span className={`pd-badge pd-badge--${type}`}>{type.toUpperCase()}</span>
         </div>
         <div>
           <div className={`hp-row${isLowHp ? ' hp-row--danger' : ''}`}>
             <span>HP</span>
             <span>
-              {pokemon.currentHp} / {MAX_HP}
+              {hp} / {MAX_HP}
             </span>
           </div>
-          <HpBar hp={pokemon.currentHp} ariaLabel={`HP de ${pokemon.name}`} />
+          <HpBar hp={hp} ariaLabel={`HP de ${name}`} />
         </div>
         <button
           type="button"
           className={`pd-btn pd-btn--block${selectable ? ' pd-btn--primary' : ''}`}
           disabled={!selectable}
           aria-pressed={selectable ? selected : undefined}
-          aria-label={`${pokemon.name}${isActive ? ' — desplegado actualmente' : isKo ? ' — fuera de servicio' : ''}`}
-          onClick={() => selectable && onSelect(pokemon.pokemonId)}
+          aria-label={`${name}${isActive ? ' — desplegado actualmente' : isKo ? ' — fuera de servicio' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            pick()
+          }}
           style={selectable && selected ? { outline: '2px solid var(--pd-yellow)', outlineOffset: 2 } : undefined}
         >
           {isActive ? 'DESPLEGADO ACTUALMENTE' : isKo ? 'UNIDAD FUERA DE SERVICIO' : selected ? 'SELECCIONADO' : 'ENVIAR AL COMBATE'}
