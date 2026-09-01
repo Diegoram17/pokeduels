@@ -373,7 +373,9 @@ function TeamSelectScreen() {
   // Starters the backend reported as taken by a rival (team:starter_rejected
   // with reason 'taken') — rendered as .mon-card--taken per Prototipos/3.
   const [takenStarterIds, setTakenStarterIds] = useState<number[]>([])
-  const [howToPlayOpen, setHowToPlayOpen] = useState(false)
+  // Opens automatically on screen entry (product decision); the topbar
+  // button reopens it on demand afterward.
+  const [howToPlayOpen, setHowToPlayOpen] = useState(true)
 
   const loadCatalog = useCallback(() => {
     setError(null)
