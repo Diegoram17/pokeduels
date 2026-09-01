@@ -8,6 +8,7 @@ import { isTeamComplete, toggleRoster, toggleStarter, ROSTER_SIZE } from '../lib
 import ErrorBanner from '../components/ErrorBanner'
 import ScreenTopbar from '../components/ScreenTopbar'
 import GlowBlob from '../components/GlowBlob'
+import HowToPlayModal from '../components/HowToPlayModal'
 
 /**
  * Screen 3: Team Select. Exclusive starter picker (deselect-first), a
@@ -372,6 +373,7 @@ function TeamSelectScreen() {
   // Starters the backend reported as taken by a rival (team:starter_rejected
   // with reason 'taken') — rendered as .mon-card--taken per Prototipos/3.
   const [takenStarterIds, setTakenStarterIds] = useState<number[]>([])
+  const [howToPlayOpen, setHowToPlayOpen] = useState(false)
 
   const loadCatalog = useCallback(() => {
     setError(null)
@@ -420,6 +422,16 @@ function TeamSelectScreen() {
         <button
           type="button"
           className="pd-btn pd-btn--ghost"
+          onClick={() => setHowToPlayOpen(true)}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            help
+          </span>
+          ¿CÓMO JUGAR?
+        </button>
+        <button
+          type="button"
+          className="pd-btn pd-btn--ghost"
           onClick={() => navigate('/lobby')}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
@@ -428,6 +440,8 @@ function TeamSelectScreen() {
           VOLVER
         </button>
       </ScreenTopbar>
+
+      {howToPlayOpen && <HowToPlayModal onClose={() => setHowToPlayOpen(false)} />}
 
       <main id="main-content" className="draft-main">
         <div className="draft-left pd-scroll">
