@@ -104,8 +104,8 @@ Estas mecánicas del juego original **NO** se implementan en esta versión:
 
 ## 7. Pendientes de definición antes de implementar
 
-- Lista concreta de los **50 pokémon** del catálogo y su tipo asignado (uno solo por pokémon). Criterio acordado: los **más populares/representativos**, buscando cubrir la mayor cantidad posible de los 18 tipos. *(Pendiente — se define en un siguiente paso.)*
-- Matriz de efectividad de tipos a usar (subset o tabla completa de 18 tipos).
+- Lista concreta de los **50 pokémon** del catálogo y su tipo asignado (uno solo por pokémon). Criterio acordado: los **más populares/representativos**, buscando cubrir la mayor cantidad posible de los 18 tipos. *(Resuelto 2026-08-31 — catálogo curado y seedeado: 54 pokémon en total, 50 del catálogo + 4 iniciales, en `backend/seed/seed-data.json`.)*
+- Matriz de efectividad de tipos a usar (subset o tabla completa de 18 tipos). *(Resuelto 2026-08-31 — matriz 18×18 completa, 324 filas, seedeada.)*
 
 ## 8. Arquitectura técnica
 

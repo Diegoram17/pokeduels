@@ -225,7 +225,7 @@ La decisión de fallar ruidosamente en vez de devolver daño corrupto (NaN) es c
 Evidence
 TECH-DESIGN §4.2 ("si ocurre, es un bug de seed — fallar ruidosamente"); §4.4 (calcularDaño llamado sin try/catch visible alrededor); ADR-0001 (instancia única, estado en memoria compartido).
 Attack scenario
-No es directamente disparable por un atacante si la constraint FK sobre type_effectiveness se sostiene como está diseñada (§3.1), pero cualquier hueco de seed, bug de migración, o combinación de tipos no anticipada durante la curación pendiente del catálogo de 50 pokémon (TECH-DESIGN §10, ítem abierto) tumbaría el proceso para todos los jugadores en plena partida.
+No es directamente disparable por un atacante si la constraint FK sobre type_effectiveness se sostiene como está diseñada (§3.1), pero cualquier hueco de seed, bug de migración, o combinación de tipos no anticipada (el catálogo — 54 pokémon — y la matriz 18×18 ya están curados y seedeados; corrección 2026-08-31, antes decía "curación pendiente, TECH-DESIGN §10 ítem abierto") tumbaría el proceso para todos los jugadores en plena partida.
 Potential impact
 Corte total de servicio para todos los jugadores concurrentes por una sola fila de datos mala o un caso borde, no acotado al duelo afectado.
 Existing mitigation

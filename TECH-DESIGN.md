@@ -282,7 +282,7 @@ function resolverRonda(duel, accionP1, accionP2) {
 | Método | Endpoint | Descripción |
 |---|---|---|
 | `POST` | `/api/session` | Crear sesión con nickname → devuelve `{ playerId, sessionToken }` |
-| `GET` | `/api/pokemons` | Catálogo (50 + 4 starters) con tipo y sprite |
+| `GET` | `/api/pokemons` | Catálogo (54 = 50 del catálogo + 4 starters) con tipo y sprite |
 | `GET` | `/api/type-effectiveness` | Matriz de tipos (para hints en UI) |
 | `GET` | `/api/rooms` | Salas en estado `waiting` con ocupación actual |
 | `POST` | `/api/rooms` | Crear sala (`max_players: 2\|4`) → devuelve `code` |
