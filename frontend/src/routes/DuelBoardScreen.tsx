@@ -393,38 +393,54 @@ function DuelBoardScreen() {
   const [showPostVictoryLead, setShowPostVictoryLead] = useState(false)
 
   // Post-round KO (QA-round-3): when the OPPONENT'S active is KO'd but the
-  // human still has a healthy active, the server marks the duel
-  // `awaiting_switch` for both sides. The human does not have to switch — so
-  // instead of forcing them onto /swap, offer a one-time keep-or-change
-  // modal. Keyed by turn so it prompts once per KO round.
+  // human still has a healthy active, offer a keep-or-change modal instead of
+  // forcing them onto /swap. Keyed by turn so it prompts once per KO round.
+  // It is triggered by the rival's fainted-count rising — NOT by the
+  // transient `awaiting_switch` phase, which a bot's instant auto-switch
+  // clears within ~1s — and it stays open until the player answers.
   const postRoundSwitchKeyRef = useRef<string | null>(null)
+  const rivalFaintedSeenRef = useRef<number | null>(null)
   const [showPostRoundSwitch, setShowPostRoundSwitch] = useState(false)
 
   // Bot actions are server-controlled (backend/ws/botManager.js + duelHandlers
   // auto-fill lead/turn/switch for bot players) — the client never impersonates
   // a bot on the human's socket.
 
-  // KO detection: the server snapshot flips the duel to awaiting_switch after a
-  // KO. If it was the HUMAN's active that fainted, they must pick a
-  // replacement -> forced swap. If the human still has an active (the opponent
-  // is the one switching), don't force anything — raise the keep-or-change
-  // modal once. Hooks run unconditionally (Rules of Hooks); the `duel`
-  // null-check lives in the effect body.
+  // KO detection.
   useEffect(() => {
     if (!duel) return
-    if (duel.phase !== 'awaiting_switch') {
+    if (duel.phase === 'finished' || duel.winnerId != null) {
       setShowPostRoundSwitch(false)
       return
     }
-    if (!humanActivePokemon(state)) {
+    // The HUMAN lost their active -> a genuine forced switch, no choice. This
+    // runs regardless of the KO-tracking baseline so a fresh mount straight
+    // into `awaiting_switch` still routes correctly.
+    if (duel.phase === 'awaiting_switch' && !humanActivePokemon(state)) {
       navigate('/swap?mode=forced', { replace: true })
       return
     }
-    const key = `${duel.duelId}:${duel.turnNumber}`
-    if (postRoundSwitchKeyRef.current !== key) {
-      postRoundSwitchKeyRef.current = key
-      setShowPostRoundSwitch(true)
+    const ownerId = Number(state.player.playerId)
+    const rivalFainted = state.duelPokemonState.filter(
+      (p) => p.ownerId !== ownerId && p.fainted,
+    ).length
+    // Baseline on the first snapshot / a fresh mount — never prompt for KOs
+    // that already happened before this render.
+    if (rivalFaintedSeenRef.current == null) {
+      rivalFaintedSeenRef.current = rivalFainted
+      return
     }
+    // A rival pokemon just fainted and the human still has an active -> raise
+    // the keep-or-change modal ONCE for this turn. It stays open until the
+    // player clicks (the bot's own instant auto-switch must not dismiss it).
+    if (rivalFainted > rivalFaintedSeenRef.current && humanActivePokemon(state)) {
+      const key = `${duel.duelId}:${duel.turnNumber}`
+      if (postRoundSwitchKeyRef.current !== key) {
+        postRoundSwitchKeyRef.current = key
+        setShowPostRoundSwitch(true)
+      }
+    }
+    rivalFaintedSeenRef.current = rivalFainted
   }, [duel, state, navigate])
 
   // QA-round-5: after CONTINUAR, the human stays in combat while the opponent
@@ -535,7 +551,10 @@ function DuelBoardScreen() {
   // Round-1 gate: the rival lead is not broadcast until the first
   // duel:turn_resolved, so the move grid must not wait on rivalActive.
   const canAct =
-    duel.phase === 'awaiting_actions' && Boolean(humanActive) && !replaying
+    duel.phase === 'awaiting_actions' &&
+    Boolean(humanActive) &&
+    !replaying &&
+    !showPostRoundSwitch
 
   const handleAttack = (index: MoveIndex) => {
     actions.submitAction(index)
