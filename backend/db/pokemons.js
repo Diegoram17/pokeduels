@@ -8,7 +8,7 @@ export async function listPokemons() {
   const { rows } = await pool.query(
     `SELECT id, name, type, pokeapi_id, sprite_url, back_sprite_url, is_starter
      FROM pokemons
-     ORDER BY id`,
+     ORDER BY pokeapi_id`,
   );
   return rows;
 }
