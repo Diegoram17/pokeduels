@@ -415,6 +415,11 @@ function WaitRoomScreen() {
           <PostDuelRematchPanel
             won={won}
             onRematch={() => {
+              // Drop the finished duel + stale roster so nothing from the last
+              // match survives into the rematch (the finish modal keys off
+              // duel.phase === 'finished' and would otherwise re-fire after
+              // team-select).
+              actions.clearDuel()
               actions.updateTeamSelection({ starterId: null, rosterIds: [] })
               setRematchDismissed(true)
               navigate('/team-select')

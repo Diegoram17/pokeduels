@@ -43,13 +43,13 @@ function makeFakeSocket(): Socket & { _fire: (event: string, payload?: unknown) 
 
 let fakeSocket: ReturnType<typeof makeFakeSocket>
 
-/** Probe route: surfaces the live teamSelection so a REVANCHA reset is observable. */
+/** Probe route: surfaces the live teamSelection + duel so a REVANCHA reset is observable. */
 function TeamSelectProbe() {
   const [state] = useMockState()
   const { starterId, rosterIds } = state.teamSelection
   return (
     <div data-testid="team-select-probe">
-      starter={starterId ?? 'none'} roster={rosterIds.length}
+      starter={starterId ?? 'none'} roster={rosterIds.length} duel={state.duel?.phase ?? 'none'}
     </div>
   )
 }
@@ -202,10 +202,31 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
       screen.getByRole('button', { name: /revancha/i }).click()
     })
 
-    // Routed to team-select, the stale roster cleared, and no room:ready emitted
-    // (each match now starts from a clean team pick).
-    expect(screen.getByTestId('team-select-probe')).toHaveTextContent('starter=none roster=0')
+    // Routed to team-select, the stale roster cleared, the finished duel cleared
+    // (so it can't re-trigger the win modal), and no room:ready emitted.
+    expect(screen.getByTestId('team-select-probe')).toHaveTextContent(
+      'starter=none roster=0 duel=none',
+    )
     expect(fakeSocket.emit).not.toHaveBeenCalledWith('room:ready', { ready: true })
+  })
+
+  it('shows no rematch panel once the finished duel has been cleared (post-REVANCHA return)', () => {
+    // State as it is after REVANCHA cleared the duel and the player picked a
+    // fresh team, then navigated team-select -> wait-room.
+    renderWaitRoom({
+      player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+      room: makeRoom(2),
+      teamSelection: { starterId: 99, rosterIds: [1, 2, 3, 10, 11] },
+      tournament: null,
+      duelPokemonState: [],
+      duel: null,
+      pendingDuelId: null,
+      finalRanking: null,
+      roomAborted: null,
+    })
+
+    expect(screen.queryByText('¡GANASTE EL DUELO!')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('rematch-panel')).not.toBeInTheDocument()
   })
 
   it('ENTRAR AL COMBATE joins via duel:join and only navigates once duel:state lands', () => {

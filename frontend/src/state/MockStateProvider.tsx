@@ -33,6 +33,8 @@ export interface MockStateActions {
   joinDuel(duelId: string): void
   /** Clears the room:aborted recovery banner (the player clicked "back to lobby"). */
   acknowledgeRoomAborted(): void
+  /** Drops a finished duel from state so a rematch starts clean (no stale finish modal). */
+  clearDuel(): void
   resetSession(): void
 }
 
@@ -166,6 +168,9 @@ export function MockStateProvider({ children }: { children: ReactNode }) {
       },
       acknowledgeRoomAborted: () => {
         dispatch({ type: 'roomAbortedAcknowledged' })
+      },
+      clearDuel: () => {
+        dispatch({ type: 'duelCleared' })
       },
       resetSession: () => {
         // "Play again" keeps the nickname/token but must drop the live WS
