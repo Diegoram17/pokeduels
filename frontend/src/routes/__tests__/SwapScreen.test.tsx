@@ -240,6 +240,15 @@ describe('SwapScreen — forced mode', () => {
     expect(screen.getByRole('button', { name: /snorlax/i })).toBeEnabled()
   })
 
+  it('re-requests the duel state and offers an escape when the forced roster is empty (QA-round-3)', () => {
+    renderSwapFromState({ ...buildForcedSwapState(), duelPokemonState: [] }, '/swap?mode=forced')
+
+    expect(screen.getByTestId('bench-empty')).toBeInTheDocument()
+    expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 42 })
+    // never trapped: a way back to the board exists even in forced mode.
+    expect(screen.getByRole('button', { name: /volver al combate/i })).toBeInTheDocument()
+  })
+
   it('emits duel:switch_decision with the numeric id and returns to the duel without local mutation', async () => {
     renderSwapFromState(buildForcedSwapState(), '/swap?mode=forced')
 

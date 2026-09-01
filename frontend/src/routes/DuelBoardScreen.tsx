@@ -153,19 +153,23 @@ function LeadPicker({
 
   return (
     <div className="lead-picker" data-testid="lead-picker">
-      <h2 className="pd-title" style={{ margin: 0 }}>
-        ELIGE TU PRIMER POKÉMON
-      </h2>
-      <p className="pd-body" style={{ margin: '8px 0 16px' }}>
-        Selecciona el Pokémon que abrirá el combate.
-      </p>
-      <p
-        data-testid="lead-countdown"
-        className="pd-stat pd-stat--xl"
-        style={{ color: 'var(--pd-yellow)', margin: '0 0 12px' }}
-      >
-        {String(remaining).padStart(2, '0')}
-      </p>
+      <div className="lead-picker__head">
+        <span
+          data-testid="lead-countdown"
+          className="lead-picker__count"
+          aria-label="Segundos restantes"
+        >
+          {String(remaining).padStart(2, '0')}
+        </span>
+        <div>
+          <h2 className="pd-title" style={{ margin: 0 }}>
+            ELIGE TU PRIMER POKÉMON
+          </h2>
+          <p className="pd-meta" style={{ margin: '2px 0 0' }}>
+            Selecciona el Pokémon que abrirá el combate.
+          </p>
+        </div>
+      </div>
       <div className="lead-grid">
         {roster.map((p) => (
           <button
@@ -281,6 +285,42 @@ function PostVictoryLeadModal({
 }
 
 /**
+ * QA-round-3: after winning a round exchange (the opponent's active was KO'd
+ * and they are switching), the human is NOT forced to swap. This in-combat
+ * modal lets them keep the current pokemon (CONTINUAR) or go to a voluntary
+ * swap (CAMBIAR POKÉMON) — no redirect is imposed.
+ */
+function PostRoundSwitchModal({
+  onContinue,
+  onChange,
+}: {
+  onContinue: () => void
+  onChange: () => void
+}) {
+  const continueRef = useRef<HTMLButtonElement>(null)
+  return (
+    <Modal ariaLabel="Ganaste el versus" onClose={onContinue} initialFocusRef={continueRef}>
+      <div data-testid="post-round-switch">
+        <h2 className="pd-title" style={{ marginBottom: 8 }}>
+          ¡GANASTE ESTE VERSUS!
+        </h2>
+        <p className="pd-body" style={{ marginBottom: 24 }}>
+          ¿Deseas mantener tu Pokémon actual o cambiarlo?
+        </p>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <button type="button" ref={continueRef} className="pd-btn pd-btn--primary" onClick={onContinue}>
+            CONTINUAR
+          </button>
+          <button type="button" className="pd-btn pd-btn--secondary" onClick={onChange}>
+            CAMBIAR POKÉMON
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+/**
  * Custom surrender confirmation (RF-7.7): a Tailwind/design-system modal
  * instead of the native window.confirm. Confirming emits duel:surrender,
  * canceling resumes it.
@@ -352,20 +392,40 @@ function DuelBoardScreen() {
   const postVictoryPromptedDuelIdRef = useRef<string | null>(null)
   const [showPostVictoryLead, setShowPostVictoryLead] = useState(false)
 
+  // Post-round KO (QA-round-3): when the OPPONENT'S active is KO'd but the
+  // human still has a healthy active, the server marks the duel
+  // `awaiting_switch` for both sides. The human does not have to switch — so
+  // instead of forcing them onto /swap, offer a one-time keep-or-change
+  // modal. Keyed by turn so it prompts once per KO round.
+  const postRoundSwitchKeyRef = useRef<string | null>(null)
+  const [showPostRoundSwitch, setShowPostRoundSwitch] = useState(false)
+
   // Bot actions are server-controlled (backend/ws/botManager.js + duelHandlers
   // auto-fill lead/turn/switch for bot players) — the client never impersonates
   // a bot on the human's socket.
 
-  // KO detection: the server snapshot flips the duel to awaiting_switch when
-  // the human active faints with bench remaining — send the player to the
-  // forced swap. Hooks must run unconditionally (Rules of Hooks), so the
-  // `duel` null-check lives inside the effect body.
+  // KO detection: the server snapshot flips the duel to awaiting_switch after a
+  // KO. If it was the HUMAN's active that fainted, they must pick a
+  // replacement -> forced swap. If the human still has an active (the opponent
+  // is the one switching), don't force anything — raise the keep-or-change
+  // modal once. Hooks run unconditionally (Rules of Hooks); the `duel`
+  // null-check lives in the effect body.
   useEffect(() => {
     if (!duel) return
-    if (duel.phase === 'awaiting_switch') {
-      navigate('/swap?mode=forced', { replace: true })
+    if (duel.phase !== 'awaiting_switch') {
+      setShowPostRoundSwitch(false)
+      return
     }
-  }, [duel, navigate])
+    if (!humanActivePokemon(state)) {
+      navigate('/swap?mode=forced', { replace: true })
+      return
+    }
+    const key = `${duel.duelId}:${duel.turnNumber}`
+    if (postRoundSwitchKeyRef.current !== key) {
+      postRoundSwitchKeyRef.current = key
+      setShowPostRoundSwitch(true)
+    }
+  }, [duel, state, navigate])
 
   // Duel finish routing (server-driven): 1v1 -> wait-room rematch panel;
   // bracket + final ranking -> ranking screen; bracket + no final ranking ->
@@ -461,7 +521,11 @@ function DuelBoardScreen() {
   )
 
   return (
-    <div className="pd-page duel-shell">
+    <div
+      className={`pd-page duel-shell${
+        duel.phase === 'lead_selection' ? ' duel-shell--lead' : ''
+      }`}
+    >
       <ScreenTopbar nickname={state.player.nickname}>
         <SurrenderButton onClick={() => setShowSurrender(true)} />
       </ScreenTopbar>
@@ -473,6 +537,16 @@ function DuelBoardScreen() {
             setShowSurrender(false)
           }}
           onCancel={() => setShowSurrender(false)}
+        />
+      )}
+
+      {showPostRoundSwitch && (
+        <PostRoundSwitchModal
+          onContinue={() => setShowPostRoundSwitch(false)}
+          onChange={() => {
+            setShowPostRoundSwitch(false)
+            navigate('/swap?mode=voluntary')
+          }}
         />
       )}
 

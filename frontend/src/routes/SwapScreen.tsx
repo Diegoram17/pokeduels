@@ -164,6 +164,19 @@ function SwapScreen() {
     }
   }, [pendingSwap, duelPokemonState, navigate])
 
+  // QA-round-3: the confirm above waits for the server's duel:state. If it
+  // never lands (dropped WS frame, backend hiccup) the player was stuck on a
+  // dead "CONFIRMAR CAMBIO" with no feedback. Release the pending state after
+  // a hard ceiling so they can retry instead of the screen freezing.
+  useEffect(() => {
+    if (pendingSwap == null) return
+    const id = setTimeout(() => {
+      setPendingSwap(null)
+      setSwitchError('sin_respuesta_del_servidor')
+    }, 7000)
+    return () => clearTimeout(id)
+  }, [pendingSwap])
+
   // If the server rejects the switch (duel:switch_rejected -> lastRejection
   // with moveIndex null), stay put and surface the reason so the player can
   // retry instead of bouncing back to the board with the old active pokemon.
@@ -180,6 +193,22 @@ function SwapScreen() {
     }
   }, [pendingSwap, duel])
 
+  // QA-round-3: forced mode with no selectable bench pokemon means the client
+  // is holding a stale/empty roster snapshot (a dropped duel:state) — the
+  // player would be trapped with nothing to click. Re-request the duel state
+  // once so the roster repopulates.
+  const resyncedRef = useRef(false)
+  useEffect(() => {
+    if (!duel || resyncedRef.current) return
+    if (searchParams.get('mode') !== 'forced') return
+    const mine = duelPokemonState.filter((p) => p.ownerId === Number(player.playerId))
+    const anySelectable = mine.some((p) => !p.isActive && !p.fainted && p.currentHp > 0)
+    if (!anySelectable) {
+      resyncedRef.current = true
+      actions.joinDuel(duel.duelId)
+    }
+  }, [duel, duelPokemonState, player.playerId, searchParams, actions])
+
   if (!duel) {
     return <Navigate to="/duel" replace />
   }
@@ -187,6 +216,7 @@ function SwapScreen() {
   const mode: SwapMode = searchParams.get('mode') === 'forced' ? 'forced' : 'voluntary'
   // Numeric server-issued identity: the player side matches Number(playerId).
   const myPokemon = duelPokemonState.filter((p) => p.ownerId === Number(player.playerId))
+  const hasSelectable = myPokemon.some((p) => !p.isActive && !p.fainted && p.currentHp > 0)
 
   const handleSelect = (pokemonId: number) => {
     setSelectedId((current) => (current === pokemonId ? null : pokemonId))
@@ -228,15 +258,36 @@ function SwapScreen() {
           </p>
           {switchError && (
             <p role="status" className="pd-label" style={{ color: 'var(--pd-danger)', textAlign: 'center', margin: '16px 0 0' }}>
-              CAMBIO RECHAZADO — {switchError.toUpperCase()}
+              {switchError === 'sin_respuesta_del_servidor'
+                ? 'SIN RESPUESTA DEL SERVIDOR — VOLVÉ A INTENTAR'
+                : `CAMBIO RECHAZADO — ${switchError.toUpperCase()}`}
             </p>
           )}
         </div>
 
-        <BenchList pokemon={myPokemon} selectedId={selectedId} onSelect={handleSelect} />
+        {mode === 'forced' && !hasSelectable ? (
+          <div className="bench-empty" role="status" data-testid="bench-empty">
+            <p className="pd-label" style={{ color: 'var(--pd-yellow)' }}>
+              SINCRONIZANDO EL EQUIPO…
+            </p>
+            <p className="pd-meta" style={{ marginTop: 8 }}>
+              No llegó la lista de Pokémon. Reintentando con el servidor.
+            </p>
+            <button
+              type="button"
+              className="pd-btn pd-btn--ghost"
+              style={{ marginTop: 16 }}
+              onClick={() => navigate('/duel')}
+            >
+              VOLVER AL COMBATE
+            </button>
+          </div>
+        ) : (
+          <BenchList pokemon={myPokemon} selectedId={selectedId} onSelect={handleSelect} />
+        )}
 
         <div className="switch-foot">
-          <ConfirmSwapButton disabled={!selectedId} onClick={handleConfirm} />
+          <ConfirmSwapButton disabled={!selectedId || pendingSwap != null} onClick={handleConfirm} />
         </div>
       </main>
     </div>

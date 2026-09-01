@@ -300,6 +300,57 @@ describe('DuelBoardScreen — lead selection', () => {
   })
 })
 
+describe('DuelBoardScreen — post-round KO (opponent switching)', () => {
+  // Rival active KO'd + rival has a live bench -> phase derives to
+  // awaiting_switch. The HUMAN still has a live active, so they are NOT forced
+  // onto /swap: a keep-or-change modal appears instead.
+  function fireOpponentKoSnapshot() {
+    act(() => {
+      fakeSocket._fire('duel:turn_resolved', {
+        duelId: 42,
+        turnNumber: 2,
+        winnerId: null,
+        endReason: null,
+        pokemonStates: [
+          { duelId: 42, ownerId: 10, pokemonId: 25, type: 'electric', currentHp: 60, ppMove1: 3, ppMove2: 4, ppMove3: 4, isActive: true, fainted: false },
+          { duelId: 42, ownerId: 11, pokemonId: 23, type: 'flying', currentHp: 0, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: true },
+          { duelId: 42, ownerId: 11, pokemonId: 5, type: 'normal', currentHp: 100, ppMove1: 4, ppMove2: 4, ppMove3: 4, isActive: false, fainted: false },
+        ],
+      })
+    })
+  }
+
+  it('shows the keep-or-change modal (no /swap redirect) when the human still has an active', () => {
+    renderBoard(2)
+    startRound1()
+    fireOpponentKoSnapshot()
+
+    expect(screen.getByTestId('post-round-switch')).toBeInTheDocument()
+    expect(screen.getByText('¡GANASTE ESTE VERSUS!')).toBeInTheDocument()
+    expect(screen.queryByText('SWAP-LANDED')).not.toBeInTheDocument()
+
+    act(() => {
+      screen.getByRole('button', { name: /continuar/i }).click()
+    })
+    expect(screen.queryByTestId('post-round-switch')).not.toBeInTheDocument()
+    expect(screen.queryByText('SWAP-LANDED')).not.toBeInTheDocument()
+  })
+
+  it('CAMBIAR POKÉMON from the modal goes to voluntary swap', () => {
+    renderBoard(2)
+    startRound1()
+    fireOpponentKoSnapshot()
+
+    const modal = screen.getByTestId('post-round-switch')
+    act(() => {
+      within(modal).getByRole('button', { name: /cambiar pokémon/i }).click()
+    })
+    // The modal routed to the swap screen (voluntary mode — see onChange).
+    expect(screen.getByText('SWAP-LANDED')).toBeInTheDocument()
+    expect(screen.queryByTestId('post-round-switch')).not.toBeInTheDocument()
+  })
+})
+
 describe('DuelBoardScreen — post-victory lead modal (bracket rounds)', () => {
   function nextRoundLeadSnapshot(): DuelSnapshot {
     return {
