@@ -66,11 +66,16 @@ function renderLobby() {
 beforeEach(() => {
   setSessionToken('token-1')
   vi.stubGlobal('fetch', vi.fn())
+  // Default: mark the session's rules modal as already seen so the bulk of the
+  // suite renders the lobby without the first-visit auto-open. The dedicated
+  // auto-open test clears this itself.
+  sessionStorage.setItem('pd:rules-seen', '1')
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
   setSessionToken(null)
+  sessionStorage.clear()
 })
 
 describe('LobbyScreen', () => {
@@ -254,6 +259,41 @@ describe('LobbyScreen', () => {
 
     expect(await screen.findByText('#AB12')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('auto-opens the rules modal on the first lobby visit of the session, not on later visits', async () => {
+    sessionStorage.clear()
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, []))
+
+    const { unmount } = renderLobby()
+    expect(
+      await screen.findByRole('dialog', { name: 'Reglas del juego' }),
+    ).toBeInTheDocument()
+    unmount()
+
+    renderLobby()
+    await screen.findByText('SALAS DE BATALLA')
+    expect(
+      screen.queryByRole('dialog', { name: 'Reglas del juego' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('polls GET /api/rooms on an interval so abandoned rooms drop off without a manual refresh', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse(200, waitingRooms))
+      renderLobby()
+      // initial load
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
+      const initialCalls = vi.mocked(fetch).mock.calls.length
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(7000)
+      })
+      expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(initialCalls)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('opens the Reglas del juego modal from the topbar button and closes it via CERRAR', async () => {

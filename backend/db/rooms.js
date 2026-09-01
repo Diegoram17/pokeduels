@@ -56,9 +56,14 @@ export async function createRoomWithCreator(maxPlayers, playerId) {
 
 /**
  * Lists rooms still waiting for players, each with its current occupancy
- * (count of room_players). Non-waiting rooms are excluded. Empty rooms are
- * deleted automatically when the last player leaves, so no stale cleanup
- * filter is needed here.
+ * (count of room_players). Non-waiting rooms are excluded.
+ *
+ * A `waiting` room is only shown while at least one seated player still holds
+ * a live WS connection (`room_players.connected = TRUE`). Explicit leaves
+ * delete an emptied room, but a plain disconnect only flips `connected` and
+ * relies on an in-memory 60s grace timer (lost on a process restart) — those
+ * "ghost" rooms would otherwise linger in the lobby. `reconcileStaleWaitingRooms`
+ * sweeps them at boot; this filter hides them immediately in between.
  */
 export async function listWaitingRooms() {
   const { rows } = await pool.query(
@@ -67,6 +72,10 @@ export async function listWaitingRooms() {
      FROM rooms r
      LEFT JOIN room_players rp ON rp.room_id = r.id
      WHERE r.status = 'waiting'
+       AND EXISTS (
+         SELECT 1 FROM room_players rpc
+         WHERE rpc.room_id = r.id AND rpc.connected = TRUE
+       )
      GROUP BY r.id
      ORDER BY r.created_at`,
   );

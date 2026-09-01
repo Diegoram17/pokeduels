@@ -210,6 +210,32 @@ describe('WaitRoomScreen — 1v1 PostDuelRematchPanel', () => {
     expect(screen.getByText('DUEL-LANDED')).toBeInTheDocument()
   })
 
+  it('REVANCHA dismisses the outcome overlay so the wait-room is usable again without a new duel:start', () => {
+    renderWaitRoom({
+      player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },
+      room: makeRoom(2),
+      teamSelection: { starterId: 25, rosterIds: [] },
+      tournament: null,
+      duelPokemonState: [],
+      duel: makeFinished1v1Duel('11'),
+      pendingDuelId: null,
+      finalRanking: null,
+      roomAborted: null,
+    })
+
+    expect(screen.getByText('PERDISTE EL DUELO')).toBeInTheDocument()
+
+    act(() => {
+      screen.getByRole('button', { name: /revancha/i }).click()
+    })
+
+    expect(
+      screen.queryByRole('dialog', { name: /duelo terminado/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^listo/i })).toBeInTheDocument()
+    expect(fakeSocket.emit).toHaveBeenCalledWith('room:ready', { ready: true })
+  })
+
   it('leaves the room to the lobby when the player chooses SALIR', async () => {
     renderWaitRoom({
       player: { nickname: 'Ash', playerId: '10', sessionToken: 'token-1' },

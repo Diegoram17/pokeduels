@@ -287,6 +287,17 @@ function WaitRoomScreen() {
   const room = state.room
   const [, forceUpdate] = useState(0)
 
+  // QA-round-2: the "PERDISTE/GANASTE EL DUELO" overlay used to have no exit —
+  // REVANCHA re-readied silently and the modal stayed up, so it read as "does
+  // nothing". Now REVANCHA also dismisses the overlay, dropping the player back
+  // into the wait-room (already server-reset to not-ready, then re-readied by
+  // the same click) to await the opponent — no trip back to the lobby.
+  const [rematchDismissed, setRematchDismissed] = useState(false)
+  const finishedDuelId = state.duel?.phase === 'finished' ? state.duel.duelId : null
+  useEffect(() => {
+    setRematchDismissed(false)
+  }, [finishedDuelId])
+
   if (!room) {
     return <Navigate to="/lobby" replace />
   }
@@ -296,7 +307,10 @@ function WaitRoomScreen() {
   const players = buildPlayerList(room)
 
   const showRematch =
-    !isTournament && state.duel?.phase === 'finished' && state.pendingDuelId === null
+    !isTournament &&
+    state.duel?.phase === 'finished' &&
+    state.pendingDuelId === null &&
+    !rematchDismissed
   const won = state.duel?.winnerId === state.player.playerId
 
   // Find current player's ready state from the room roster
@@ -399,7 +413,13 @@ function WaitRoomScreen() {
         </div>
 
         {showRematch && (
-          <PostDuelRematchPanel won={won} onRematch={() => actions.setReady(true)} />
+          <PostDuelRematchPanel
+            won={won}
+            onRematch={() => {
+              actions.setReady(true)
+              setRematchDismissed(true)
+            }}
+          />
         )}
       </main>
     </div>

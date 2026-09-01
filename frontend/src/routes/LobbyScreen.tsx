@@ -290,6 +290,27 @@ function LobbyScreen() {
     loadRooms()
   }, [loadRooms])
 
+  // Poll the room list while the lobby is mounted so abandoned/finished rooms
+  // drop off the view without a manual refresh (QA-round-2: "salas fantasma").
+  // GET /api/rooms already returns only rooms with a connected player.
+  useEffect(() => {
+    const id = window.setInterval(loadRooms, 7000)
+    return () => window.clearInterval(id)
+  }, [loadRooms])
+
+  // First lobby visit of the session: pop the rules modal automatically. The
+  // "Reglas del juego" button (below) still reopens it on demand.
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem('pd:rules-seen')) {
+        setRulesOpen(true)
+        sessionStorage.setItem('pd:rules-seen', '1')
+      }
+    } catch {
+      // sessionStorage unavailable (private mode / blocked) — skip the auto-open.
+    }
+  }, [])
+
   // Generic WS disconnect/reconnect banner (decision #1, obs #192): no
   // countdown of the backend grace window, manual retry only — the roster
   // restores from the next room:state automatically on reconnect.
