@@ -21,6 +21,7 @@ vi.mock('socket.io-client', () => ({
 import { disconnectSocket } from '../../../lib/socket'
 
 const SOCKET_EVENTS = [
+  'connect',
   'room:state',
   'duel:start',
   'duel:state',
@@ -105,7 +106,7 @@ describe('useDuelSocket', () => {
     expect((opts as { auth: { sessionToken: string } }).auth.sessionToken).toBe('token-1')
   })
 
-  it('subscribes exactly once to each of the 12 socket events', () => {
+  it('subscribes exactly once to each socket event (12 WS events + connect)', () => {
     mount('token-1')
     for (const event of SOCKET_EVENTS) {
       expect(fakeSocket.on).toHaveBeenCalledWith(event, expect.any(Function))
@@ -131,7 +132,7 @@ describe('useDuelSocket', () => {
     )
   })
 
-  it('unsubscribes all 12 events, disconnects and clears the refs on unmount', () => {
+  it('unsubscribes every event, disconnects and clears the refs on unmount', () => {
     const { unmount, pendingJoinRef } = mount('token-1', { pendingJoin: '7' })
     unmount()
     for (const event of SOCKET_EVENTS) {

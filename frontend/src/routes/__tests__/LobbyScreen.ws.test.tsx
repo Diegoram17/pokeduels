@@ -28,20 +28,26 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 function makeFakeSocket(): Socket & { _fire: (event: string, payload?: unknown) => void } {
-  const handlers = new Map<string, (payload?: unknown) => void>()
+  // Multi-listener per event (real socket.io semantics): LobbyScreen and
+  // useDuelSocket both subscribe to 'connect', so a single-slot map would
+  // silently drop one.
+  const handlers = new Map<string, Set<(payload?: unknown) => void>>()
   const fake = {
     on: vi.fn((event: string, handler: (payload?: unknown) => void) => {
-      handlers.set(event, handler)
+      const set = handlers.get(event) ?? new Set()
+      set.add(handler)
+      handlers.set(event, set)
       return fake
     }),
-    off: vi.fn((event: string) => {
-      handlers.delete(event)
+    off: vi.fn((event: string, handler?: (payload?: unknown) => void) => {
+      if (handler) handlers.get(event)?.delete(handler)
+      else handlers.delete(event)
       return fake
     }),
     emit: vi.fn(),
     disconnect: vi.fn(),
     _fire: (event: string, payload?: unknown) => {
-      handlers.get(event)?.(payload)
+      for (const handler of handlers.get(event) ?? []) handler(payload)
     },
   }
   return fake as unknown as Socket & { _fire: (event: string, payload?: unknown) => void }

@@ -66,18 +66,25 @@ export function useDuelSocket({
       socket.emit('duel:join', { duelId: Number(pendingJoin) })
     }
 
-    // Re-sync a persisted room membership on every (re)connect — mirrors the
-    // pendingJoinRef pattern above, but for rooms: loadMockState() can restore
-    // a room from a previous session, and without this the client never tells
-    // the server it's back, so it never receives a fresh room:state and every
-    // room:ready/leave silently no-ops (socket.data.roomId stays undefined).
-    const persistedRoomCode = stateRef.current.room?.code
-    if (persistedRoomCode) {
-      socket.emit('room:join', {
-        code: persistedRoomCode,
-        nickname: stateRef.current.player.nickname,
-      })
+    // Re-announce room + duel membership to the server. Runs on the first
+    // connection AND — via the 'connect' listener below — after every automatic
+    // reconnection. socket.io gives the reconnected client a BRAND-NEW server
+    // socket that is no longer in the `room:<id>` / `duel:<id>` broadcast rooms,
+    // so without re-announcing the client silently stops receiving room:state /
+    // duel:state (e.g. a mid-duel switch then hangs with no server response and
+    // the board stays stale). loadMockState() can also restore a room/duel from
+    // a previous session on a cold load.
+    const resyncMembership = () => {
+      const { room, duel, player } = stateRef.current
+      if (room?.code) {
+        socket.emit('room:join', { code: room.code, nickname: player.nickname })
+      }
+      if (duel && duel.phase !== 'finished') {
+        socket.emit('duel:join', { duelId: Number(duel.duelId) })
+      }
     }
+    resyncMembership()
+    socket.on('connect', resyncMembership)
 
     socket.on('room:state', (payload: unknown) => {
       const room = payload as {
@@ -216,6 +223,7 @@ export function useDuelSocket({
     })
 
     return () => {
+      socket.off('connect')
       socket.off('room:state')
       socket.off('duel:start')
       socket.off('duel:state')

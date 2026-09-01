@@ -371,6 +371,40 @@ describe('SwapScreen — voluntary mode', () => {
     expect(screen.getByText(/fainted/i)).toBeInTheDocument()
   })
 
+  it('resyncs the duel state when the server does not answer the switch, and only errors after the retry window', () => {
+    vi.useFakeTimers()
+    try {
+      renderSwapFromState(buildLiveVoluntaryState(), '/swap?mode=voluntary')
+
+      act(() => {
+        screen.getByRole('button', { name: /snorlax/i }).click()
+      })
+      act(() => {
+        screen.getByRole('button', { name: /confirmar cambio/i }).click()
+      })
+      expect(fakeSocket.emit).toHaveBeenCalledWith('duel:switch_decision', { duelId: 42, switchTo: 5 })
+
+      ;(fakeSocket.emit as unknown as ReturnType<typeof vi.fn>).mockClear()
+      // No duel:state / duel:switch_rejected arrives (a reconnect dropped our
+      // duel-room subscription). Mid-window, the screen forces a fresh snapshot
+      // + re-subscribe instead of just sitting dead.
+      act(() => {
+        vi.advanceTimersByTime(4000)
+      })
+      expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 42 })
+      expect(screen.queryByText(/SIN RESPUESTA DEL SERVIDOR/i)).not.toBeInTheDocument()
+
+      // Still nothing after the full window -> surface the hard error so the
+      // player can retry.
+      act(() => {
+        vi.advanceTimersByTime(6000)
+      })
+      expect(screen.getByText(/SIN RESPUESTA DEL SERVIDOR/i)).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not let a stale rejection block a second, different switch attempt', async () => {
     renderSwapFromState(buildLiveVoluntaryState(), '/swap?mode=voluntary')
 

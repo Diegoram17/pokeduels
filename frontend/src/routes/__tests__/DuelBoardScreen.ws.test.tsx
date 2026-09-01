@@ -756,7 +756,10 @@ describe('DuelBoardScreen — mid-duel reconnection (duel:join re-emit)', () => 
     expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 99 })
     const emitMock = fakeSocket.emit as unknown as ReturnType<typeof vi.fn>
     const joinCalls = emitMock.mock.calls.filter((call: unknown[]) => call[0] === 'duel:join')
-    expect(joinCalls).toHaveLength(2)
+    // The remount resyncs against the duel the client now holds (99), never
+    // reusing 42 from the previous mount — the last join targets 99.
+    expect(joinCalls.at(-1)?.[1]).toEqual({ duelId: 99 })
+    expect(joinCalls.some((c) => (c[1] as { duelId: number }).duelId === 99)).toBe(true)
   })
 
   it('does not re-emit duel:join for a finished duel (finish routing owns that state)', () => {

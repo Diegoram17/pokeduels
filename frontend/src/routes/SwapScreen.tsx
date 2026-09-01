@@ -157,6 +157,7 @@ function SwapScreen() {
   const [pendingSwap, setPendingSwap] = useState<number | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const { duel, duelPokemonState, player } = state
+  const duelId = duel?.duelId ?? null
   // Snapshot of lastRejection at submit time — a rejection left over from a
   // PREVIOUS attempt keeps the same object reference until a new snapshot or
   // rejection replaces it, so comparing by reference (not just moveIndex)
@@ -176,18 +177,27 @@ function SwapScreen() {
     }
   }, [pendingSwap, duelPokemonState, navigate])
 
-  // QA-round-3: the confirm above waits for the server's duel:state. If it
-  // never lands (dropped WS frame, backend hiccup) the player was stuck on a
-  // dead "CONFIRMAR CAMBIO" with no feedback. Release the pending state after
-  // a hard ceiling so they can retry instead of the screen freezing.
+  // The confirm above waits for the server's duel:state. If it never lands, the
+  // usual cause is a WS reconnect that dropped this client's duel-room
+  // subscription, so the server's post-switch broadcast reached nobody. Instead
+  // of just freezing then erroring, self-heal: at the mid-point force a fresh
+  // snapshot + re-subscribe (duel:join). If the switch actually landed, that
+  // snapshot flips the target to isActive and the confirm effect above
+  // navigates. Only if the retry also yields nothing do we surface the error.
   useEffect(() => {
-    if (pendingSwap == null) return
-    const id = setTimeout(() => {
+    if (pendingSwap == null || duelId == null) return
+    const resyncId = setTimeout(() => {
+      actions.joinDuel(duelId)
+    }, 4000)
+    const failId = setTimeout(() => {
       setPendingSwap(null)
       setSwitchError('sin_respuesta_del_servidor')
-    }, 7000)
-    return () => clearTimeout(id)
-  }, [pendingSwap])
+    }, 10000)
+    return () => {
+      clearTimeout(resyncId)
+      clearTimeout(failId)
+    }
+  }, [pendingSwap, duelId, actions])
 
   // If the server rejects the switch (duel:switch_rejected -> lastRejection
   // with moveIndex null), stay put and surface the reason so the player can

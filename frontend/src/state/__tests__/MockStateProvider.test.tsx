@@ -211,6 +211,73 @@ describe('MockStateProvider socket lifecycle', () => {
     })
   })
 
+  it('re-announces room:join AND duel:join on a socket reconnect so the broadcast rooms are restored', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      serializeMockState({
+        ...createInitialState(),
+        player: { nickname: 'Ash', playerId: 'p1', sessionToken: 'token-1' },
+        room: {
+          code: 'AB12',
+          maxPlayers: 2,
+          status: 'in_progress',
+          players: [{ playerId: 'p1', nickname: 'Ash', ready: true, connected: true }],
+        },
+        duel: {
+          duelId: '42',
+          slot: '1v1',
+          phase: 'awaiting_actions',
+          turnNumber: 1,
+          winnerId: null,
+          endReason: null,
+          opponentDisconnected: false,
+          lastRejection: null,
+        },
+      }),
+    )
+
+    renderProvider()
+    ;(fakeSocket.emit as unknown as ReturnType<typeof vi.fn>).mockClear()
+
+    // socket.io fires 'connect' again after every automatic reconnection; the
+    // fresh server socket is no longer in the room/duel broadcast rooms.
+    act(() => {
+      fakeSocket._fire('connect')
+    })
+
+    expect(fakeSocket.emit).toHaveBeenCalledWith('room:join', { code: 'AB12', nickname: 'Ash' })
+    expect(fakeSocket.emit).toHaveBeenCalledWith('duel:join', { duelId: 42 })
+  })
+
+  it('does not re-join a finished duel on reconnect', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      serializeMockState({
+        ...createInitialState(),
+        player: { nickname: 'Ash', playerId: 'p1', sessionToken: 'token-1' },
+        duel: {
+          duelId: '42',
+          slot: '1v1',
+          phase: 'finished',
+          turnNumber: 5,
+          winnerId: 'p1',
+          endReason: 'ko',
+          opponentDisconnected: false,
+          lastRejection: null,
+        },
+      }),
+    )
+
+    renderProvider()
+    ;(fakeSocket.emit as unknown as ReturnType<typeof vi.fn>).mockClear()
+
+    act(() => {
+      fakeSocket._fire('connect')
+    })
+
+    expect(fakeSocket.emit).not.toHaveBeenCalledWith('duel:join', expect.anything())
+  })
+
   it('clears the persisted room when the server rejects the rejoin (room:join_rejected)', () => {
     localStorage.setItem(
       STORAGE_KEY,
